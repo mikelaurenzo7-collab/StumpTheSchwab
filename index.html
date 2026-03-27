@@ -39,17 +39,21 @@
                 <!-- Populated by SynthPanel.js -->
             </aside>
 
-            <!-- Center: Sequencer / Piano Roll -->
+            <!-- Center: Sequencer / Piano Roll / Effects -->
             <main class="center-panel">
                 <div class="view-tabs">
                     <button class="tab-btn active" data-view="sequencer">STEP SEQUENCER</button>
                     <button class="tab-btn" data-view="pianoroll">PIANO ROLL</button>
+                    <button class="tab-btn" data-view="effects">EFFECTS</button>
                 </div>
                 <div id="sequencer-view" class="view active">
                     <!-- Populated by StepSequencer.js -->
                 </div>
                 <div id="pianoroll-view" class="view">
                     <!-- Populated by PianoRoll.js -->
+                </div>
+                <div id="effects-view" class="view">
+                    <!-- Populated by EffectsPanel.js -->
                 </div>
             </main>
 
@@ -71,9 +75,14 @@
                 <span id="status-scale">Scale: Natural Minor</span>
             </div>
             <div class="status-right">
+                <button class="status-action-btn" id="btn-save" title="Save Project">SAVE</button>
+                <button class="status-action-btn" id="btn-load" title="Load Project">LOAD</button>
+                <button class="status-action-btn accent" id="btn-export" title="Export Audio">EXPORT</button>
+                <span class="status-sep">|</span>
                 <span id="cpu-meter">CPU: <span id="cpu-value">0%</span></span>
                 <span class="status-sep">|</span>
-                <span>NOVA v1.0</span>
+                <button class="status-action-btn help-btn" id="btn-help" title="Keyboard Shortcuts (?)">?</button>
+                <span>NOVA v2.0</span>
             </div>
         </footer>
     </div>

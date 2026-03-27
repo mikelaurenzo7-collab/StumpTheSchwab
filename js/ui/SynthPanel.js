@@ -678,6 +678,7 @@ export default class SynthPanel {
         if (!selectEl) return;
         selectEl.value = name;
         this._root.querySelector('#preset-name').textContent = name || 'Init';
-        if (this._onPresetChange) this._onPresetChange(name);
+        // Do NOT fire _onPresetChange here — this is a UI-only update.
+        // The caller (App.js) already handles loading the preset into the engine.
     }
 }

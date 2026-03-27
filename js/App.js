@@ -14,6 +14,10 @@ import PianoRoll from './ui/PianoRoll.js';
 import MixerPanel from './ui/MixerPanel.js';
 import SynthPanel from './ui/SynthPanel.js';
 
+import EffectsPanel from './ui/EffectsPanel.js';
+import ProjectManager from './ProjectManager.js';
+import KeyboardHelp from './ui/KeyboardHelp.js';
+
 import Presets from './data/Presets.js';
 import Scales from './data/Scales.js';
 import DrumPatterns from './data/DrumPatterns.js';
@@ -29,6 +33,9 @@ class App {
         this.pianoRoll = null;
         this.mixer = null;
         this.synthPanel = null;
+        this.effectsPanel = null;
+        this.projectManager = null;
+        this.keyboardHelp = null;
 
         this.isInitialized = false;
         this.metronomeOn = false;
@@ -149,8 +156,11 @@ class App {
         this._wirePianoRoll();
         this._wireMixer();
         this._wireSynthPanel();
+        this._wireEffectsPanel();
         this._wireKeyboard();
         this._wireEngine();
+        this._wireProjectManager();
+        this._wireHelpButton();
 
         // 7. Load default state
         this._loadDefaults();
@@ -170,6 +180,9 @@ class App {
         this.pianoRoll = new PianoRoll(document.getElementById('pianoroll-view'));
         this.mixer = new MixerPanel(document.getElementById('mixer-panel'));
         this.synthPanel = new SynthPanel(document.getElementById('synth-panel'));
+        this.effectsPanel = new EffectsPanel(document.getElementById('effects-view'));
+        this.projectManager = new ProjectManager();
+        this.keyboardHelp = new KeyboardHelp();
     }
 
     // ── Wire: Transport ──
@@ -223,18 +236,29 @@ class App {
         this.sequencer.onGenreSelect((genre) => {
             const patterns = DrumPatterns.getByGenre(genre);
             if (patterns && patterns.length > 0) {
-                const pattern = patterns[0];
-                this.drums.loadPattern(pattern);
-                this.sequencer.setPattern(pattern.pattern);
-                if (pattern.bpm) {
-                    this.engine.setBPM(pattern.bpm);
-                    this.transport.setBPM(pattern.bpm);
+                const patternData = patterns[0];
+                // Load into drum machine (handles {v} objects internally)
+                this.drums.loadPattern(patternData.pattern);
+                // Convert {v} objects to raw velocity numbers for step sequencer UI
+                const uiPattern = {};
+                for (const [sound, steps] of Object.entries(patternData.pattern)) {
+                    uiPattern[sound] = steps.map(s => {
+                        if (s === null) return null;
+                        if (typeof s === 'object' && s.v !== undefined) return s.v;
+                        if (typeof s === 'number') return s;
+                        return null;
+                    });
                 }
-                if (pattern.swing != null) {
-                    this.engine.setSwing(pattern.swing);
-                    this.sequencer.setSwing(pattern.swing);
+                this.sequencer.setPattern(uiPattern);
+                if (patternData.bpm) {
+                    this.engine.setBPM(patternData.bpm);
+                    this.transport.setBPM(patternData.bpm);
                 }
-                this._updateStatus(`Loaded ${pattern.name} pattern`);
+                if (patternData.swing != null) {
+                    this.engine.setSwing(patternData.swing);
+                    this.sequencer.setSwing(patternData.swing);
+                }
+                this._updateStatus(`Loaded ${patternData.name} pattern`);
             }
         });
 
@@ -334,6 +358,20 @@ class App {
                 return;
             }
 
+            // ? = toggle keyboard help
+            if (e.key === '?' || (e.shiftKey && key === '/')) {
+                this.keyboardHelp.toggle();
+                return;
+            }
+
+            // Escape = close help overlay
+            if (key === 'escape') {
+                if (this.keyboardHelp.isVisible) {
+                    this.keyboardHelp.hide();
+                }
+                return;
+            }
+
             // Space = play/stop
             if (key === ' ') {
                 e.preventDefault();
@@ -430,6 +468,166 @@ class App {
             this.sequencer.clearHighlight();
             this.synth.allNotesOff();
         });
+    }
+
+    // ── Wire: Effects Panel ──
+    _wireEffectsPanel() {
+        this.effectsPanel.onParamChange((effectName, param, value) => {
+            switch (effectName) {
+                case 'eq':
+                    this.effects.setEQParam(param.split('.')[0], param.split('.')[1], value);
+                    break;
+                case 'distortion':
+                    this.effects.setDistortionParam(param, value);
+                    break;
+                case 'chorus':
+                    this.effects.setChorusParam(param, value);
+                    break;
+                case 'delay':
+                    this.effects.setDelayParam(param, value);
+                    break;
+                case 'reverb':
+                    this.effects.setReverbParam(param, value);
+                    break;
+                case 'compressor':
+                    this.effects.setCompressorParam(param, value);
+                    break;
+            }
+        });
+
+        this.effectsPanel.onBypassChange((effectName, bypassed) => {
+            this.effects.setBypass(effectName, bypassed);
+            this._updateStatus(`${effectName} ${bypassed ? 'bypassed' : 'enabled'}`);
+        });
+    }
+
+    // ── Wire: Project Manager ──
+    _wireProjectManager() {
+        const saveBtn = document.getElementById('btn-save');
+        const loadBtn = document.getElementById('btn-load');
+        const exportBtn = document.getElementById('btn-export');
+
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => {
+                const name = prompt('Project name:');
+                if (!name) return;
+                const state = this._gatherProjectState();
+                this.projectManager.saveProject(name, state);
+                this._updateStatus(`Saved: ${name}`);
+            });
+        }
+
+        if (loadBtn) {
+            loadBtn.addEventListener('click', () => {
+                const projects = this.projectManager.listProjects();
+                if (projects.length === 0) {
+                    this._updateStatus('No saved projects');
+                    return;
+                }
+                const names = projects.map((p, i) => `${i + 1}. ${p.name}`).join('\n');
+                const choice = prompt(`Load project:\n${names}\n\nEnter number:`);
+                if (!choice) return;
+                const idx = parseInt(choice, 10) - 1;
+                if (idx >= 0 && idx < projects.length) {
+                    const state = this.projectManager.loadProject(projects[idx].name);
+                    if (state) {
+                        this._restoreProjectState(state);
+                        this._updateStatus(`Loaded: ${projects[idx].name}`);
+                    }
+                }
+            });
+        }
+
+        if (exportBtn) {
+            exportBtn.addEventListener('click', () => {
+                if (this.projectManager._isRecording) {
+                    this.projectManager.stopRecording().then(blob => {
+                        this.projectManager.downloadRecording(blob, 'nova-export.webm');
+                        exportBtn.textContent = 'EXPORT';
+                        exportBtn.classList.remove('recording');
+                        this._updateStatus('Export saved');
+                    });
+                } else {
+                    this.projectManager.startRecording(
+                        this.engine.getAudioContext(),
+                        this.engine.getMasterGain()
+                    );
+                    exportBtn.textContent = 'STOP REC';
+                    exportBtn.classList.add('recording');
+                    this._updateStatus('Recording... click STOP REC when done');
+                }
+            });
+        }
+    }
+
+    _gatherProjectState() {
+        return {
+            bpm: this.engine.bpm,
+            swing: this.engine.swing,
+            timeSignature: { ...this.engine.timeSignature },
+            synthParams: this.synth.getParams(),
+            drumPatterns: this.drums.getPattern(),
+            drumPatternIndex: this.drums.currentPattern,
+            pianoRollNotes: this.pianoRoll ? this.pianoRoll.getNotes() : [],
+            mixerState: this.engine.channels.map(ch => ({
+                volume: ch.volume,
+                pan: ch.pan,
+                muted: ch.muted,
+                solo: ch.solo
+            })),
+            masterVolume: this.engine.masterGain.gain.value,
+            effectsState: this.effects.getAllParams()
+        };
+    }
+
+    _restoreProjectState(state) {
+        if (state.bpm) {
+            this.engine.setBPM(state.bpm);
+            this.transport.setBPM(state.bpm);
+        }
+        if (state.swing != null) {
+            this.engine.setSwing(state.swing);
+            this.sequencer.setSwing(state.swing);
+        }
+        if (state.synthParams) {
+            this.synth.loadPreset(state.synthParams);
+            this.synthPanel.setParams(state.synthParams);
+        }
+        if (state.drumPatterns) {
+            this.drums.loadPattern(state.drumPatterns);
+            this.sequencer.setPattern(state.drumPatterns);
+        }
+        if (state.pianoRollNotes) {
+            this.pianoRoll.setNotes(state.pianoRollNotes);
+            this._pianoRollNotes = state.pianoRollNotes;
+        }
+        if (state.mixerState) {
+            state.mixerState.forEach((ch, i) => {
+                this.engine.setChannelVolume(i, ch.volume);
+                this.engine.setChannelPan(i, ch.pan);
+                this.engine.setChannelMute(i, ch.muted);
+                this.engine.setChannelSolo(i, ch.solo);
+                this.mixer.setChannelVolume(i, ch.volume);
+                this.mixer.setChannelPan(i, ch.pan);
+                this.mixer.setChannelMute(i, ch.muted);
+                this.mixer.setChannelSolo(i, ch.solo);
+            });
+        }
+        if (state.masterVolume != null) {
+            this.engine.getMasterGain().gain.setValueAtTime(
+                state.masterVolume, this.engine.getAudioContext().currentTime
+            );
+        }
+    }
+
+    // ── Wire: Help Button ──
+    _wireHelpButton() {
+        const helpBtn = document.getElementById('btn-help');
+        if (helpBtn) {
+            helpBtn.addEventListener('click', () => {
+                this.keyboardHelp.toggle();
+            });
+        }
     }
 
     // ── Defaults ──
