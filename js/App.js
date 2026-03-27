@@ -15,8 +15,11 @@ import MixerPanel from './ui/MixerPanel.js';
 import SynthPanel from './ui/SynthPanel.js';
 
 import EffectsPanel from './ui/EffectsPanel.js';
+import ArrangementView from './ui/ArrangementView.js';
+import AIPanel from './ui/AIPanel.js';
 import ProjectManager from './ProjectManager.js';
 import KeyboardHelp from './ui/KeyboardHelp.js';
+import MusicBrain from './ai/MusicBrain.js';
 
 import Presets from './data/Presets.js';
 import Scales from './data/Scales.js';
@@ -34,6 +37,8 @@ class App {
         this.mixer = null;
         this.synthPanel = null;
         this.effectsPanel = null;
+        this.arrangementView = null;
+        this.aiPanel = null;
         this.projectManager = null;
         this.keyboardHelp = null;
 
@@ -112,9 +117,9 @@ class App {
                 const targetView = document.getElementById(`${view}-view`);
                 if (targetView) {
                     targetView.classList.add('active');
-                    // Resize piano roll canvas when switching to it
+                    // Resize canvases after layout completes
                     if (view === 'pianoroll' && this.pianoRoll) {
-                        this.pianoRoll.resize();
+                        requestAnimationFrame(() => this.pianoRoll.resize());
                     }
                 }
             });
@@ -129,11 +134,11 @@ class App {
         // 1. Create audio engine
         this.engine = new AudioEngine();
 
-        // 2. Create effects processor (available for send buses)
+        // 2. Create effects processor and insert into master bus chain
+        //    Audio path: channels → masterGain → [effects] → masterAnalyser → limiter → destination
         this.effects = new Effects(this.engine.getAudioContext());
-        // Effects are available as send effects via the mixer
-        // Connect effects output back to master gain
-        this.effects.output.connect(this.engine.getMasterGain());
+        this.engine.masterGain.disconnect(this.engine.masterAnalyser);
+        this.effects.connectChain(this.engine.masterGain, this.engine.masterAnalyser);
 
         // 3. Create synthesizer (routed to channel 0)
         this.synth = new Synthesizer(
@@ -157,6 +162,8 @@ class App {
         this._wireMixer();
         this._wireSynthPanel();
         this._wireEffectsPanel();
+        this._wireArrangement();
+        this._wireAIPanel();
         this._wireKeyboard();
         this._wireEngine();
         this._wireProjectManager();
@@ -181,6 +188,8 @@ class App {
         this.mixer = new MixerPanel(document.getElementById('mixer-panel'));
         this.synthPanel = new SynthPanel(document.getElementById('synth-panel'));
         this.effectsPanel = new EffectsPanel(document.getElementById('effects-view'));
+        this.arrangementView = new ArrangementView(document.getElementById('arrangement-view'));
+        this.aiPanel = new AIPanel(document.getElementById('ai-view'));
         this.projectManager = new ProjectManager();
         this.keyboardHelp = new KeyboardHelp();
     }
@@ -422,8 +431,8 @@ class App {
             // Metronome
             if (this.metronomeOn) {
                 const beatsPerBar = this.engine.timeSignature?.beats || 4;
-                const stepsPerBeat = 16 / beatsPerBar;
-                const isDownbeat = step % 16 === 0;
+                const stepsPerBeat = this.engine.totalSteps / beatsPerBar;
+                const isDownbeat = step === 0;
                 const isBeat = step % stepsPerBeat === 0;
                 if (isBeat) {
                     this.engine.playMetronome(time, isDownbeat);
@@ -433,8 +442,9 @@ class App {
             // Play piano roll notes at this step
             if (this._pianoRollNotes && this._pianoRollNotes.length > 0) {
                 const stepBeat = step / 4; // Convert step to beats (16 steps = 4 beats)
+                const stepBeatInt = Math.round(stepBeat * 1000);
                 this._pianoRollNotes.forEach(note => {
-                    if (Math.abs(note.start - stepBeat) < 0.001) {
+                    if (Math.round(note.start * 1000) === stepBeatInt) {
                         const durationSteps = note.duration * 4;
                         const durationSeconds = durationSteps * this.engine._getStepDuration(step);
                         this.synth.noteOn(note.midi, note.velocity || 0.8, time);
@@ -467,6 +477,150 @@ class App {
             this.transport.resetBeat();
             this.sequencer.clearHighlight();
             this.synth.allNotesOff();
+        });
+    }
+
+    // ── Wire: Arrangement View ──
+    _wireArrangement() {
+        this.arrangementView.onModeChange((mode) => {
+            this._updateStatus(`Mode: ${mode.toUpperCase()}`);
+        });
+
+        this.arrangementView.onSceneChange((barIndex, sceneData) => {
+            if (sceneData) {
+                // Load scene's drum pattern into drum machine
+                if (sceneData.drumPattern) {
+                    this.drums.loadPattern(sceneData.drumPattern);
+                }
+                // Load scene's synth notes for piano roll playback
+                if (sceneData.synthNotes) {
+                    this._pianoRollNotes = sceneData.synthNotes;
+                }
+            }
+        });
+    }
+
+    // ── Wire: AI Composer Panel ──
+    _wireAIPanel() {
+        this.aiPanel.onGenerateChords((key, scale, mood, bars) => {
+            const chords = MusicBrain.generateChords(key, scale, mood, bars);
+            // Convert chord notes to piano roll entries
+            const notes = [];
+            chords.forEach(chord => {
+                chord.notes.forEach(midi => {
+                    notes.push({
+                        midi,
+                        start: chord.start || 0,
+                        duration: chord.duration || 1,
+                        velocity: 0.7
+                    });
+                });
+            });
+            this.pianoRoll.setNotes(notes);
+            this._pianoRollNotes = notes;
+            this.aiPanel.setStatus(`Generated ${chords.length}-chord progression`);
+            this.aiPanel.pushHistory(`Chords: ${mood} in ${['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][key]} ${scale}`);
+            this._updateStatus('AI: Chord progression generated');
+        });
+
+        this.aiPanel.onGenerateMelody((chords, scale, key, density, bars) => {
+            const currentNotes = this.pianoRoll.getNotes();
+            const melody = MusicBrain.generateMelody(chords, scale, key, density, bars);
+            const allNotes = [...currentNotes, ...melody];
+            this.pianoRoll.setNotes(allNotes);
+            this._pianoRollNotes = allNotes;
+            this.aiPanel.setStatus(`Generated ${melody.length}-note melody`);
+            this.aiPanel.pushHistory(`Melody: ${density} density`);
+            this._updateStatus('AI: Melody generated');
+        });
+
+        this.aiPanel.onGenerateBassline((chords, genre, key) => {
+            const currentNotes = this.pianoRoll.getNotes();
+            const bassline = MusicBrain.generateBassline(chords, genre, key);
+            const allNotes = [...currentNotes, ...bassline];
+            this.pianoRoll.setNotes(allNotes);
+            this._pianoRollNotes = allNotes;
+            this.aiPanel.setStatus(`Generated ${bassline.length}-note bassline`);
+            this.aiPanel.pushHistory(`Bassline: ${genre}`);
+            this._updateStatus('AI: Bassline generated');
+        });
+
+        this.aiPanel.onGenerateBeat((genre, complexity, variation) => {
+            const pattern = MusicBrain.generateDrumPattern(genre, complexity, variation);
+            this.drums.loadPattern(pattern);
+            this.sequencer.setPattern(pattern);
+            this.aiPanel.setStatus(`Generated ${genre} beat (complexity ${complexity})`);
+            this.aiPanel.pushHistory(`Beat: ${genre} x${complexity}`);
+            this._updateStatus('AI: Drum pattern generated');
+        });
+
+        this.aiPanel.onSurprise(() => {
+            const genres = ['trap', 'house', 'boombap', 'rnb', 'lofi', 'pop'];
+            const moods = ['happy', 'sad', 'dark', 'epic', 'chill', 'dreamy'];
+            const scales = ['major', 'minor', 'dorian', 'pentatonic'];
+            const genre = genres[Math.floor(Math.random() * genres.length)];
+            const mood = moods[Math.floor(Math.random() * moods.length)];
+            const scale = scales[Math.floor(Math.random() * scales.length)];
+            const key = Math.floor(Math.random() * 12);
+
+            // Generate everything
+            const chords = MusicBrain.generateChords(key, scale, mood, 4);
+            const melody = MusicBrain.generateMelody(chords, scale, key, 'medium', 4);
+            const bassline = MusicBrain.generateBassline(chords, genre, key);
+            const beat = MusicBrain.generateDrumPattern(genre, 3, Math.random());
+
+            // Apply chord + melody + bass to piano roll
+            const notes = [];
+            chords.forEach(chord => {
+                chord.notes.forEach(midi => {
+                    notes.push({ midi, start: chord.start || 0, duration: chord.duration || 1, velocity: 0.65 });
+                });
+            });
+            const allNotes = [...notes, ...melody, ...bassline];
+            this.pianoRoll.setNotes(allNotes);
+            this._pianoRollNotes = allNotes;
+
+            // Apply beat
+            this.drums.loadPattern(beat);
+            this.sequencer.setPattern(beat);
+
+            // Apply mood
+            const moodParams = MusicBrain.getMoodParams(mood, 0.6);
+            if (moodParams.synth) {
+                for (const [param, value] of Object.entries(moodParams.synth)) {
+                    this.synth.setParam(`filter.${param === 'filterFrequency' ? 'frequency' : param}`, value);
+                }
+            }
+            if (moodParams.bpmRange?.suggested) {
+                this.engine.setBPM(moodParams.bpmRange.suggested);
+                this.transport.setBPM(moodParams.bpmRange.suggested);
+            }
+
+            const keyNames = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+            this.aiPanel.setStatus(`Surprise: ${mood} ${genre} in ${keyNames[key]} ${scale}`);
+            this.aiPanel.pushHistory(`Surprise: ${mood} ${genre}`);
+            this._updateStatus(`AI: Full ${mood} ${genre} track generated`);
+        });
+
+        this.aiPanel.onMoodChange((mood) => {
+            // Real-time mood parameter adjustment
+            const avgMood = (mood.dark_bright + mood.calm_energetic) / 200;
+            const moodName = avgMood < 0.3 ? 'dark' : avgMood < 0.5 ? 'chill' : avgMood < 0.7 ? 'happy' : 'epic';
+            const params = MusicBrain.getMoodParams(moodName, mood.calm_energetic / 100);
+            if (params.synth?.filterFrequency) {
+                this.synth.setParam('filter.frequency', params.synth.filterFrequency);
+            }
+            if (params.effects?.reverbWet !== undefined) {
+                this.effects.setReverbParam('wetDry', params.effects.reverbWet);
+                this.effects.setBypass('reverb', params.effects.reverbWet < 0.05);
+            }
+        });
+
+        this.aiPanel.onUndo(() => {
+            // Simple undo: clear piano roll
+            this.pianoRoll.clear();
+            this._pianoRollNotes = [];
+            this._updateStatus('AI: Undo');
         });
     }
 
@@ -503,61 +657,63 @@ class App {
 
     // ── Wire: Project Manager ──
     _wireProjectManager() {
-        const saveBtn = document.getElementById('btn-save');
-        const loadBtn = document.getElementById('btn-load');
-        const exportBtn = document.getElementById('btn-export');
+        // Use the ProjectManager's built-in modal UI
+        const pmContainer = document.getElementById('pm-trigger-container');
+        if (!pmContainer) return;
 
-        if (saveBtn) {
-            saveBtn.addEventListener('click', () => {
-                const name = prompt('Project name:');
-                if (!name) return;
-                const state = this._gatherProjectState();
-                this.projectManager.saveProject(name, state);
-                this._updateStatus(`Saved: ${name}`);
-            });
-        }
+        const hooks = this.projectManager.buildSaveLoadUI(pmContainer);
 
-        if (loadBtn) {
-            loadBtn.addEventListener('click', () => {
-                const projects = this.projectManager.listProjects();
-                if (projects.length === 0) {
-                    this._updateStatus('No saved projects');
-                    return;
-                }
-                const names = projects.map((p, i) => `${i + 1}. ${p.name}`).join('\n');
-                const choice = prompt(`Load project:\n${names}\n\nEnter number:`);
-                if (!choice) return;
-                const idx = parseInt(choice, 10) - 1;
-                if (idx >= 0 && idx < projects.length) {
-                    const state = this.projectManager.loadProject(projects[idx].name);
-                    if (state) {
-                        this._restoreProjectState(state);
-                        this._updateStatus(`Loaded: ${projects[idx].name}`);
-                    }
-                }
-            });
-        }
+        hooks.onSave((name) => {
+            const state = this._gatherProjectState();
+            this.projectManager.saveProject(name, state);
+            this._updateStatus(`Saved: ${name}`);
+        });
 
-        if (exportBtn) {
-            exportBtn.addEventListener('click', () => {
-                if (this.projectManager._isRecording) {
-                    this.projectManager.stopRecording().then(blob => {
-                        this.projectManager.downloadRecording(blob, 'nova-export.webm');
-                        exportBtn.textContent = 'EXPORT';
-                        exportBtn.classList.remove('recording');
-                        this._updateStatus('Export saved');
-                    });
-                } else {
-                    this.projectManager.startRecording(
-                        this.engine.getAudioContext(),
-                        this.engine.getMasterGain()
-                    );
-                    exportBtn.textContent = 'STOP REC';
-                    exportBtn.classList.add('recording');
-                    this._updateStatus('Recording... click STOP REC when done');
-                }
+        hooks.onLoad((name) => {
+            const state = this.projectManager.loadProject(name);
+            if (state) {
+                this._restoreProjectState(state);
+                this._updateStatus(`Loaded: ${name}`);
+            }
+        });
+
+        hooks.onExport(() => {
+            const state = this._gatherProjectState();
+            this.projectManager.exportProjectJSON(state, 'nova-project');
+            this._updateStatus('Project exported as JSON');
+        });
+
+        hooks.onImport((state, filename) => {
+            this._restoreProjectState(state);
+            this._updateStatus(`Imported: ${filename}`);
+        });
+
+        hooks.onRecord((action) => {
+            if (action === 'start') {
+                this.projectManager.startRecording(
+                    this.engine.getAudioContext(),
+                    this.engine.getMasterGain()
+                );
+                this._updateStatus('Recording...');
+            } else {
+                this.projectManager.stopRecording().then(blob => {
+                    this.projectManager.downloadRecording(blob, 'nova-recording');
+                    this._updateStatus('Recording saved');
+                });
+            }
+        });
+
+        hooks.onBounce((duration) => {
+            this._updateStatus(`Bouncing ${duration}s...`);
+            this.projectManager.bounceToWAV(
+                this.engine.getAudioContext(),
+                this.engine.getMasterGain(),
+                duration
+            ).then(blob => {
+                this.projectManager.downloadRecording(blob, 'nova-bounce.wav');
+                this._updateStatus('WAV bounce complete');
             });
-        }
+        });
     }
 
     _gatherProjectState() {

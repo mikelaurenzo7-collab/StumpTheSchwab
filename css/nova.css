@@ -247,6 +247,15 @@ html, body {
     border-bottom-color: var(--nova-accent);
 }
 
+.tab-btn-ai {
+    background: linear-gradient(135deg, rgba(123, 47, 255, 0.08), rgba(0, 212, 255, 0.08));
+}
+.tab-btn-ai.active {
+    color: var(--nova-accent-2);
+    border-bottom-color: var(--nova-accent-2);
+    background: linear-gradient(135deg, rgba(123, 47, 255, 0.15), rgba(0, 212, 255, 0.05));
+}
+
 /* ── Views ── */
 .view {
     display: none;
@@ -254,6 +263,7 @@ html, body {
     overflow: hidden;
 }
 .view.active { display: flex; flex-direction: column; flex: 1; }
+#arrangement-view, #ai-view { overflow-y: auto; overflow-x: hidden; }
 
 /* ═══════════════════════════════════════════════════
    TRANSPORT BAR
