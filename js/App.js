@@ -28,6 +28,8 @@ import MasteringChain from './engine/MasteringChain.js';
 import CollabManager from './CollabManager.js';
 import MIDIManager from './engine/MIDIManager.js';
 import UndoManager from './UndoManager.js';
+import AutomationEngine from './engine/AutomationEngine.js';
+import AutomationLane from './ui/AutomationLane.js';
 
 import Presets from './data/Presets.js';
 import Scales from './data/Scales.js';
@@ -59,6 +61,8 @@ class App {
         this.undoManager = null;
         this.projectManager = null;
         this.keyboardHelp = null;
+        this.automationEngine = null;
+        this.automationLane = null;
         this._masteringEnabled = false;
 
         this.isInitialized = false;
@@ -140,6 +144,9 @@ class App {
                     if (view === 'pianoroll' && this.pianoRoll) {
                         requestAnimationFrame(() => this.pianoRoll.resize());
                     }
+                    if (view === 'automation' && this.automationLane) {
+                        requestAnimationFrame(() => this.automationLane.resize());
+                    }
                 }
             });
         });
@@ -180,16 +187,19 @@ class App {
         // 4c. Create mastering chain (sits between effects output and analyser)
         this.mastering = new MasteringChain(this.engine.getAudioContext());
 
-        // 4d. Create undo manager
+        // 4d. Create automation engine
+        this.automationEngine = new AutomationEngine();
+
+        // 4e. Create undo manager
         this.undoManager = new UndoManager(50);
 
-        // 4e. Create MIDI manager
+        // 4f. Create MIDI manager
         this.midi = new MIDIManager();
         this.midi.init().then(ok => {
             if (ok) this._updateStatus('MIDI devices detected');
         });
 
-        // 4f. Create collab manager
+        // 4g. Create collab manager
         this.collab = new CollabManager();
 
         // 5. Create UI components
@@ -207,6 +217,7 @@ class App {
         this._wireSoundDesigner();
         this._wirePerformance();
         this._wireMastering();
+        this._wireAutomation();
         this._wireMIDI();
         this._wireUndo();
         this._wireCollab();
@@ -296,6 +307,10 @@ class App {
         this.spectrumAnalyzer.connectAnalyser(this.engine.masterAnalyser);
         this.performanceView = new PerformanceView(document.getElementById('performance-view'));
         this.soundDesigner = new SoundDesigner(document.getElementById('sound-designer-container'));
+        this.automationLane = new AutomationLane(
+            document.getElementById('automation-view'),
+            this.automationEngine
+        );
         this.projectManager = new ProjectManager();
         this.keyboardHelp = new KeyboardHelp();
     }
@@ -659,10 +674,17 @@ class App {
                 });
             }
 
+            // Evaluate automation at current beat position
+            const beatPosition = step / 4; // 16 steps = 4 beats
+            this.automationEngine.evaluate(beatPosition);
+
             // Update sequencer playhead (must be on UI thread)
             requestAnimationFrame(() => {
                 this.sequencer.highlightStep(step);
                 this.pianoRoll.setPlayheadPosition(step / 4);
+                if (this.automationLane) {
+                    this.automationLane.setPlayheadPosition(step / 4);
+                }
 
                 // Update beat indicators
                 const beatsPerBar = this.engine.timeSignature?.beats || 4;
@@ -679,6 +701,11 @@ class App {
             this.transport.resetBeat();
             this.sequencer.clearHighlight();
             this.synth.allNotesOff();
+            this.automationEngine.resetPlayback();
+            this.automationEngine.stopRecording();
+            if (this.automationLane) {
+                this.automationLane.setPlayheadPosition(-1);
+            }
         });
     }
 
@@ -1021,6 +1048,50 @@ class App {
         }
     }
 
+    // ── Wire: Automation ──
+    _wireAutomation() {
+        // Register the value callback — this is where automation drives parameters
+        this.automationEngine.onValue((paramPath, value, _normalized) => {
+            // Route automation values to the correct target
+            if (paramPath.startsWith('effects.')) {
+                // Effects automation: effects.reverb.wetDry → setReverbParam('wetDry', value)
+                const parts = paramPath.split('.');
+                const effectName = parts[1];
+                const param = parts[2];
+                switch (effectName) {
+                    case 'reverb':
+                        this.effects.setReverbParam(param, value);
+                        this.effects.setBypass('reverb', value < 0.01 && param === 'wetDry');
+                        break;
+                    case 'delay':
+                        this.effects.setDelayParam(param, value);
+                        this.effects.setBypass('delay', value < 0.01 && param === 'wetDry');
+                        break;
+                    case 'distortion':
+                        this.effects.setDistortionParam(param, value);
+                        break;
+                    case 'chorus':
+                        this.effects.setChorusParam(param, value);
+                        this.effects.setBypass('chorus', value < 0.01 && param === 'wetDry');
+                        break;
+                }
+            } else if (paramPath.startsWith('channel.')) {
+                // Channel automation: channel.0.volume → setChannelVolume(0, value)
+                const parts = paramPath.split('.');
+                const ch = parseInt(parts[1]);
+                const param = parts[2];
+                if (param === 'volume') {
+                    this.engine.setChannelVolume(ch, value);
+                } else if (param === 'pan') {
+                    this.engine.setChannelPan(ch, value);
+                }
+            } else {
+                // Synth param automation
+                this.synth.setParam(paramPath, value);
+            }
+        });
+    }
+
     // ── Wire: Effects Panel ──
     _wireEffectsPanel() {
         this.effectsPanel.onParamChange((effectName, param, value) => {
@@ -1129,7 +1200,9 @@ class App {
                 solo: ch.solo
             })),
             masterVolume: this.engine.masterGain.gain.value,
-            effectsState: this.effects.getAllParams()
+            effectsState: this.effects.getAllParams(),
+            automation: this.automationEngine.serialize(),
+            automationUI: this.automationLane ? this.automationLane.getState() : null
         };
     }
 
@@ -1170,6 +1243,12 @@ class App {
             this.engine.getMasterGain().gain.setValueAtTime(
                 state.masterVolume, this.engine.getAudioContext().currentTime
             );
+        }
+        if (state.automation) {
+            this.automationEngine.deserialize(state.automation);
+            if (this.automationLane) {
+                this.automationLane.restoreState(state.automationUI);
+            }
         }
     }
 

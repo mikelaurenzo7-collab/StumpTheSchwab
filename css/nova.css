@@ -1321,3 +1321,187 @@ html, body {
     .synth-panel { width: 220px; min-width: 220px; }
     .mixer-panel { width: 180px; min-width: 180px; }
 }
+
+/* ═══════════════════════════════════════════════════
+   AUTOMATION LANES
+   ═══════════════════════════════════════════════════ */
+.automation-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--nova-surface);
+    overflow: hidden;
+}
+
+.automation-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 12px;
+    background: var(--nova-surface-2);
+    border-bottom: 1px solid var(--nova-border);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.auto-tool-group,
+.auto-snap-group,
+.auto-interp-group,
+.auto-action-group,
+.auto-add-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.auto-tool-btn {
+    padding: 4px 10px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    background: transparent;
+    border: 1px solid var(--nova-border);
+    border-radius: var(--radius-sm);
+    color: var(--nova-text-dim);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+.auto-tool-btn:hover {
+    border-color: var(--nova-accent);
+    color: var(--nova-text);
+}
+.auto-tool-btn.active {
+    background: rgba(0, 212, 255, 0.1);
+    border-color: var(--nova-accent);
+    color: var(--nova-accent);
+    box-shadow: var(--shadow-glow);
+}
+
+.auto-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--nova-text-dim);
+    margin-right: 2px;
+}
+
+.auto-select {
+    padding: 3px 6px;
+    font-size: 11px;
+    background: var(--nova-surface);
+    border: 1px solid var(--nova-border);
+    border-radius: var(--radius-sm);
+    color: var(--nova-text);
+    cursor: pointer;
+    outline: none;
+}
+.auto-select:focus {
+    border-color: var(--nova-accent);
+}
+
+.auto-action-btn {
+    padding: 4px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    background: transparent;
+    border: 1px solid var(--nova-border);
+    border-radius: var(--radius-sm);
+    color: var(--nova-text-dim);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+.auto-action-btn:hover {
+    border-color: var(--nova-accent-2);
+    color: var(--nova-text);
+    background: rgba(123, 47, 255, 0.1);
+}
+
+.automation-canvas-wrap {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    min-height: 0;
+}
+
+.automation-canvas {
+    display: block;
+    width: 100%;
+    cursor: default;
+}
+
+/* Lane List */
+.automation-lane-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px 12px;
+    background: var(--nova-surface-2);
+    border-top: 1px solid var(--nova-border);
+    flex-shrink: 0;
+    min-height: 36px;
+}
+
+.automation-lane-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    background: var(--nova-surface-3);
+    border: 1px solid var(--nova-border);
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+}
+
+.auto-lane-color {
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    flex-shrink: 0;
+}
+
+.auto-lane-label {
+    color: var(--nova-text);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.auto-lane-btn {
+    padding: 2px 5px;
+    font-size: 9px;
+    font-weight: 700;
+    background: transparent;
+    border: 1px solid var(--nova-border);
+    border-radius: 2px;
+    color: var(--nova-text-dim);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    line-height: 1;
+}
+.auto-lane-btn:hover {
+    border-color: var(--nova-text-dim);
+    color: var(--nova-text);
+}
+
+.auto-lane-enable.active {
+    background: rgba(0, 255, 136, 0.15);
+    border-color: var(--nova-success);
+    color: var(--nova-success);
+}
+
+.auto-lane-arm.armed {
+    background: rgba(255, 51, 102, 0.2);
+    border-color: var(--nova-danger);
+    color: var(--nova-danger);
+    animation: recPulse 1s ease-in-out infinite;
+}
+
+@keyframes recPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.auto-lane-remove:hover {
+    border-color: var(--nova-danger);
+    color: var(--nova-danger);
+}

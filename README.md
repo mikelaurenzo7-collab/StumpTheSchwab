@@ -19,6 +19,7 @@ A talented musician with no software experience can open NOVA and produce a prof
 - **8-Channel Mixer** — Faders, pan, solo/mute, send buses, level meters
 - **Professional Effects** — EQ, Distortion, Chorus, Delay, Reverb, Compressor with per-effect bypass
 - **Arrangement View** — Scene management and pattern chaining for full song structure
+- **Automation Lanes** — Draw, erase, and record parameter automation curves with linear/smooth/step interpolation, snap-to-grid, and per-lane arm/bypass
 - **31 Synth Presets** — Bass, Lead, Pad, Keys, FX, and Synth categories
 
 ### AI Music Intelligence
@@ -95,7 +96,8 @@ nova/
 │   │   ├── Effects.js            6-effect processing chain
 │   │   ├── Sampler.js            Audio file player (8 slots)
 │   │   ├── MasteringChain.js     AI mastering engine
-│   │   └── MIDIManager.js        Web MIDI hardware support
+│   │   ├── MIDIManager.js        Web MIDI hardware support
+│   │   └── AutomationEngine.js   Parameter automation curves
 │   ├── ai/
 │   │   └── MusicBrain.js         Algorithmic music intelligence
 │   ├── ui/
@@ -110,6 +112,7 @@ nova/
 │   │   ├── SoundDesigner.js      NLP sound design interface
 │   │   ├── PerformanceView.js    Live clip launcher
 │   │   ├── SpectrumAnalyzer.js   Frequency + waveform display
+│   │   ├── AutomationLane.js     Automation curve editor (canvas)
 │   │   ├── KeyboardHelp.js       Shortcut overlay
 │   │   └── Onboarding.js         Interactive tutorial
 │   └── data/
