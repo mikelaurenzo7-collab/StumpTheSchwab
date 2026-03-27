@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NOVA — Music Production Studio</title>
+  <meta name="description" content="NOVA is a next-generation music production platform. Create professional music instantly.">
+  <link rel="stylesheet" href="css/nova.css">
+  <style>
+    /* Inline critical splash styles for instant render */
+    #splash-screen .loader {
+      width: 200px;
+      height: 3px;
+      background: var(--bg-tertiary);
+      border-radius: 2px;
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    #splash-screen .loader.visible {
+      opacity: 1;
+    }
+    #splash-screen .loader .loader-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+      border-radius: 2px;
+      transition: width 0.3s ease;
+    }
+    #splash-screen .version {
+      position: absolute;
+      bottom: 24px;
+      font-size: 11px;
+      color: var(--text-tertiary);
+      letter-spacing: 1px;
+    }
+    #splash-screen .shortcuts-hint {
+      color: var(--text-tertiary);
+      font-size: 11px;
+      margin-top: 8px;
+      opacity: 0;
+      transition: opacity 0.3s ease 0.5s;
+    }
+    #splash-screen .shortcuts-hint.visible {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <!-- Splash Screen -->
+  <div id="splash-screen">
+    <div class="logo">NOVA</div>
+    <div class="tagline">Music Production Studio</div>
+    <button class="start-btn" id="start-btn">Start Creating</button>
+    <div class="shortcuts-hint" id="shortcuts-hint">
+      Space: Play/Stop &nbsp;&bull;&nbsp; 1/2: Switch Views &nbsp;&bull;&nbsp; Click grid to make beats
+    </div>
+    <div class="loader" id="splash-loader">
+      <div class="loader-bar" id="splash-loader-bar"></div>
+    </div>
+    <div class="version">v1.0.0</div>
+  </div>
+
+  <!-- App Container -->
+  <div id="app"></div>
+
+  <script type="module">
+    import { App } from './js/ui/App.js';
+
+    const startBtn = document.getElementById('start-btn');
+    const splash = document.getElementById('splash-screen');
+    const loader = document.getElementById('splash-loader');
+    const loaderBar = document.getElementById('splash-loader-bar');
+    const shortcutsHint = document.getElementById('shortcuts-hint');
+
+    // Show shortcuts hint after brief delay
+    setTimeout(() => shortcutsHint.classList.add('visible'), 300);
+
+    let app = null;
+
+    startBtn.addEventListener('click', async () => {
+      startBtn.textContent = 'Loading...';
+      startBtn.disabled = true;
+      loader.classList.add('visible');
+
+      try {
+        // Progress simulation with real init
+        loaderBar.style.width = '20%';
+
+        app = new App();
+
+        loaderBar.style.width = '50%';
+        await app.init();
+
+        loaderBar.style.width = '100%';
+
+        // Short delay to show completion then hide splash
+        setTimeout(() => {
+          splash.classList.add('hidden');
+          // Remove from DOM after transition
+          setTimeout(() => {
+            splash.remove();
+          }, 600);
+        }, 300);
+
+      } catch (err) {
+        console.error('[NOVA] Failed to initialize:', err);
+        startBtn.textContent = 'Retry';
+        startBtn.disabled = false;
+        loaderBar.style.width = '0%';
+        loader.classList.remove('visible');
+
+        // Show error to user
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = 'color: var(--color-danger); font-size: 12px; margin-top: 12px; max-width: 400px; text-align: center;';
+        errorDiv.textContent = 'Something went wrong initializing the audio engine. Please try again.';
+
+        const existing = splash.querySelector('.error-msg');
+        if (existing) existing.remove();
+        errorDiv.className = 'error-msg';
+        splash.insertBefore(errorDiv, loader);
+      }
+    });
+
+    // Prevent accidental page leave when working
+    window.addEventListener('beforeunload', (e) => {
+      if (app && app.state.isPlaying) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+  </script>
+</body>
+</html>
