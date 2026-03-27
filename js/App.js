@@ -32,6 +32,8 @@ import UndoManager from './UndoManager.js';
 import Presets from './data/Presets.js';
 import Scales from './data/Scales.js';
 import DrumPatterns from './data/DrumPatterns.js';
+import SongTemplates from './data/SongTemplates.js';
+import Onboarding from './ui/Onboarding.js';
 
 class App {
     constructor() {
@@ -223,6 +225,62 @@ class App {
         this._startCPUMonitor();
 
         this._updateStatus('NOVA Initialized — Ready to create');
+
+        // 10. Start onboarding for first-time users
+        this.onboarding = new Onboarding();
+        if (!this.onboarding.isComplete()) {
+            setTimeout(() => this.onboarding.start(), 800);
+        }
+    }
+
+    // ── Load Song Template ──
+    loadTemplate(name) {
+        const template = SongTemplates.getByName(name);
+        if (!template) return;
+
+        // Apply BPM
+        this.engine.setBPM(template.bpm);
+        this.transport.setBPM(template.bpm);
+
+        // Apply swing
+        if (template.swing) {
+            this.engine.setSwing(template.swing);
+            this.sequencer.setSwing(template.swing);
+        }
+
+        // Apply synth preset
+        if (template.synthPreset) {
+            this.synth.loadPreset(template.synthPreset);
+            this.synthPanel.setParams(template.synthPreset);
+        }
+
+        // Apply drum pattern
+        if (template.drumPattern) {
+            this.drums.loadPattern(template.drumPattern);
+            this.sequencer.setPattern(template.drumPattern);
+        }
+
+        // Apply notes
+        if (template.notes && template.notes.length > 0) {
+            this.pianoRoll.setNotes(template.notes);
+            this._pianoRollNotes = template.notes;
+        }
+
+        // Apply effects
+        if (template.effects) {
+            if (template.effects.reverb && !template.effects.reverb.bypass) {
+                this.effects.setReverbParam('wetDry', template.effects.reverb.wetDry);
+                this.effects.setReverbParam('roomSize', template.effects.reverb.roomSize);
+                this.effects.setBypass('reverb', false);
+            }
+            if (template.effects.delay && !template.effects.delay.bypass) {
+                this.effects.setDelayParam('wetDry', template.effects.delay.wetDry);
+                this.effects.setDelayParam('feedback', template.effects.delay.feedback);
+                this.effects.setBypass('delay', false);
+            }
+        }
+
+        this._updateStatus(`Template loaded: ${template.name}`);
     }
 
     _initUI() {
