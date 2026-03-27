@@ -65,9 +65,14 @@
                 </div>
             </main>
 
-            <!-- Right Sidebar: Mixer -->
-            <aside id="mixer-panel" class="panel mixer-panel">
-                <!-- Populated by MixerPanel.js -->
+            <!-- Right Sidebar: Mixer + Visualizer -->
+            <aside class="panel mixer-panel" style="display:flex;flex-direction:column;">
+                <div id="mixer-panel" style="flex:1;overflow-y:auto;">
+                    <!-- Populated by MixerPanel.js -->
+                </div>
+                <div id="spectrum-analyzer" style="height:160px;min-height:100px;border-top:1px solid var(--nova-border);">
+                    <!-- Populated by SpectrumAnalyzer.js -->
+                </div>
             </aside>
         </div>
 

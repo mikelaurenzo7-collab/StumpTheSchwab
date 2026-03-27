@@ -17,9 +17,11 @@ import SynthPanel from './ui/SynthPanel.js';
 import EffectsPanel from './ui/EffectsPanel.js';
 import ArrangementView from './ui/ArrangementView.js';
 import AIPanel from './ui/AIPanel.js';
+import SpectrumAnalyzer from './ui/SpectrumAnalyzer.js';
 import ProjectManager from './ProjectManager.js';
 import KeyboardHelp from './ui/KeyboardHelp.js';
 import MusicBrain from './ai/MusicBrain.js';
+import Sampler from './engine/Sampler.js';
 
 import Presets from './data/Presets.js';
 import Scales from './data/Scales.js';
@@ -39,6 +41,8 @@ class App {
         this.effectsPanel = null;
         this.arrangementView = null;
         this.aiPanel = null;
+        this.spectrumAnalyzer = null;
+        this.sampler = null;
         this.projectManager = null;
         this.keyboardHelp = null;
 
@@ -152,6 +156,12 @@ class App {
             this.engine.getChannelOutput(4)
         );
 
+        // 4b. Create sampler (routed to channel 1)
+        this.sampler = new Sampler(
+            this.engine.getAudioContext(),
+            this.engine.getChannelOutput(1)
+        );
+
         // 5. Create UI components
         this._initUI();
 
@@ -190,6 +200,8 @@ class App {
         this.effectsPanel = new EffectsPanel(document.getElementById('effects-view'));
         this.arrangementView = new ArrangementView(document.getElementById('arrangement-view'));
         this.aiPanel = new AIPanel(document.getElementById('ai-view'));
+        this.spectrumAnalyzer = new SpectrumAnalyzer(document.getElementById('spectrum-analyzer'));
+        this.spectrumAnalyzer.connectAnalyser(this.engine.masterAnalyser);
         this.projectManager = new ProjectManager();
         this.keyboardHelp = new KeyboardHelp();
     }
@@ -502,45 +514,65 @@ class App {
 
     // ── Wire: AI Composer Panel ──
     _wireAIPanel() {
-        this.aiPanel.onGenerateChords((key, scale, mood, bars) => {
+        const KEY_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+        // Convert mood slider values to a mood string for MusicBrain
+        const moodFromSliders = (moodObj) => {
+            if (typeof moodObj === 'string') return moodObj;
+            const brightness = (moodObj?.dark_bright ?? 50) / 100;
+            const energy = (moodObj?.calm_energetic ?? 50) / 100;
+            if (brightness < 0.3 && energy < 0.4) return 'dark';
+            if (brightness < 0.3 && energy >= 0.4) return 'aggressive';
+            if (brightness < 0.5 && energy < 0.4) return 'sad';
+            if (brightness < 0.5) return 'chill';
+            if (brightness >= 0.7 && energy >= 0.7) return 'epic';
+            if (brightness >= 0.5 && energy < 0.4) return 'dreamy';
+            if (brightness >= 0.5 && energy >= 0.4) return 'happy';
+            return 'nostalgic';
+        };
+
+        // Store last generated chords for melody/bass generation
+        this._lastAIChords = [];
+
+        this.aiPanel.onGenerateChords((key, scale, moodObj, bars) => {
+            const mood = moodFromSliders(moodObj);
             const chords = MusicBrain.generateChords(key, scale, mood, bars);
-            // Convert chord notes to piano roll entries
+            this._lastAIChords = chords;
             const notes = [];
             chords.forEach(chord => {
                 chord.notes.forEach(midi => {
-                    notes.push({
-                        midi,
-                        start: chord.start || 0,
-                        duration: chord.duration || 1,
-                        velocity: 0.7
-                    });
+                    notes.push({ midi, start: chord.start || 0, duration: chord.duration || 1, velocity: 0.7 });
                 });
             });
             this.pianoRoll.setNotes(notes);
             this._pianoRollNotes = notes;
-            this.aiPanel.setStatus(`Generated ${chords.length}-chord progression`);
-            this.aiPanel.pushHistory(`Chords: ${mood} in ${['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][key]} ${scale}`);
-            this._updateStatus('AI: Chord progression generated');
+            this.aiPanel.setStatus(`Generated ${chords.length}-chord ${mood} progression`);
+            this.aiPanel.pushHistory(`Chords: ${mood} in ${KEY_NAMES[key]} ${scale}`);
+            this._updateStatus(`AI: ${mood} chord progression generated`);
         });
 
-        this.aiPanel.onGenerateMelody((chords, scale, key, density, bars) => {
+        this.aiPanel.onGenerateMelody((_chords, scale, key, density, bars) => {
+            const chords = this._lastAIChords.length > 0 ? this._lastAIChords : MusicBrain.generateChords(key, scale, 'chill', bars);
+            if (this._lastAIChords.length === 0) this._lastAIChords = chords;
             const currentNotes = this.pianoRoll.getNotes();
             const melody = MusicBrain.generateMelody(chords, scale, key, density, bars);
             const allNotes = [...currentNotes, ...melody];
             this.pianoRoll.setNotes(allNotes);
             this._pianoRollNotes = allNotes;
-            this.aiPanel.setStatus(`Generated ${melody.length}-note melody`);
+            this.aiPanel.setStatus(`Generated ${melody.length}-note ${density} melody`);
             this.aiPanel.pushHistory(`Melody: ${density} density`);
             this._updateStatus('AI: Melody generated');
         });
 
-        this.aiPanel.onGenerateBassline((chords, genre, key) => {
+        this.aiPanel.onGenerateBassline((_chords, genre, key) => {
+            const chords = this._lastAIChords.length > 0 ? this._lastAIChords : MusicBrain.generateChords(key, 'minor', 'chill', 4);
+            if (this._lastAIChords.length === 0) this._lastAIChords = chords;
             const currentNotes = this.pianoRoll.getNotes();
             const bassline = MusicBrain.generateBassline(chords, genre, key);
             const allNotes = [...currentNotes, ...bassline];
             this.pianoRoll.setNotes(allNotes);
             this._pianoRollNotes = allNotes;
-            this.aiPanel.setStatus(`Generated ${bassline.length}-note bassline`);
+            this.aiPanel.setStatus(`Generated ${bassline.length}-note ${genre} bassline`);
             this.aiPanel.pushHistory(`Bassline: ${genre}`);
             this._updateStatus('AI: Bassline generated');
         });
@@ -563,32 +595,50 @@ class App {
             const scale = scales[Math.floor(Math.random() * scales.length)];
             const key = Math.floor(Math.random() * 12);
 
-            // Generate everything
+            // Generate full track
             const chords = MusicBrain.generateChords(key, scale, mood, 4);
+            this._lastAIChords = chords;
             const melody = MusicBrain.generateMelody(chords, scale, key, 'medium', 4);
             const bassline = MusicBrain.generateBassline(chords, genre, key);
             const beat = MusicBrain.generateDrumPattern(genre, 3, Math.random());
 
-            // Apply chord + melody + bass to piano roll
-            const notes = [];
+            // Apply everything to piano roll
+            const chordNotes = [];
             chords.forEach(chord => {
                 chord.notes.forEach(midi => {
-                    notes.push({ midi, start: chord.start || 0, duration: chord.duration || 1, velocity: 0.65 });
+                    chordNotes.push({ midi, start: chord.start || 0, duration: chord.duration || 1, velocity: 0.65 });
                 });
             });
-            const allNotes = [...notes, ...melody, ...bassline];
+            const allNotes = [...chordNotes, ...melody, ...bassline];
             this.pianoRoll.setNotes(allNotes);
             this._pianoRollNotes = allNotes;
 
-            // Apply beat
+            // Apply drums
             this.drums.loadPattern(beat);
             this.sequencer.setPattern(beat);
 
-            // Apply mood
+            // Apply mood parameters to synth and effects
             const moodParams = MusicBrain.getMoodParams(mood, 0.6);
             if (moodParams.synth) {
-                for (const [param, value] of Object.entries(moodParams.synth)) {
-                    this.synth.setParam(`filter.${param === 'filterFrequency' ? 'frequency' : param}`, value);
+                this.synth.setParam('filter.frequency', moodParams.synth.filterFrequency);
+                this.synth.setParam('filter.Q', moodParams.synth.filterQ);
+                this.synth.setParam('ampEnv.attack', moodParams.synth.ampAttack);
+                this.synth.setParam('ampEnv.release', moodParams.synth.ampRelease);
+            }
+            if (moodParams.effects) {
+                this.effects.setReverbParam('wetDry', moodParams.effects.reverbWet);
+                this.effects.setReverbParam('roomSize', moodParams.effects.reverbSize);
+                this.effects.setBypass('reverb', moodParams.effects.reverbWet < 0.05);
+                this.effects.setDelayParam('wetDry', moodParams.effects.delayWet);
+                this.effects.setBypass('delay', moodParams.effects.delayWet < 0.05);
+                if (moodParams.effects.distortionAmount > 0.05) {
+                    this.effects.setDistortionParam('amount', moodParams.effects.distortionAmount);
+                    this.effects.setDistortionParam('wetDry', 0.5);
+                    this.effects.setBypass('distortion', false);
+                }
+                if (moodParams.effects.chorusWet > 0.05) {
+                    this.effects.setChorusParam('wetDry', moodParams.effects.chorusWet);
+                    this.effects.setBypass('chorus', false);
                 }
             }
             if (moodParams.bpmRange?.suggested) {
@@ -596,30 +646,34 @@ class App {
                 this.transport.setBPM(moodParams.bpmRange.suggested);
             }
 
-            const keyNames = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-            this.aiPanel.setStatus(`Surprise: ${mood} ${genre} in ${keyNames[key]} ${scale}`);
+            this.aiPanel.setStatus(`Surprise: ${mood} ${genre} in ${KEY_NAMES[key]} ${scale}`);
             this.aiPanel.pushHistory(`Surprise: ${mood} ${genre}`);
             this._updateStatus(`AI: Full ${mood} ${genre} track generated`);
         });
 
-        this.aiPanel.onMoodChange((mood) => {
-            // Real-time mood parameter adjustment
-            const avgMood = (mood.dark_bright + mood.calm_energetic) / 200;
-            const moodName = avgMood < 0.3 ? 'dark' : avgMood < 0.5 ? 'chill' : avgMood < 0.7 ? 'happy' : 'epic';
-            const params = MusicBrain.getMoodParams(moodName, mood.calm_energetic / 100);
+        this.aiPanel.onMoodChange((moodSliders) => {
+            const moodName = moodFromSliders(moodSliders);
+            const intensity = (moodSliders.calm_energetic ?? 50) / 100;
+            const params = MusicBrain.getMoodParams(moodName, intensity);
+
+            // Apply synth params in real-time
             if (params.synth?.filterFrequency) {
                 this.synth.setParam('filter.frequency', params.synth.filterFrequency);
             }
-            if (params.effects?.reverbWet !== undefined) {
+
+            // Apply effects
+            if (params.effects) {
                 this.effects.setReverbParam('wetDry', params.effects.reverbWet);
                 this.effects.setBypass('reverb', params.effects.reverbWet < 0.05);
+                this.effects.setChorusParam('wetDry', params.effects.chorusWet);
+                this.effects.setBypass('chorus', params.effects.chorusWet < 0.05);
             }
         });
 
         this.aiPanel.onUndo(() => {
-            // Simple undo: clear piano roll
             this.pianoRoll.clear();
             this._pianoRollNotes = [];
+            this._lastAIChords = [];
             this._updateStatus('AI: Undo');
         });
     }
