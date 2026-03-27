@@ -263,7 +263,7 @@ html, body {
     overflow: hidden;
 }
 .view.active { display: flex; flex-direction: column; flex: 1; }
-#arrangement-view, #ai-view { overflow-y: auto; overflow-x: hidden; }
+#arrangement-view, #ai-view, #performance-view { overflow-y: auto; overflow-x: hidden; }
 
 /* ═══════════════════════════════════════════════════
    TRANSPORT BAR

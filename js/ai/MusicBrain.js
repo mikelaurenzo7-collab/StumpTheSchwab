@@ -549,6 +549,255 @@ export default class MusicBrain {
         return closest;
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    //  6. AI SOUND DESIGNER — Natural Language → Synth Parameters
+    // ═══════════════════════════════════════════════════════════════
+
+    static designSound(description) {
+        const desc = description.toLowerCase();
+        const has = (word) => desc.includes(word);
+
+        // Start with neutral init patch
+        const patch = {
+            osc1: { type: 'sawtooth', octave: 0, detune: 0, gain: 0.8 },
+            osc2: { type: 'square', octave: 0, detune: 7, gain: 0.0 },
+            filter: { type: 'lowpass', frequency: 3000, Q: 1 },
+            filterEnv: { attack: 0.01, decay: 0.3, sustain: 0.4, release: 0.3, amount: 2000 },
+            ampEnv: { attack: 0.01, decay: 0.3, sustain: 0.7, release: 0.3 },
+            lfo: { type: 'sine', rate: 0, depth: 0, destination: 'none' },
+            glide: 0,
+            masterGain: 0.3
+        };
+
+        const effects = {
+            reverb: { wetDry: 0, roomSize: 0.3, bypass: true },
+            delay: { wetDry: 0, feedback: 0.2, bypass: true },
+            chorus: { wetDry: 0, rate: 1.5, depth: 0.5, bypass: true },
+            distortion: { amount: 0, wetDry: 0, bypass: true }
+        };
+
+        const matched = [];
+
+        // ── Tonal character ──
+        if (has('warm') || has('lush') || has('rich')) {
+            patch.osc1.type = 'sawtooth';
+            patch.osc2.gain = 0.4;
+            patch.osc2.detune = 12;
+            patch.filter.frequency = 4500;
+            patch.filter.Q = 0.8;
+            matched.push('warm');
+        }
+        if (has('bright') || has('crisp') || has('brilliant')) {
+            patch.filter.frequency = 8000;
+            patch.filter.Q = 1.5;
+            patch.filterEnv.amount = 5000;
+            patch.ampEnv.attack = 0.005;
+            matched.push('bright');
+        }
+        if (has('dark') || has('deep') || has('murky')) {
+            patch.filter.frequency = 600;
+            patch.filter.Q = 3;
+            patch.osc1.type = 'sawtooth';
+            patch.filterEnv.amount = 800;
+            effects.reverb.wetDry = 0.3;
+            effects.reverb.bypass = false;
+            matched.push('dark');
+        }
+        if (has('thin') || has('narrow') || has('nasal')) {
+            patch.filter.type = 'bandpass';
+            patch.filter.frequency = 1500;
+            patch.filter.Q = 8;
+            matched.push('thin');
+        }
+
+        // ── Instrument type ──
+        if (has('pad') || has('atmosphere') || has('ambient')) {
+            patch.ampEnv.attack = 0.5;
+            patch.ampEnv.decay = 1.0;
+            patch.ampEnv.sustain = 0.8;
+            patch.ampEnv.release = 2.0;
+            patch.filterEnv.attack = 0.3;
+            effects.reverb.wetDry = 0.4;
+            effects.reverb.roomSize = 0.7;
+            effects.reverb.bypass = false;
+            effects.chorus.wetDry = 0.2;
+            effects.chorus.bypass = false;
+            matched.push('pad');
+        }
+        if (has('bass') || has('sub') || has('low')) {
+            patch.osc1.octave = -1;
+            patch.osc2.octave = -1;
+            patch.filter.frequency = 300;
+            patch.filterEnv.amount = 500;
+            patch.ampEnv.decay = 0.4;
+            patch.ampEnv.sustain = 0.6;
+            matched.push('bass');
+        }
+        if (has('lead') || has('solo') || has('melody')) {
+            patch.filter.frequency = 5000;
+            patch.osc2.gain = 0.3;
+            patch.osc2.detune = 5;
+            patch.ampEnv.attack = 0.01;
+            patch.glide = 0.05;
+            matched.push('lead');
+        }
+        if (has('pluck') || has('stab') || has('hit')) {
+            patch.ampEnv.attack = 0.001;
+            patch.ampEnv.decay = 0.2;
+            patch.ampEnv.sustain = 0.0;
+            patch.ampEnv.release = 0.15;
+            patch.filterEnv.attack = 0.001;
+            patch.filterEnv.decay = 0.15;
+            patch.filterEnv.sustain = 0.0;
+            patch.filterEnv.amount = 6000;
+            matched.push('pluck');
+        }
+        if (has('key') || has('piano') || has('organ') || has('electric piano') || has('ep')) {
+            patch.osc1.type = 'sine';
+            patch.osc2.type = 'triangle';
+            patch.osc2.gain = 0.3;
+            patch.ampEnv.attack = 0.005;
+            patch.ampEnv.decay = 0.5;
+            patch.ampEnv.sustain = 0.3;
+            matched.push('keys');
+        }
+        if (has('bell') || has('chime') || has('metallic')) {
+            patch.osc1.type = 'sine';
+            patch.osc2.type = 'sine';
+            patch.osc2.octave = 1;
+            patch.osc2.gain = 0.5;
+            patch.osc2.detune = 1;
+            patch.ampEnv.decay = 1.5;
+            patch.ampEnv.sustain = 0.0;
+            patch.filter.frequency = 6000;
+            matched.push('bell');
+        }
+        if (has('string') || has('violin') || has('cello')) {
+            patch.osc1.type = 'sawtooth';
+            patch.osc2.type = 'sawtooth';
+            patch.osc2.gain = 0.5;
+            patch.osc2.detune = 8;
+            patch.ampEnv.attack = 0.15;
+            patch.ampEnv.release = 0.8;
+            patch.lfo.rate = 5;
+            patch.lfo.depth = 0.1;
+            patch.lfo.destination = 'pitch';
+            matched.push('strings');
+        }
+
+        // ── Era/style ──
+        if (has('80s') || has('retro') || has('synthwave') || has('vapor')) {
+            patch.osc1.type = 'sawtooth';
+            patch.osc2.type = 'square';
+            patch.osc2.gain = 0.4;
+            patch.osc2.detune = 10;
+            effects.chorus.wetDry = 0.3;
+            effects.chorus.bypass = false;
+            effects.delay.wetDry = 0.15;
+            effects.delay.feedback = 0.3;
+            effects.delay.bypass = false;
+            matched.push('80s');
+        }
+        if (has('lo-fi') || has('lofi') || has('vintage') || has('tape')) {
+            patch.filter.frequency = 2000;
+            patch.filter.Q = 0.5;
+            effects.chorus.wetDry = 0.1;
+            effects.chorus.bypass = false;
+            matched.push('lofi');
+        }
+        if (has('futuristic') || has('cyber') || has('digital') || has('glitch')) {
+            patch.osc1.type = 'square';
+            patch.osc2.type = 'sawtooth';
+            patch.filter.Q = 6;
+            patch.lfo.rate = 8;
+            patch.lfo.depth = 0.3;
+            patch.lfo.destination = 'filter';
+            effects.delay.wetDry = 0.2;
+            effects.delay.bypass = false;
+            matched.push('futuristic');
+        }
+
+        // ── Texture modifiers ──
+        if (has('shimmer') || has('sparkle') || has('glisten')) {
+            patch.osc2.octave = 1;
+            patch.osc2.gain = 0.25;
+            patch.osc2.type = 'triangle';
+            effects.reverb.wetDry = 0.5;
+            effects.reverb.roomSize = 0.8;
+            effects.reverb.bypass = false;
+            effects.chorus.wetDry = 0.15;
+            effects.chorus.bypass = false;
+            matched.push('shimmer');
+        }
+        if (has('aggressive') || has('harsh') || has('distorted') || has('dirty')) {
+            effects.distortion.amount = 0.4;
+            effects.distortion.wetDry = 0.5;
+            effects.distortion.bypass = false;
+            patch.filter.Q = 5;
+            patch.ampEnv.attack = 0.001;
+            matched.push('aggressive');
+        }
+        if (has('ethereal') || has('dreamy') || has('floating') || has('airy')) {
+            patch.ampEnv.attack = 0.4;
+            patch.ampEnv.release = 2.5;
+            effects.reverb.wetDry = 0.6;
+            effects.reverb.roomSize = 0.9;
+            effects.reverb.bypass = false;
+            patch.lfo.rate = 0.5;
+            patch.lfo.depth = 0.15;
+            patch.lfo.destination = 'filter';
+            matched.push('ethereal');
+        }
+        if (has('wobble') || has('dubstep') || has('wub')) {
+            patch.lfo.rate = 4;
+            patch.lfo.depth = 0.6;
+            patch.lfo.destination = 'filter';
+            patch.filter.Q = 8;
+            patch.filter.frequency = 1500;
+            matched.push('wobble');
+        }
+        if (has('brass') || has('horn') || has('trumpet')) {
+            patch.osc1.type = 'sawtooth';
+            patch.osc2.type = 'sawtooth';
+            patch.osc2.gain = 0.3;
+            patch.filter.frequency = 3000;
+            patch.filterEnv.amount = 4000;
+            patch.filterEnv.attack = 0.03;
+            patch.filterEnv.decay = 0.2;
+            patch.ampEnv.attack = 0.03;
+            matched.push('brass');
+        }
+        if (has('noise') || has('white noise') || has('wind') || has('texture')) {
+            // Simulate noise character with high-frequency content
+            patch.osc1.type = 'sawtooth';
+            patch.osc2.type = 'square';
+            patch.osc2.gain = 0.5;
+            patch.osc2.detune = 50;
+            patch.filter.type = 'bandpass';
+            patch.filter.frequency = 5000;
+            patch.filter.Q = 0.5;
+            matched.push('noise');
+        }
+        if (has('wide') || has('stereo') || has('huge') || has('massive')) {
+            patch.osc2.gain = 0.6;
+            patch.osc2.detune = 15;
+            effects.chorus.wetDry = 0.25;
+            effects.chorus.bypass = false;
+            effects.reverb.wetDry = 0.2;
+            effects.reverb.bypass = false;
+            matched.push('wide');
+        }
+
+        return {
+            patch,
+            effects,
+            matched,
+            description: matched.length > 0
+                ? `Designed: ${matched.join(' + ')}`
+                : 'No descriptors matched — using default patch'
+        };
+    }
+
     static _closestIndex(midi, scaleNotes) {
         let idx = 0;
         let minDist = Math.abs(midi - scaleNotes[0]);

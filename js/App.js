@@ -18,10 +18,13 @@ import EffectsPanel from './ui/EffectsPanel.js';
 import ArrangementView from './ui/ArrangementView.js';
 import AIPanel from './ui/AIPanel.js';
 import SpectrumAnalyzer from './ui/SpectrumAnalyzer.js';
+import PerformanceView from './ui/PerformanceView.js';
+import SoundDesigner from './ui/SoundDesigner.js';
 import ProjectManager from './ProjectManager.js';
 import KeyboardHelp from './ui/KeyboardHelp.js';
 import MusicBrain from './ai/MusicBrain.js';
 import Sampler from './engine/Sampler.js';
+import MasteringChain from './engine/MasteringChain.js';
 
 import Presets from './data/Presets.js';
 import Scales from './data/Scales.js';
@@ -42,9 +45,13 @@ class App {
         this.arrangementView = null;
         this.aiPanel = null;
         this.spectrumAnalyzer = null;
+        this.performanceView = null;
+        this.soundDesigner = null;
         this.sampler = null;
+        this.mastering = null;
         this.projectManager = null;
         this.keyboardHelp = null;
+        this._masteringEnabled = false;
 
         this.isInitialized = false;
         this.metronomeOn = false;
@@ -162,6 +169,9 @@ class App {
             this.engine.getChannelOutput(1)
         );
 
+        // 4c. Create mastering chain (sits between effects output and analyser)
+        this.mastering = new MasteringChain(this.engine.getAudioContext());
+
         // 5. Create UI components
         this._initUI();
 
@@ -174,6 +184,9 @@ class App {
         this._wireEffectsPanel();
         this._wireArrangement();
         this._wireAIPanel();
+        this._wireSoundDesigner();
+        this._wirePerformance();
+        this._wireMastering();
         this._wireKeyboard();
         this._wireEngine();
         this._wireProjectManager();
@@ -202,6 +215,8 @@ class App {
         this.aiPanel = new AIPanel(document.getElementById('ai-view'));
         this.spectrumAnalyzer = new SpectrumAnalyzer(document.getElementById('spectrum-analyzer'));
         this.spectrumAnalyzer.connectAnalyser(this.engine.masterAnalyser);
+        this.performanceView = new PerformanceView(document.getElementById('performance-view'));
+        this.soundDesigner = new SoundDesigner(document.getElementById('ai-view'));
         this.projectManager = new ProjectManager();
         this.keyboardHelp = new KeyboardHelp();
     }
@@ -676,6 +691,147 @@ class App {
             this._lastAIChords = [];
             this._updateStatus('AI: Undo');
         });
+    }
+
+    // ── Wire: Sound Designer ──
+    _wireSoundDesigner() {
+        this.soundDesigner.onDesign((description) => {
+            const result = MusicBrain.designSound(description);
+            // Apply synth patch
+            this.synth.loadPreset(result.patch);
+            this.synthPanel.setParams(result.patch);
+            // Apply effects
+            if (result.effects.reverb && !result.effects.reverb.bypass) {
+                this.effects.setReverbParam('wetDry', result.effects.reverb.wetDry);
+                this.effects.setReverbParam('roomSize', result.effects.reverb.roomSize);
+                this.effects.setBypass('reverb', false);
+            }
+            if (result.effects.delay && !result.effects.delay.bypass) {
+                this.effects.setDelayParam('wetDry', result.effects.delay.wetDry);
+                this.effects.setDelayParam('feedback', result.effects.delay.feedback);
+                this.effects.setBypass('delay', false);
+            }
+            if (result.effects.chorus && !result.effects.chorus.bypass) {
+                this.effects.setChorusParam('wetDry', result.effects.chorus.wetDry);
+                this.effects.setBypass('chorus', false);
+            }
+            if (result.effects.distortion && !result.effects.distortion.bypass) {
+                this.effects.setDistortionParam('amount', result.effects.distortion.amount);
+                this.effects.setDistortionParam('wetDry', result.effects.distortion.wetDry);
+                this.effects.setBypass('distortion', false);
+            }
+            this.soundDesigner.setResult(result);
+            this._updateStatus(`Sound designed: ${result.matched.join(' + ') || 'default'}`);
+        });
+
+        this.soundDesigner.onReapply((entry) => {
+            if (entry && entry.result) {
+                this.synth.loadPreset(entry.result.patch);
+                this.synthPanel.setParams(entry.result.patch);
+                this._updateStatus(`Re-applied: ${entry.description}`);
+            }
+        });
+    }
+
+    // ── Wire: Performance View ──
+    _wirePerformance() {
+        this.performanceView.onClipTrigger((row, col, clipData) => {
+            if (clipData) {
+                if (row === 0 && clipData.drumPattern) {
+                    this.drums.loadPattern(clipData.drumPattern);
+                    this.sequencer.setPattern(clipData.drumPattern);
+                }
+                if ((row === 1 || row === 2) && clipData.synthNotes) {
+                    this._pianoRollNotes = clipData.synthNotes;
+                }
+            }
+            this._updateStatus(`Clip launched: row ${row}, col ${col}`);
+        });
+
+        this.performanceView.onClipStop((row) => {
+            if (row === 0) {
+                this.drums.clearPattern();
+            }
+            if (row === 1 || row === 2) {
+                this._pianoRollNotes = [];
+            }
+            this._updateStatus(`Row ${row} stopped`);
+        });
+
+        this.performanceView.onMacroChange((macroName, value) => {
+            switch (macroName) {
+                case 'ATMOSPHERE':
+                    this.effects.setReverbParam('wetDry', value * 0.8);
+                    this.effects.setDelayParam('wetDry', value * 0.5);
+                    this.effects.setChorusParam('wetDry', value * 0.4);
+                    this.effects.setBypass('reverb', value < 0.05);
+                    this.effects.setBypass('delay', value < 0.05);
+                    this.effects.setBypass('chorus', value < 0.05);
+                    break;
+                case 'ENERGY':
+                    this.synth.setParam('filter.frequency', 1000 + value * 7000);
+                    if (value > 0.3) {
+                        this.effects.setDistortionParam('amount', (value - 0.3) * 0.43);
+                        this.effects.setDistortionParam('wetDry', 0.5);
+                        this.effects.setBypass('distortion', false);
+                    }
+                    break;
+                case 'SPACE':
+                    this.effects.setReverbParam('roomSize', 0.2 + value * 0.7);
+                    this.effects.setDelayParam('feedback', 0.1 + value * 0.4);
+                    break;
+                case 'GRIT':
+                    this.effects.setDistortionParam('amount', value * 0.6);
+                    this.effects.setDistortionParam('wetDry', value > 0.05 ? 0.5 : 0);
+                    this.effects.setBypass('distortion', value < 0.05);
+                    this.synth.setParam('filter.Q', 1 + value * 11);
+                    break;
+            }
+        });
+    }
+
+    // ── Wire: Mastering ──
+    _wireMastering() {
+        // Add mastering toggle to transport area
+        const transportInner = document.querySelector('.transport-inner');
+        if (transportInner) {
+            const masterBtn = document.createElement('button');
+            masterBtn.className = 'transport-btn';
+            masterBtn.id = 'btn-mastering';
+            masterBtn.title = 'Toggle Mastering';
+            masterBtn.textContent = 'M';
+            masterBtn.style.cssText = 'font-size:11px;font-weight:900;width:36px;height:36px;';
+
+            masterBtn.addEventListener('click', () => {
+                this._masteringEnabled = !this._masteringEnabled;
+                if (this._masteringEnabled) {
+                    // Insert mastering between effects output and analyser
+                    this.effects.output.disconnect(this.engine.masterAnalyser);
+                    this.mastering.connectChain(this.effects.output, this.engine.masterAnalyser);
+                    masterBtn.classList.add('active');
+                    masterBtn.style.background = 'rgba(123, 47, 255, 0.2)';
+                    masterBtn.style.borderColor = '#7b2fff';
+                    masterBtn.style.color = '#7b2fff';
+                    this._updateStatus('Mastering ON — Professional output enabled');
+                } else {
+                    this.mastering.disconnectChain();
+                    this.effects.output.connect(this.engine.masterAnalyser);
+                    masterBtn.classList.remove('active');
+                    masterBtn.style.background = '';
+                    masterBtn.style.borderColor = '';
+                    masterBtn.style.color = '';
+                    this._updateStatus('Mastering OFF');
+                }
+            });
+
+            // Insert before the master volume section
+            const masterSection = transportInner.querySelector('.transport-master');
+            if (masterSection) {
+                transportInner.insertBefore(masterBtn, masterSection);
+            } else {
+                transportInner.appendChild(masterBtn);
+            }
+        }
     }
 
     // ── Wire: Effects Panel ──
