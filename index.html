@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NOVA — Digital Audio Workstation</title>
+    <link rel="stylesheet" href="css/nova.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
+</head>
+<body>
+    <!-- Splash Screen -->
+    <div id="splash" class="splash">
+        <div class="splash-content">
+            <div class="splash-logo">
+                <span class="logo-n">N</span><span class="logo-o">O</span><span class="logo-v">V</span><span class="logo-a">A</span>
+            </div>
+            <div class="splash-subtitle">DIGITAL AUDIO WORKSTATION</div>
+            <div class="splash-tagline">Musicality First. Complexity Second.</div>
+            <button id="splash-start" class="splash-btn">
+                <span class="btn-glow"></span>
+                START CREATING
+            </button>
+            <div class="splash-hint">Click to initialize audio engine</div>
+        </div>
+        <div class="splash-particles" id="particles"></div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app" class="app hidden">
+        <!-- Header / Transport Bar -->
+        <header id="transport-bar" class="transport-bar">
+            <!-- Populated by TransportBar.js -->
+        </header>
+
+        <!-- Main Content Area -->
+        <div class="main-layout">
+            <!-- Left Sidebar: Synth Panel -->
+            <aside id="synth-panel" class="panel synth-panel">
+                <!-- Populated by SynthPanel.js -->
+            </aside>
+
+            <!-- Center: Sequencer / Piano Roll -->
+            <main class="center-panel">
+                <div class="view-tabs">
+                    <button class="tab-btn active" data-view="sequencer">STEP SEQUENCER</button>
+                    <button class="tab-btn" data-view="pianoroll">PIANO ROLL</button>
+                </div>
+                <div id="sequencer-view" class="view active">
+                    <!-- Populated by StepSequencer.js -->
+                </div>
+                <div id="pianoroll-view" class="view">
+                    <!-- Populated by PianoRoll.js -->
+                </div>
+            </main>
+
+            <!-- Right Sidebar: Mixer -->
+            <aside id="mixer-panel" class="panel mixer-panel">
+                <!-- Populated by MixerPanel.js -->
+            </aside>
+        </div>
+
+        <!-- Footer / Status Bar -->
+        <footer class="status-bar">
+            <div class="status-left">
+                <span class="status-indicator"></span>
+                <span id="status-text">NOVA Ready</span>
+            </div>
+            <div class="status-center">
+                <span id="status-key">Key: C Minor</span>
+                <span class="status-sep">|</span>
+                <span id="status-scale">Scale: Natural Minor</span>
+            </div>
+            <div class="status-right">
+                <span id="cpu-meter">CPU: <span id="cpu-value">0%</span></span>
+                <span class="status-sep">|</span>
+                <span>NOVA v1.0</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Load App -->
+    <script type="module" src="js/App.js"></script>
+</body>
+</html>
