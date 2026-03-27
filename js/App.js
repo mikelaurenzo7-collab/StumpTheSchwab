@@ -25,6 +25,9 @@ import KeyboardHelp from './ui/KeyboardHelp.js';
 import MusicBrain from './ai/MusicBrain.js';
 import Sampler from './engine/Sampler.js';
 import MasteringChain from './engine/MasteringChain.js';
+import CollabManager from './CollabManager.js';
+import MIDIManager from './engine/MIDIManager.js';
+import UndoManager from './UndoManager.js';
 
 import Presets from './data/Presets.js';
 import Scales from './data/Scales.js';
@@ -49,6 +52,9 @@ class App {
         this.soundDesigner = null;
         this.sampler = null;
         this.mastering = null;
+        this.collab = null;
+        this.midi = null;
+        this.undoManager = null;
         this.projectManager = null;
         this.keyboardHelp = null;
         this._masteringEnabled = false;
@@ -172,6 +178,18 @@ class App {
         // 4c. Create mastering chain (sits between effects output and analyser)
         this.mastering = new MasteringChain(this.engine.getAudioContext());
 
+        // 4d. Create undo manager
+        this.undoManager = new UndoManager(50);
+
+        // 4e. Create MIDI manager
+        this.midi = new MIDIManager();
+        this.midi.init().then(ok => {
+            if (ok) this._updateStatus('MIDI devices detected');
+        });
+
+        // 4f. Create collab manager
+        this.collab = new CollabManager();
+
         // 5. Create UI components
         this._initUI();
 
@@ -187,6 +205,9 @@ class App {
         this._wireSoundDesigner();
         this._wirePerformance();
         this._wireMastering();
+        this._wireMIDI();
+        this._wireUndo();
+        this._wireCollab();
         this._wireKeyboard();
         this._wireEngine();
         this._wireProjectManager();
@@ -212,11 +233,11 @@ class App {
         this.synthPanel = new SynthPanel(document.getElementById('synth-panel'));
         this.effectsPanel = new EffectsPanel(document.getElementById('effects-view'));
         this.arrangementView = new ArrangementView(document.getElementById('arrangement-view'));
-        this.aiPanel = new AIPanel(document.getElementById('ai-view'));
+        this.aiPanel = new AIPanel(document.getElementById('ai-panel-container'));
         this.spectrumAnalyzer = new SpectrumAnalyzer(document.getElementById('spectrum-analyzer'));
         this.spectrumAnalyzer.connectAnalyser(this.engine.masterAnalyser);
         this.performanceView = new PerformanceView(document.getElementById('performance-view'));
-        this.soundDesigner = new SoundDesigner(document.getElementById('ai-view'));
+        this.soundDesigner = new SoundDesigner(document.getElementById('sound-designer-container'));
         this.projectManager = new ProjectManager();
         this.keyboardHelp = new KeyboardHelp();
     }
@@ -378,6 +399,89 @@ class App {
         });
     }
 
+    // ── Wire: MIDI Manager ──
+    _wireMIDI() {
+        this.midi.onNoteOn((note, velocity) => {
+            this.synth.noteOn(note, velocity);
+        });
+        this.midi.onNoteOff((note) => {
+            this.synth.noteOff(note);
+        });
+        this.midi.onCC((cc, value) => {
+            // CC1 (mod wheel) → filter cutoff
+            if (cc === 1) {
+                this.synth.setParam('filter.frequency', 200 + value * 15000);
+            }
+            // CC74 → filter resonance
+            if (cc === 74) {
+                this.synth.setParam('filter.Q', value * 20);
+            }
+        });
+        this.midi.onMappedCC((paramPath, value) => {
+            this.synth.setParam(paramPath, value);
+        });
+    }
+
+    // ── Wire: Undo/Redo ──
+    _wireUndo() {
+        this.undoManager.onChange(({ canUndo, canRedo, undoDesc, redoDesc }) => {
+            const undoBtn = document.getElementById('btn-undo');
+            const redoBtn = document.getElementById('btn-redo');
+            if (undoBtn) {
+                undoBtn.disabled = !canUndo;
+                undoBtn.title = canUndo ? `Undo: ${undoDesc}` : 'Nothing to undo';
+            }
+            if (redoBtn) {
+                redoBtn.disabled = !canRedo;
+                redoBtn.title = canRedo ? `Redo: ${redoDesc}` : 'Nothing to redo';
+            }
+        });
+    }
+
+    // ── Wire: Collaboration ──
+    _wireCollab() {
+        // Build collab UI in status bar area
+        const collabContainer = document.getElementById('collab-container');
+        if (collabContainer) {
+            this.collab.buildUI(collabContainer);
+        }
+
+        this.collab.onTransport(({ action, bpm, swing }) => {
+            if (this.collab.getRole() === 'jammer') {
+                if (action === 'play') {
+                    this.engine.play();
+                    this.transport.setPlaying(true);
+                } else if (action === 'stop') {
+                    this.engine.stop();
+                    this.transport.setPlaying(false);
+                }
+                if (bpm) {
+                    this.engine.setBPM(bpm);
+                    this.transport.setBPM(bpm);
+                }
+                if (swing != null) this.engine.setSwing(swing);
+            }
+        });
+
+        this.collab.onDrumPattern((pattern) => {
+            this.drums.loadPattern(pattern);
+            this.sequencer.setPattern(pattern);
+        });
+
+        this.collab.onNotes((notes) => {
+            this.pianoRoll.setNotes(notes);
+            this._pianoRollNotes = notes;
+        });
+
+        this.collab.onSynthParam((param, value) => {
+            this.synth.setParam(param, value);
+        });
+
+        this.collab.onChat((peerId, message) => {
+            this._updateStatus(`[${peerId.slice(0,4)}]: ${message}`);
+        });
+    }
+
     // ── Wire: Keyboard (QWERTY → MIDI) ──
     _wireKeyboard() {
         document.addEventListener('keydown', (e) => {
@@ -391,6 +495,19 @@ class App {
                 this.baseOctave = parseInt(key);
                 this.keyboardMap = Scales.getKeyboardMap(this.baseOctave);
                 this._updateStatus(`Octave: ${this.baseOctave}`);
+                return;
+            }
+
+            // Ctrl+Z = undo, Ctrl+Shift+Z = redo
+            if ((e.ctrlKey || e.metaKey) && key === 'z') {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    const cmd = this.undoManager.redo();
+                    if (cmd) this._updateStatus(`Redo: ${cmd.description}`);
+                } else {
+                    const cmd = this.undoManager.undo();
+                    if (cmd) this._updateStatus(`Undo: ${cmd.description}`);
+                }
                 return;
             }
 
@@ -725,9 +842,9 @@ class App {
         });
 
         this.soundDesigner.onReapply((entry) => {
-            if (entry && entry.result) {
-                this.synth.loadPreset(entry.result.patch);
-                this.synthPanel.setParams(entry.result.patch);
+            if (entry && entry.patch) {
+                this.synth.loadPreset(entry.patch);
+                this.synthPanel.setParams(entry.patch);
                 this._updateStatus(`Re-applied: ${entry.description}`);
             }
         });
@@ -756,6 +873,18 @@ class App {
                 this._pianoRollNotes = [];
             }
             this._updateStatus(`Row ${row} stopped`);
+        });
+
+        this.performanceView.onCrossfade((value) => {
+            // Crossfade between A-side (columns 0-3) and B-side (columns 4-7)
+            // value 0 = full A, value 1 = full B
+            // Adjust channel volumes: A-side channels get (1-value), B-side get value
+            for (let i = 0; i < 4; i++) {
+                this.engine.setChannelVolume(i, (1 - value) * 0.8);
+            }
+            for (let i = 4; i < 8; i++) {
+                this.engine.setChannelVolume(i, value * 0.8);
+            }
         });
 
         this.performanceView.onMacroChange((macroName, value) => {

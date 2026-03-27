@@ -65,7 +65,8 @@
                     <!-- Populated by EffectsPanel.js -->
                 </div>
                 <div id="ai-view" class="view">
-                    <!-- Populated by AIPanel.js -->
+                    <div id="ai-panel-container" style="flex:1;overflow-y:auto;"></div>
+                    <div id="sound-designer-container" style="border-top:1px solid var(--nova-border);overflow-y:auto;"></div>
                 </div>
             </main>
 
@@ -92,12 +93,14 @@
                 <span id="status-scale">Scale: Natural Minor</span>
             </div>
             <div class="status-right">
+                <span id="collab-container"></span>
+                <span class="status-sep">|</span>
                 <span id="pm-trigger-container"></span>
                 <span class="status-sep">|</span>
                 <span id="cpu-meter">CPU: <span id="cpu-value">0%</span></span>
                 <span class="status-sep">|</span>
                 <button class="status-action-btn help-btn" id="btn-help" title="Keyboard Shortcuts (?)">?</button>
-                <span>NOVA v3.0</span>
+                <span>NOVA v3.3</span>
             </div>
         </footer>
     </div>
