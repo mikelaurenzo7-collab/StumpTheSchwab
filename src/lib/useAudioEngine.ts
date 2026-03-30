@@ -46,18 +46,59 @@ export function useAudioEngine() {
   const sequenceRef = useRef<Tone.Sequence | null>(null);
   const initializedRef = useRef(false);
 
+  // Effects refs
+  const reverbRef = useRef<Tone.Reverb | null>(null);
+  const delayRef = useRef<Tone.FeedbackDelay | null>(null);
+  const reverbSendRef = useRef<Tone.Gain | null>(null);
+  const delaySendRef = useRef<Tone.Gain | null>(null);
+  const masterGainRef = useRef<Tone.Gain | null>(null);
+
   const initAudio = useCallback(async () => {
     if (initializedRef.current) return;
     await Tone.start();
     initializedRef.current = true;
 
-    const tracks = useEngineStore.getState().tracks;
+    const state = useEngineStore.getState();
+    const tracks = state.tracks;
+
+    // Create master bus
+    const masterGain = new Tone.Gain(1).toDestination();
+    masterGainRef.current = masterGain;
+
+    // Create reverb send chain: sendGain → reverb → destination
+    const reverb = new Tone.Reverb({ decay: 2.5, preDelay: 0.01 });
+    await reverb.generate();
+    reverb.wet.value = 1; // Fully wet — send gain controls amount
+    reverb.toDestination();
+    const reverbSend = new Tone.Gain(state.reverbWet);
+    reverbSend.connect(reverb);
+    reverbRef.current = reverb;
+    reverbSendRef.current = reverbSend;
+
+    // Create delay send chain: sendGain → delay → destination
+    const delay = new Tone.FeedbackDelay({
+      delayTime: state.delayTime,
+      feedback: state.delayFeedback,
+      maxDelay: 2,
+    });
+    delay.wet.value = 1; // Fully wet — send gain controls amount
+    delay.toDestination();
+    const delaySend = new Tone.Gain(state.delayWet);
+    delaySend.connect(delay);
+    delayRef.current = delay;
+    delaySendRef.current = delaySend;
 
     // Create synths + gain nodes for each track
     synthsRef.current = [];
     gainNodesRef.current = [];
     tracks.forEach((track) => {
-      const gain = new Tone.Gain(track.volume).toDestination();
+      const gain = new Tone.Gain(track.volume);
+      // Dry path → master → destination
+      gain.connect(masterGain);
+      // Send paths → effects
+      gain.connect(reverbSend);
+      gain.connect(delaySend);
+
       const synth = createSynth(track.sound);
       synth.connect(gain);
       synthsRef.current.push(synth);
@@ -65,7 +106,7 @@ export function useAudioEngine() {
     });
   }, []);
 
-  // Sync BPM
+  // Sync BPM + swing
   useEffect(() => {
     const unsub = useEngineStore.subscribe((state) => {
       Tone.getTransport().bpm.value = state.bpm;
@@ -88,6 +129,22 @@ export function useAudioEngine() {
     return unsub;
   }, []);
 
+  // Sync effects parameters
+  useEffect(() => {
+    const unsub = useEngineStore.subscribe((state) => {
+      if (reverbSendRef.current) {
+        reverbSendRef.current.gain.value = state.reverbWet;
+      }
+      if (delaySendRef.current) {
+        delaySendRef.current.gain.value = state.delayWet;
+      }
+      if (delayRef.current) {
+        delayRef.current.feedback.value = state.delayFeedback;
+      }
+    });
+    return unsub;
+  }, []);
+
   // Playback control
   useEffect(() => {
     let prevPlaybackState = useEngineStore.getState().playbackState;
@@ -103,7 +160,7 @@ export function useAudioEngine() {
           sequenceRef.current.dispose();
         }
 
-        const { tracks, totalSteps, setCurrentStep } = useEngineStore.getState();
+        const { totalSteps, setCurrentStep } = useEngineStore.getState();
         const stepIndices = Array.from({ length: totalSteps }, (_, i) => i);
 
         transport.bpm.value = useEngineStore.getState().bpm;
@@ -156,6 +213,11 @@ export function useAudioEngine() {
       sequenceRef.current?.dispose();
       synthsRef.current.forEach((s) => s.dispose());
       gainNodesRef.current.forEach((g) => g.dispose());
+      reverbRef.current?.dispose();
+      delayRef.current?.dispose();
+      reverbSendRef.current?.dispose();
+      delaySendRef.current?.dispose();
+      masterGainRef.current?.dispose();
       Tone.getTransport().stop();
       Tone.getTransport().cancel();
     };
