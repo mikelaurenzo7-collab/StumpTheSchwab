@@ -13,6 +13,14 @@ export interface Track {
   solo: boolean;
 }
 
+// Snapshot captures the user-editable state for undo/redo
+interface Snapshot {
+  tracks: Track[];
+  bpm: number;
+  swing: number;
+  totalSteps: number;
+}
+
 export interface EngineState {
   // Transport
   bpm: number;
@@ -23,6 +31,12 @@ export interface EngineState {
 
   // Tracks
   tracks: Track[];
+
+  // History
+  _past: Snapshot[];
+  _future: Snapshot[];
+  canUndo: boolean;
+  canRedo: boolean;
 
   // Actions — transport
   setBpm: (bpm: number) => void;
@@ -42,10 +56,18 @@ export interface EngineState {
   setTrackVolume: (trackId: number, volume: number) => void;
   toggleMute: (trackId: number) => void;
   toggleSolo: (trackId: number) => void;
+
+  // Actions — history
+  undo: () => void;
+  redo: () => void;
+
+  // Actions — pattern loading
+  loadPattern: (pattern: { tracks: Track[]; bpm: number; swing: number; totalSteps: number }) => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────
 const INITIAL_STEPS = 16;
+const MAX_HISTORY = 50;
 
 function createTracks(totalSteps: number): Track[] {
   return DEFAULT_KIT.map((sound, i) => ({
@@ -58,6 +80,24 @@ function createTracks(totalSteps: number): Track[] {
   }));
 }
 
+function snapshot(state: EngineState): Snapshot {
+  return {
+    tracks: state.tracks.map((t) => ({ ...t, steps: [...t.steps] })),
+    bpm: state.bpm,
+    swing: state.swing,
+    totalSteps: state.totalSteps,
+  };
+}
+
+// Wraps a state update to push current state onto the undo stack
+function withHistory(
+  state: EngineState,
+  changes: Partial<EngineState>
+): Partial<EngineState> {
+  const past = [...state._past, snapshot(state)].slice(-MAX_HISTORY);
+  return { ...changes, _past: past, _future: [], canUndo: true, canRedo: false };
+}
+
 // ── Store ──────────────────────────────────────────────────────
 export const useEngineStore = create<EngineState>()((set) => ({
   bpm: 120,
@@ -67,8 +107,19 @@ export const useEngineStore = create<EngineState>()((set) => ({
   totalSteps: INITIAL_STEPS,
   tracks: createTracks(INITIAL_STEPS),
 
-  setBpm: (bpm) => set({ bpm: Math.max(30, Math.min(300, bpm)) }),
-  setSwing: (swing) => set({ swing: Math.max(0, Math.min(1, swing)) }),
+  _past: [],
+  _future: [],
+  canUndo: false,
+  canRedo: false,
+
+  setBpm: (bpm) =>
+    set((state) =>
+      withHistory(state, { bpm: Math.max(30, Math.min(300, bpm)) })
+    ),
+  setSwing: (swing) =>
+    set((state) =>
+      withHistory(state, { swing: Math.max(0, Math.min(1, swing)) })
+    ),
 
   play: () => set({ playbackState: "playing" }),
   pause: () => set({ playbackState: "paused" }),
@@ -76,39 +127,47 @@ export const useEngineStore = create<EngineState>()((set) => ({
   setCurrentStep: (step) => set({ currentStep: step }),
 
   toggleStep: (trackId, step) =>
-    set((state) => ({
-      tracks: state.tracks.map((t) =>
-        t.id === trackId
-          ? { ...t, steps: t.steps.map((s, i) => (i === step ? !s : s)) }
-          : t
-      ),
-    })),
+    set((state) =>
+      withHistory(state, {
+        tracks: state.tracks.map((t) =>
+          t.id === trackId
+            ? { ...t, steps: t.steps.map((s, i) => (i === step ? !s : s)) }
+            : t
+        ),
+      })
+    ),
 
   clearTrack: (trackId) =>
-    set((state) => ({
-      tracks: state.tracks.map((t) =>
-        t.id === trackId ? { ...t, steps: t.steps.map(() => false) } : t
-      ),
-    })),
+    set((state) =>
+      withHistory(state, {
+        tracks: state.tracks.map((t) =>
+          t.id === trackId ? { ...t, steps: t.steps.map(() => false) } : t
+        ),
+      })
+    ),
 
   clearAll: () =>
-    set((state) => ({
-      tracks: state.tracks.map((t) => ({
-        ...t,
-        steps: t.steps.map(() => false),
-      })),
-    })),
+    set((state) =>
+      withHistory(state, {
+        tracks: state.tracks.map((t) => ({
+          ...t,
+          steps: t.steps.map(() => false),
+        })),
+      })
+    ),
 
   setTotalSteps: (totalSteps) =>
-    set((state) => ({
-      totalSteps,
-      tracks: state.tracks.map((t) => ({
-        ...t,
-        steps: Array(totalSteps)
-          .fill(false)
-          .map((_, i) => t.steps[i] ?? false),
-      })),
-    })),
+    set((state) =>
+      withHistory(state, {
+        totalSteps,
+        tracks: state.tracks.map((t) => ({
+          ...t,
+          steps: Array(totalSteps)
+            .fill(false)
+            .map((_, i) => t.steps[i] ?? false),
+        })),
+      })
+    ),
 
   setTrackVolume: (trackId, volume) =>
     set((state) => ({
@@ -130,4 +189,44 @@ export const useEngineStore = create<EngineState>()((set) => ({
         t.id === trackId ? { ...t, solo: !t.solo } : t
       ),
     })),
+
+  undo: () =>
+    set((state) => {
+      if (state._past.length === 0) return state;
+      const prev = state._past[state._past.length - 1];
+      const newPast = state._past.slice(0, -1);
+      const newFuture = [snapshot(state), ...state._future].slice(0, MAX_HISTORY);
+      return {
+        ...prev,
+        _past: newPast,
+        _future: newFuture,
+        canUndo: newPast.length > 0,
+        canRedo: true,
+      };
+    }),
+
+  redo: () =>
+    set((state) => {
+      if (state._future.length === 0) return state;
+      const next = state._future[0];
+      const newFuture = state._future.slice(1);
+      const newPast = [...state._past, snapshot(state)].slice(-MAX_HISTORY);
+      return {
+        ...next,
+        _past: newPast,
+        _future: newFuture,
+        canUndo: true,
+        canRedo: newFuture.length > 0,
+      };
+    }),
+
+  loadPattern: (pattern) =>
+    set((state) =>
+      withHistory(state, {
+        tracks: pattern.tracks,
+        bpm: pattern.bpm,
+        swing: pattern.swing,
+        totalSteps: pattern.totalSteps,
+      })
+    ),
 }));

@@ -15,6 +15,10 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
   const clearAll = useEngineStore((s) => s.clearAll);
   const totalSteps = useEngineStore((s) => s.totalSteps);
   const setTotalSteps = useEngineStore((s) => s.setTotalSteps);
+  const undo = useEngineStore((s) => s.undo);
+  const redo = useEngineStore((s) => s.redo);
+  const canUndo = useEngineStore((s) => s.canUndo);
+  const canRedo = useEngineStore((s) => s.canRedo);
 
   const handlePlay = useCallback(async () => {
     await onInit();
@@ -54,6 +58,26 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
       >
         ⏹
       </button>
+
+      {/* Undo / Redo */}
+      <div className="flex items-center gap-0.5 ml-1">
+        <button
+          onClick={undo}
+          disabled={!canUndo}
+          className="w-8 h-8 rounded bg-surface-2 hover:bg-surface-3 text-muted hover:text-foreground flex items-center justify-center transition-colors text-sm disabled:opacity-25 disabled:cursor-default disabled:hover:bg-surface-2 disabled:hover:text-muted"
+          title="Undo (Ctrl+Z)"
+        >
+          ↩
+        </button>
+        <button
+          onClick={redo}
+          disabled={!canRedo}
+          className="w-8 h-8 rounded bg-surface-2 hover:bg-surface-3 text-muted hover:text-foreground flex items-center justify-center transition-colors text-sm disabled:opacity-25 disabled:cursor-default disabled:hover:bg-surface-2 disabled:hover:text-muted"
+          title="Redo (Ctrl+Shift+Z)"
+        >
+          ↪
+        </button>
+      </div>
 
       {/* BPM */}
       <div className="flex items-center gap-2">
