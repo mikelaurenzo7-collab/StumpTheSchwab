@@ -35,7 +35,7 @@ export interface MasterBus {
 export interface Track {
   id: number;
   sound: TrackSound;
-  steps: boolean[];
+  steps: number[]; // 0 = off, 0.25–1.0 = velocity
   volume: number; // 0-1
   muted: boolean;
   solo: boolean;
@@ -66,6 +66,7 @@ export interface EngineState {
 
   // Actions — sequencer
   toggleStep: (trackId: number, step: number) => void;
+  setStepVelocity: (trackId: number, step: number, velocity: number) => void;
   clearTrack: (trackId: number) => void;
   clearAll: () => void;
   setTotalSteps: (steps: number) => void;
@@ -110,11 +111,18 @@ const DEFAULT_MASTER: MasterBus = {
   limiterThreshold: -3,
 };
 
+export const VELOCITY_LEVELS = [1.0, 0.75, 0.5, 0.25] as const;
+
+export function nextVelocity(current: number): number {
+  const idx = VELOCITY_LEVELS.indexOf(current as (typeof VELOCITY_LEVELS)[number]);
+  return VELOCITY_LEVELS[(idx + 1) % VELOCITY_LEVELS.length];
+}
+
 function createTracks(totalSteps: number): Track[] {
   return DEFAULT_KIT.map((sound, i) => ({
     id: i,
     sound,
-    steps: Array(totalSteps).fill(false),
+    steps: Array(totalSteps).fill(0),
     volume: 0.75,
     muted: false,
     solo: false,
@@ -144,7 +152,16 @@ export const useEngineStore = create<EngineState>()((set) => ({
     set((state) => ({
       tracks: state.tracks.map((t) =>
         t.id === trackId
-          ? { ...t, steps: t.steps.map((s, i) => (i === step ? !s : s)) }
+          ? { ...t, steps: t.steps.map((s, i) => (i === step ? (s > 0 ? 0 : 1.0) : s)) }
+          : t
+      ),
+    })),
+
+  setStepVelocity: (trackId, step, velocity) =>
+    set((state) => ({
+      tracks: state.tracks.map((t) =>
+        t.id === trackId
+          ? { ...t, steps: t.steps.map((s, i) => (i === step ? velocity : s)) }
           : t
       ),
     })),
@@ -152,7 +169,7 @@ export const useEngineStore = create<EngineState>()((set) => ({
   clearTrack: (trackId) =>
     set((state) => ({
       tracks: state.tracks.map((t) =>
-        t.id === trackId ? { ...t, steps: t.steps.map(() => false) } : t
+        t.id === trackId ? { ...t, steps: t.steps.map(() => 0) } : t
       ),
     })),
 
@@ -160,7 +177,7 @@ export const useEngineStore = create<EngineState>()((set) => ({
     set((state) => ({
       tracks: state.tracks.map((t) => ({
         ...t,
-        steps: t.steps.map(() => false),
+        steps: t.steps.map(() => 0),
       })),
     })),
 
@@ -170,8 +187,8 @@ export const useEngineStore = create<EngineState>()((set) => ({
       tracks: state.tracks.map((t) => ({
         ...t,
         steps: Array(totalSteps)
-          .fill(false)
-          .map((_, i) => t.steps[i] ?? false),
+          .fill(0)
+          .map((_, i) => t.steps[i] ?? 0),
       })),
     })),
 

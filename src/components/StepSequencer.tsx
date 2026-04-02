@@ -1,27 +1,40 @@
 "use client";
 
-import { useEngineStore } from "@/store/engine";
+import { useEngineStore, nextVelocity } from "@/store/engine";
 import { useCallback, memo } from "react";
+
+// ── Velocity labels for tooltip ──────────────────────────────
+const velLabel = (v: number) =>
+  v >= 1 ? "Full" : v >= 0.75 ? "High" : v >= 0.5 ? "Med" : "Soft";
 
 // ── Single Step Cell ───────────────────────────────────────────
 const StepCell = memo(function StepCell({
-  active,
+  velocity,
   isCurrent,
   color,
   onClick,
+  onRightClick,
   beatStart,
 }: {
-  active: boolean;
+  velocity: number;
   isCurrent: boolean;
   color: string;
   onClick: () => void;
+  onRightClick: () => void;
   beatStart: boolean;
 }) {
+  const active = velocity > 0;
+
   return (
     <button
       onClick={onClick}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onRightClick();
+      }}
+      title={active ? `${velLabel(velocity)} (${Math.round(velocity * 100)}%) — right-click to adjust` : ""}
       className={`
-        w-8 h-8 rounded-sm transition-all duration-75 border
+        relative w-8 h-8 rounded-sm transition-all duration-75 border overflow-hidden
         ${beatStart ? "ml-1" : ""}
         ${
           active
@@ -31,12 +44,18 @@ const StepCell = memo(function StepCell({
         ${isCurrent && !active ? "ring-1 ring-accent/50" : ""}
         ${isCurrent && active ? "ring-1 ring-white/60 scale-105" : ""}
       `}
-      style={
-        active
-          ? { backgroundColor: color, opacity: isCurrent ? 1 : 0.75 }
-          : undefined
-      }
-    />
+    >
+      {active && (
+        <div
+          className="absolute bottom-0 left-0 right-0 rounded-sm transition-all duration-75"
+          style={{
+            backgroundColor: color,
+            height: `${velocity * 100}%`,
+            opacity: isCurrent ? 1 : 0.8,
+          }}
+        />
+      )}
+    </button>
   );
 });
 
@@ -48,14 +67,16 @@ const TrackRow = memo(function TrackRow({
   steps,
   currentStep,
   onToggleStep,
+  onCycleVelocity,
   onClearTrack,
 }: {
   trackId: number;
   name: string;
   color: string;
-  steps: boolean[];
+  steps: number[];
   currentStep: number;
   onToggleStep: (trackId: number, step: number) => void;
+  onCycleVelocity: (trackId: number, step: number) => void;
   onClearTrack: (trackId: number) => void;
 }) {
   return (
@@ -71,14 +92,15 @@ const TrackRow = memo(function TrackRow({
 
       {/* Steps */}
       <div className="flex items-center gap-0.5">
-        {steps.map((active, stepIdx) => (
+        {steps.map((velocity, stepIdx) => (
           <StepCell
             key={stepIdx}
-            active={active}
+            velocity={velocity}
             isCurrent={currentStep === stepIdx}
             color={color}
             beatStart={stepIdx > 0 && stepIdx % 4 === 0}
             onClick={() => onToggleStep(trackId, stepIdx)}
+            onRightClick={() => onCycleVelocity(trackId, stepIdx)}
           />
         ))}
       </div>
@@ -100,11 +122,26 @@ export function StepSequencer() {
   const tracks = useEngineStore((s) => s.tracks);
   const currentStep = useEngineStore((s) => s.currentStep);
   const toggleStep = useEngineStore((s) => s.toggleStep);
+  const setStepVelocity = useEngineStore((s) => s.setStepVelocity);
   const clearTrack = useEngineStore((s) => s.clearTrack);
 
   const handleToggle = useCallback(
     (trackId: number, step: number) => toggleStep(trackId, step),
     [toggleStep]
+  );
+
+  const handleCycleVelocity = useCallback(
+    (trackId: number, step: number) => {
+      const track = useEngineStore.getState().tracks[trackId];
+      const current = track.steps[step];
+      if (current > 0) {
+        setStepVelocity(trackId, step, nextVelocity(current));
+      } else {
+        // If step is off, right-click activates at soft velocity
+        setStepVelocity(trackId, step, 0.25);
+      }
+    },
+    [setStepVelocity]
   );
 
   const handleClear = useCallback(
@@ -142,6 +179,7 @@ export function StepSequencer() {
             steps={track.steps}
             currentStep={currentStep}
             onToggleStep={handleToggle}
+            onCycleVelocity={handleCycleVelocity}
             onClearTrack={handleClear}
           />
         ))}

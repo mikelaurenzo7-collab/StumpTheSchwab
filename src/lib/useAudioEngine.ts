@@ -17,10 +17,9 @@ interface TrackFXChain {
   filter: Tone.Filter;
   delay: Tone.FeedbackDelay;
   reverb: Tone.Reverb;
-  delayGain: Tone.Gain; // wet/dry for delay
-  reverbGain: Tone.Gain; // wet/dry for reverb
-  dryGain: Tone.Gain; // dry path past delay
-  dryGainReverb: Tone.Gain; // dry path past reverb
+  delayGain: Tone.Gain; // delay send level
+  reverbGain: Tone.Gain; // reverb send level
+  dryGain: Tone.Gain; // dry path level
 }
 
 interface MasterChain {
@@ -48,11 +47,11 @@ function createSynth(sound: TrackSound): SynthNode {
   }
 }
 
-function triggerSynth(synth: SynthNode, sound: TrackSound, time: number) {
+function triggerSynth(synth: SynthNode, sound: TrackSound, time: number, velocity: number, duration: string) {
   if (synth instanceof Tone.NoiseSynth) {
-    synth.triggerAttackRelease(sound.note, time);
+    synth.triggerAttackRelease(duration, time, velocity);
   } else {
-    (synth as Tone.Synth).triggerAttackRelease(sound.note, "16n", time);
+    (synth as Tone.Synth).triggerAttackRelease(sound.note, duration, time, velocity);
   }
 }
 
@@ -68,32 +67,24 @@ function createTrackFX(destination: Tone.InputNode): TrackFXChain {
   // Reverb wet/dry
   const reverb = new Tone.Reverb({ decay: 1.5, wet: 1 });
   const reverbGain = new Tone.Gain(0); // wet level (off by default)
-  const dryGainReverb = new Tone.Gain(1);
 
-  // Signal chain:
-  // filter → dryGain → dryGainReverb → destination
-  // filter → delay → delayGain → dryGainReverb → destination
-  // filter → dryGain → reverb → reverbGain → destination
-  // (simplified: parallel wet/dry at each stage)
+  // Signal chain — three parallel sends from filter:
+  // filter → dryGain ──────────────────→ destination (dry)
+  // filter → delay → delayGain ────────→ destination (delay wet)
+  // filter → reverb → reverbGain ──────→ destination (reverb wet)
 
-  // Post-filter splits to dry and delay
   filter.connect(dryGain);
   filter.connect(delay);
+  filter.connect(reverb);
+
   delay.connect(delayGain);
-
-  // Dry + delay-wet merge, then split to dry-reverb and reverb
-  dryGain.connect(dryGainReverb);
-  delayGain.connect(dryGainReverb);
-
-  dryGain.connect(reverb);
-  delayGain.connect(reverb);
   reverb.connect(reverbGain);
 
-  // Final merge to destination
-  dryGainReverb.connect(destination as unknown as Tone.ToneAudioNode);
+  dryGain.connect(destination as unknown as Tone.ToneAudioNode);
+  delayGain.connect(destination as unknown as Tone.ToneAudioNode);
   reverbGain.connect(destination as unknown as Tone.ToneAudioNode);
 
-  return { filter, delay, reverb, delayGain, reverbGain, dryGain, dryGainReverb };
+  return { filter, delay, reverb, delayGain, reverbGain, dryGain };
 }
 
 function applyTrackFX(fx: TrackFXChain, effects: TrackEffects) {
@@ -264,6 +255,9 @@ export function useAudioEngine() {
         const { totalSteps, setCurrentStep } = useEngineStore.getState();
         const stepIndices = Array.from({ length: totalSteps }, (_, i) => i);
 
+        // Note duration scales with pattern: 16 steps = 16n, 32 = 32n, etc.
+        const noteDuration = `${totalSteps}n` as Tone.Unit.Time;
+
         transport.bpm.value = useEngineStore.getState().bpm;
         transport.swing = useEngineStore.getState().swing;
 
@@ -275,7 +269,8 @@ export function useAudioEngine() {
             const hasSolo = currentTracks.some((t: Track) => t.solo);
 
             currentTracks.forEach((track: Track, trackIndex: number) => {
-              if (!track.steps[stepIndex]) return;
+              const velocity = track.steps[stepIndex];
+              if (!velocity) return;
               const audible = hasSolo
                 ? track.solo && !track.muted
                 : !track.muted;
@@ -283,7 +278,7 @@ export function useAudioEngine() {
 
               const synth = synthsRef.current[trackIndex];
               if (synth) {
-                triggerSynth(synth, track.sound, time);
+                triggerSynth(synth, track.sound, time, velocity, noteDuration as string);
               }
             });
           },
@@ -320,7 +315,6 @@ export function useAudioEngine() {
         fx.delayGain.dispose();
         fx.reverbGain.dispose();
         fx.dryGain.dispose();
-        fx.dryGainReverb.dispose();
       });
       if (masterChainRef.current) {
         masterChainRef.current.gain.dispose();
