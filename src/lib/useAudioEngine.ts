@@ -47,11 +47,12 @@ function createSynth(sound: TrackSound): SynthNode {
   }
 }
 
-function triggerSynth(synth: SynthNode, sound: TrackSound, time: number, velocity: number, duration: string) {
+function triggerSynth(synth: SynthNode, sound: TrackSound, time: number, velocity: number, duration: string, noteOverride?: string) {
   if (synth instanceof Tone.NoiseSynth) {
     synth.triggerAttackRelease(duration, time, velocity);
   } else {
-    (synth as Tone.Synth).triggerAttackRelease(sound.note, duration, time, velocity);
+    const note = noteOverride || sound.note;
+    (synth as Tone.Synth).triggerAttackRelease(note, duration, time, velocity);
   }
 }
 
@@ -278,7 +279,8 @@ export function useAudioEngine() {
 
               const synth = synthsRef.current[trackIndex];
               if (synth) {
-                triggerSynth(synth, track.sound, time, velocity, noteDuration as string);
+                const noteOverride = track.notes?.[stepIndex] || undefined;
+                triggerSynth(synth, track.sound, time, velocity, noteDuration as string, noteOverride);
               }
             });
           },

@@ -2,6 +2,7 @@
 
 import { useEngineStore } from "@/store/engine";
 import { useCallback } from "react";
+import { SessionManager } from "@/components/SessionManager";
 
 export function Transport({ onInit }: { onInit: () => Promise<void> }) {
   const bpm = useEngineStore((s) => s.bpm);
@@ -102,6 +103,9 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Sessions */}
+      <SessionManager />
 
       {/* Clear */}
       <button

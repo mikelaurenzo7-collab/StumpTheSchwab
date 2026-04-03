@@ -36,6 +36,7 @@ export interface Track {
   id: number;
   sound: TrackSound;
   steps: number[]; // 0 = off, 0.25–1.0 = velocity
+  notes: string[]; // per-step note (empty string = use track default)
   volume: number; // 0-1
   muted: boolean;
   solo: boolean;
@@ -56,6 +57,9 @@ export interface EngineState {
   // Master bus
   master: MasterBus;
 
+  // Piano roll
+  pianoRollTrack: number | null; // which track has piano roll open, null = closed
+
   // Actions — transport
   setBpm: (bpm: number) => void;
   setSwing: (swing: number) => void;
@@ -67,9 +71,14 @@ export interface EngineState {
   // Actions — sequencer
   toggleStep: (trackId: number, step: number) => void;
   setStepVelocity: (trackId: number, step: number, velocity: number) => void;
+  setStepNote: (trackId: number, step: number, note: string) => void;
   clearTrack: (trackId: number) => void;
   clearAll: () => void;
   setTotalSteps: (steps: number) => void;
+
+  // Actions — piano roll
+  setPianoRollTrack: (trackId: number | null) => void;
+  pianoRollToggleNote: (trackId: number, step: number, note: string) => void;
 
   // Actions — mixer
   setTrackVolume: (trackId: number, volume: number) => void;
@@ -81,6 +90,12 @@ export interface EngineState {
 
   // Actions — master bus
   setMaster: <K extends keyof MasterBus>(key: K, value: MasterBus[K]) => void;
+
+  // Actions — persistence
+  saveSession: (name: string) => void;
+  loadSession: (name: string) => boolean;
+  deleteSession: (name: string) => void;
+  getSavedSessions: () => string[];
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -123,6 +138,7 @@ function createTracks(totalSteps: number): Track[] {
     id: i,
     sound,
     steps: Array(totalSteps).fill(0),
+    notes: Array(totalSteps).fill(""),
     volume: 0.75,
     muted: false,
     solo: false,
@@ -130,8 +146,36 @@ function createTracks(totalSteps: number): Track[] {
   }));
 }
 
+// ── Persistence helpers ───────────────────────────────────────
+const STORAGE_PREFIX = "sts_session_";
+
+interface SessionData {
+  bpm: number;
+  swing: number;
+  totalSteps: number;
+  tracks: { steps: number[]; notes: string[]; volume: number; muted: boolean; solo: boolean; effects: TrackEffects }[];
+  master: MasterBus;
+}
+
+function serializeSession(state: EngineState): SessionData {
+  return {
+    bpm: state.bpm,
+    swing: state.swing,
+    totalSteps: state.totalSteps,
+    tracks: state.tracks.map((t) => ({
+      steps: t.steps,
+      notes: t.notes,
+      volume: t.volume,
+      muted: t.muted,
+      solo: t.solo,
+      effects: t.effects,
+    })),
+    master: state.master,
+  };
+}
+
 // ── Store ──────────────────────────────────────────────────────
-export const useEngineStore = create<EngineState>()((set) => ({
+export const useEngineStore = create<EngineState>()((set, get) => ({
   bpm: 120,
   swing: 0,
   playbackState: "stopped",
@@ -139,6 +183,7 @@ export const useEngineStore = create<EngineState>()((set) => ({
   totalSteps: INITIAL_STEPS,
   tracks: createTracks(INITIAL_STEPS),
   master: { ...DEFAULT_MASTER },
+  pianoRollTrack: null,
 
   setBpm: (bpm) => set({ bpm: Math.max(30, Math.min(300, bpm)) }),
   setSwing: (swing) => set({ swing: Math.max(0, Math.min(1, swing)) }),
@@ -152,7 +197,13 @@ export const useEngineStore = create<EngineState>()((set) => ({
     set((state) => ({
       tracks: state.tracks.map((t) =>
         t.id === trackId
-          ? { ...t, steps: t.steps.map((s, i) => (i === step ? (s > 0 ? 0 : 1.0) : s)) }
+          ? {
+              ...t,
+              steps: t.steps.map((s, i) => (i === step ? (s > 0 ? 0 : 1.0) : s)),
+              notes: t.steps[step] > 0
+                ? t.notes.map((n, i) => (i === step ? "" : n))
+                : t.notes,
+            }
           : t
       ),
     })),
@@ -166,10 +217,21 @@ export const useEngineStore = create<EngineState>()((set) => ({
       ),
     })),
 
+  setStepNote: (trackId, step, note) =>
+    set((state) => ({
+      tracks: state.tracks.map((t) =>
+        t.id === trackId
+          ? { ...t, notes: t.notes.map((n, i) => (i === step ? note : n)) }
+          : t
+      ),
+    })),
+
   clearTrack: (trackId) =>
     set((state) => ({
       tracks: state.tracks.map((t) =>
-        t.id === trackId ? { ...t, steps: t.steps.map(() => 0) } : t
+        t.id === trackId
+          ? { ...t, steps: t.steps.map(() => 0), notes: t.notes.map(() => "") }
+          : t
       ),
     })),
 
@@ -178,6 +240,7 @@ export const useEngineStore = create<EngineState>()((set) => ({
       tracks: state.tracks.map((t) => ({
         ...t,
         steps: t.steps.map(() => 0),
+        notes: t.notes.map(() => ""),
       })),
     })),
 
@@ -189,7 +252,38 @@ export const useEngineStore = create<EngineState>()((set) => ({
         steps: Array(totalSteps)
           .fill(0)
           .map((_, i) => t.steps[i] ?? 0),
+        notes: Array(totalSteps)
+          .fill("")
+          .map((_, i) => t.notes[i] ?? ""),
       })),
+    })),
+
+  // Piano roll
+  setPianoRollTrack: (trackId) => set({ pianoRollTrack: trackId }),
+
+  pianoRollToggleNote: (trackId, step, note) =>
+    set((state) => ({
+      tracks: state.tracks.map((t) => {
+        if (t.id !== trackId) return t;
+        const currentVelocity = t.steps[step];
+        const currentNote = t.notes[step];
+
+        // If this exact note is already on this step, turn the step off
+        if (currentVelocity > 0 && currentNote === note) {
+          return {
+            ...t,
+            steps: t.steps.map((s, i) => (i === step ? 0 : s)),
+            notes: t.notes.map((n, i) => (i === step ? "" : n)),
+          };
+        }
+
+        // Otherwise, set this note on this step (full velocity if step was off)
+        return {
+          ...t,
+          steps: t.steps.map((s, i) => (i === step ? (s > 0 ? s : 1.0) : s)),
+          notes: t.notes.map((n, i) => (i === step ? note : n)),
+        };
+      }),
     })),
 
   setTrackVolume: (trackId, volume) =>
@@ -226,4 +320,61 @@ export const useEngineStore = create<EngineState>()((set) => ({
     set((state) => ({
       master: { ...state.master, [key]: value },
     })),
+
+  // Persistence
+  saveSession: (name) => {
+    try {
+      const data = serializeSession(get());
+      localStorage.setItem(STORAGE_PREFIX + name, JSON.stringify(data));
+    } catch { /* storage full or unavailable */ }
+  },
+
+  loadSession: (name) => {
+    try {
+      const raw = localStorage.getItem(STORAGE_PREFIX + name);
+      if (!raw) return false;
+      const data: SessionData = JSON.parse(raw);
+      set((state) => ({
+        bpm: data.bpm,
+        swing: data.swing,
+        totalSteps: data.totalSteps,
+        playbackState: "stopped",
+        currentStep: -1,
+        tracks: state.tracks.map((t, i) => ({
+          ...t,
+          steps: data.tracks[i]?.steps ?? t.steps,
+          notes: data.tracks[i]?.notes ?? t.notes.map(() => ""),
+          volume: data.tracks[i]?.volume ?? t.volume,
+          muted: data.tracks[i]?.muted ?? t.muted,
+          solo: data.tracks[i]?.solo ?? t.solo,
+          effects: data.tracks[i]?.effects ?? t.effects,
+        })),
+        master: data.master,
+      }));
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  deleteSession: (name) => {
+    try {
+      localStorage.removeItem(STORAGE_PREFIX + name);
+    } catch { /* unavailable */ }
+  },
+
+  getSavedSessions: () => {
+    try {
+      const sessions: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith(STORAGE_PREFIX)) {
+          sessions.push(key.slice(STORAGE_PREFIX.length));
+        }
+      }
+      return sessions.sort();
+    } catch {
+      return [];
+    }
+  },
 }));

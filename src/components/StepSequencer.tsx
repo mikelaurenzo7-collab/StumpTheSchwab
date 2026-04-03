@@ -65,29 +65,46 @@ const TrackRow = memo(function TrackRow({
   name,
   color,
   steps,
+  melodic,
+  pianoRollOpen,
   currentStep,
   onToggleStep,
   onCycleVelocity,
   onClearTrack,
+  onTogglePianoRoll,
 }: {
   trackId: number;
   name: string;
   color: string;
   steps: number[];
+  melodic: boolean;
+  pianoRollOpen: boolean;
   currentStep: number;
   onToggleStep: (trackId: number, step: number) => void;
   onCycleVelocity: (trackId: number, step: number) => void;
   onClearTrack: (trackId: number) => void;
+  onTogglePianoRoll: (trackId: number) => void;
 }) {
   return (
     <div className="flex items-center gap-0.5 group">
-      {/* Track label */}
-      <div className="w-20 shrink-0 flex items-center gap-1.5 pr-2">
+      {/* Track label — click to open piano roll for melodic tracks */}
+      <div
+        className={`w-20 shrink-0 flex items-center gap-1.5 pr-2 ${
+          melodic ? "cursor-pointer hover:opacity-80" : ""
+        }`}
+        onClick={() => melodic && onTogglePianoRoll(trackId)}
+        title={melodic ? `${pianoRollOpen ? "Close" : "Open"} piano roll` : ""}
+      >
         <div
-          className="w-2.5 h-2.5 rounded-full shrink-0"
+          className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+            pianoRollOpen ? "ring-2 ring-accent ring-offset-1 ring-offset-background" : ""
+          }`}
           style={{ backgroundColor: color }}
         />
-        <span className="text-xs font-medium text-muted truncate">{name}</span>
+        <span className={`text-xs font-medium truncate ${pianoRollOpen ? "text-accent" : "text-muted"}`}>
+          {name}
+          {melodic && <span className="text-[8px] ml-0.5 opacity-50">♪</span>}
+        </span>
       </div>
 
       {/* Steps */}
@@ -124,6 +141,8 @@ export function StepSequencer() {
   const toggleStep = useEngineStore((s) => s.toggleStep);
   const setStepVelocity = useEngineStore((s) => s.setStepVelocity);
   const clearTrack = useEngineStore((s) => s.clearTrack);
+  const pianoRollTrack = useEngineStore((s) => s.pianoRollTrack);
+  const setPianoRollTrack = useEngineStore((s) => s.setPianoRollTrack);
 
   const handleToggle = useCallback(
     (trackId: number, step: number) => toggleStep(trackId, step),
@@ -137,7 +156,6 @@ export function StepSequencer() {
       if (current > 0) {
         setStepVelocity(trackId, step, nextVelocity(current));
       } else {
-        // If step is off, right-click activates at soft velocity
         setStepVelocity(trackId, step, 0.25);
       }
     },
@@ -147,6 +165,13 @@ export function StepSequencer() {
   const handleClear = useCallback(
     (trackId: number) => clearTrack(trackId),
     [clearTrack]
+  );
+
+  const handleTogglePianoRoll = useCallback(
+    (trackId: number) => {
+      setPianoRollTrack(pianoRollTrack === trackId ? null : trackId);
+    },
+    [pianoRollTrack, setPianoRollTrack]
   );
 
   return (
@@ -177,10 +202,13 @@ export function StepSequencer() {
             name={track.sound.name}
             color={track.sound.color}
             steps={track.steps}
+            melodic={track.sound.melodic}
+            pianoRollOpen={pianoRollTrack === track.id}
             currentStep={currentStep}
             onToggleStep={handleToggle}
             onCycleVelocity={handleCycleVelocity}
             onClearTrack={handleClear}
+            onTogglePianoRoll={handleTogglePianoRoll}
           />
         ))}
       </div>
