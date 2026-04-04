@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { DEFAULT_KIT, type TrackSound } from "@/lib/sounds";
+import type { PatternPreset } from "@/lib/presets";
 
 // ── Types ──────────────────────────────────────────────────────
 export type PlaybackState = "stopped" | "playing" | "paused";
@@ -38,10 +39,20 @@ export interface Track {
   steps: number[]; // 0 = off, 0.25–1.0 = velocity
   notes: string[]; // per-step note (empty string = use track default)
   volume: number; // 0-1
+  pan: number; // -1 (left) to 1 (right)
   muted: boolean;
   solo: boolean;
   effects: TrackEffects;
 }
+
+// ── Pattern: snapshot of step data per track ──────────────────
+export interface Pattern {
+  name: string;
+  steps: number[][]; // [trackIndex][stepIndex]
+}
+
+export const PATTERN_LABELS = ["A", "B", "C", "D", "E", "F", "G", "H"] as const;
+export const MAX_PATTERNS = PATTERN_LABELS.length;
 
 export interface EngineState {
   // Transport
@@ -50,6 +61,10 @@ export interface EngineState {
   playbackState: PlaybackState;
   currentStep: number;
   totalSteps: number;
+
+  // Patterns
+  patterns: Pattern[];
+  currentPattern: number; // 0–7
 
   // Tracks
   tracks: Track[];
@@ -80,8 +95,15 @@ export interface EngineState {
   setPianoRollTrack: (trackId: number | null) => void;
   pianoRollToggleNote: (trackId: number, step: number, note: string) => void;
 
+  // Actions — patterns
+  setCurrentPattern: (index: number) => void;
+  copyPattern: (from: number, to: number) => void;
+  clearPattern: (index: number) => void;
+  loadPreset: (preset: PatternPreset) => void;
+
   // Actions — mixer
   setTrackVolume: (trackId: number, volume: number) => void;
+  setTrackPan: (trackId: number, pan: number) => void;
   toggleMute: (trackId: number) => void;
   toggleSolo: (trackId: number) => void;
 
@@ -140,6 +162,7 @@ function createTracks(totalSteps: number): Track[] {
     steps: Array(totalSteps).fill(0),
     notes: Array(totalSteps).fill(""),
     volume: 0.75,
+    pan: 0,
     muted: false,
     solo: false,
     effects: { ...DEFAULT_EFFECTS },
@@ -174,6 +197,30 @@ function serializeSession(state: EngineState): SessionData {
   };
 }
 
+// ── Pattern helpers ───────────────────────────────────────────
+function createEmptyPattern(name: string, trackCount: number, totalSteps: number): Pattern {
+  return {
+    name,
+    steps: Array.from({ length: trackCount }, () => Array(totalSteps).fill(0)),
+  };
+}
+
+function snapshotSteps(tracks: Track[]): number[][] {
+  return tracks.map((t) => [...t.steps]);
+}
+
+function applyStepsToTracks(tracks: Track[], patternSteps: number[][], totalSteps: number): Track[] {
+  return tracks.map((t, i) => {
+    const src = patternSteps[i] ?? [];
+    return {
+      ...t,
+      steps: Array(totalSteps)
+        .fill(0)
+        .map((_, j) => src[j] ?? 0),
+    };
+  });
+}
+
 // ── Store ──────────────────────────────────────────────────────
 export const useEngineStore = create<EngineState>()((set, get) => ({
   bpm: 120,
@@ -184,6 +231,12 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
   tracks: createTracks(INITIAL_STEPS),
   master: { ...DEFAULT_MASTER },
   pianoRollTrack: null,
+
+  // Patterns: 8 slots, all empty, first one is active
+  patterns: PATTERN_LABELS.map((label) =>
+    createEmptyPattern(label, DEFAULT_KIT.length, INITIAL_STEPS)
+  ),
+  currentPattern: 0,
 
   setBpm: (bpm) => set({ bpm: Math.max(30, Math.min(300, bpm)) }),
   setSwing: (swing) => set({ swing: Math.max(0, Math.min(1, swing)) }),
@@ -256,6 +309,15 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
           .fill("")
           .map((_, i) => t.notes[i] ?? ""),
       })),
+      // Resize all patterns too
+      patterns: state.patterns.map((p) => ({
+        ...p,
+        steps: p.steps.map((trackSteps) =>
+          Array(totalSteps)
+            .fill(0)
+            .map((_, i) => trackSteps[i] ?? 0)
+        ),
+      })),
     })),
 
   // Piano roll
@@ -286,10 +348,121 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
       }),
     })),
 
+  // ── Pattern actions ──────────────────────────────────────────
+  setCurrentPattern: (index) =>
+    set((state) => {
+      if (index === state.currentPattern || index < 0 || index >= MAX_PATTERNS) return state;
+
+      // Save current steps into current pattern slot
+      const updatedPatterns = state.patterns.map((p, i) =>
+        i === state.currentPattern
+          ? { ...p, steps: snapshotSteps(state.tracks) }
+          : p
+      );
+
+      // Load target pattern's steps into tracks
+      const targetSteps = updatedPatterns[index].steps;
+      return {
+        patterns: updatedPatterns,
+        currentPattern: index,
+        tracks: applyStepsToTracks(state.tracks, targetSteps, state.totalSteps),
+      };
+    }),
+
+  copyPattern: (from, to) =>
+    set((state) => {
+      if (from === to || from < 0 || to < 0 || from >= MAX_PATTERNS || to >= MAX_PATTERNS) return state;
+
+      // If copying from the active pattern, snapshot current live steps
+      const sourceSteps =
+        from === state.currentPattern
+          ? snapshotSteps(state.tracks)
+          : state.patterns[from].steps.map((s) => [...s]);
+
+      const updatedPatterns = state.patterns.map((p, i) =>
+        i === to ? { ...p, steps: sourceSteps } : p
+      );
+
+      // If we copied into the active pattern, also update tracks
+      if (to === state.currentPattern) {
+        return {
+          patterns: updatedPatterns,
+          tracks: applyStepsToTracks(state.tracks, sourceSteps, state.totalSteps),
+        };
+      }
+
+      return { patterns: updatedPatterns };
+    }),
+
+  clearPattern: (index) =>
+    set((state) => {
+      const emptySteps = Array.from({ length: state.tracks.length }, () =>
+        Array(state.totalSteps).fill(0)
+      );
+
+      const updatedPatterns = state.patterns.map((p, i) =>
+        i === index ? { ...p, steps: emptySteps } : p
+      );
+
+      // If clearing active pattern, also clear tracks
+      if (index === state.currentPattern) {
+        return {
+          patterns: updatedPatterns,
+          tracks: state.tracks.map((t) => ({ ...t, steps: t.steps.map(() => 0) })),
+        };
+      }
+
+      return { patterns: updatedPatterns };
+    }),
+
+  loadPreset: (preset) =>
+    set((state) => {
+      const totalSteps = preset.steps;
+      const trackCount = state.tracks.length;
+
+      // Build steps array, pad/truncate to match track count and step count
+      const presetSteps = Array.from({ length: trackCount }, (_, trackIdx) => {
+        const src = preset.tracks[trackIdx] ?? [];
+        return Array(totalSteps)
+          .fill(0)
+          .map((_, stepIdx) => src[stepIdx] ?? 0);
+      });
+
+      // Save into current pattern slot and apply to tracks
+      const updatedPatterns = state.patterns.map((p, i) =>
+        i === state.currentPattern ? { ...p, steps: presetSteps } : p
+      );
+
+      return {
+        bpm: preset.bpm,
+        swing: preset.swing,
+        totalSteps,
+        patterns: updatedPatterns.map((p) => ({
+          ...p,
+          steps: p.steps.map((trackSteps) =>
+            Array(totalSteps)
+              .fill(0)
+              .map((_, i) => trackSteps[i] ?? 0)
+          ),
+        })),
+        tracks: state.tracks.map((t, i) => ({
+          ...t,
+          steps: presetSteps[i] ?? Array(totalSteps).fill(0),
+        })),
+      };
+    }),
+
   setTrackVolume: (trackId, volume) =>
     set((state) => ({
       tracks: state.tracks.map((t) =>
         t.id === trackId ? { ...t, volume: Math.max(0, Math.min(1, volume)) } : t
+      ),
+    })),
+
+  setTrackPan: (trackId, pan) =>
+    set((state) => ({
+      tracks: state.tracks.map((t) =>
+        t.id === trackId ? { ...t, pan: Math.max(-1, Math.min(1, pan)) } : t
       ),
     })),
 

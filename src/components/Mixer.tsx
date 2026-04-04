@@ -203,17 +203,26 @@ const TrackFXPanel = memo(function TrackFXPanel({
   );
 });
 
+// ── Pan display helper ────────────────────────────────────────
+function panDisplay(pan: number): string {
+  if (Math.abs(pan) < 0.01) return "C";
+  const pct = Math.round(Math.abs(pan) * 100);
+  return pan < 0 ? `L${pct}` : `R${pct}`;
+}
+
 // ── Channel Strip ──────────────────────────────────────────────
 const ChannelStrip = memo(function ChannelStrip({
   trackId,
   name,
   color,
   volume,
+  pan,
   muted,
   solo,
   effects,
   fxOpen,
   onVolume,
+  onPan,
   onMute,
   onSolo,
   onToggleFX,
@@ -222,11 +231,13 @@ const ChannelStrip = memo(function ChannelStrip({
   name: string;
   color: string;
   volume: number;
+  pan: number;
   muted: boolean;
   solo: boolean;
   effects: TrackEffects;
   fxOpen: boolean;
   onVolume: (id: number, vol: number) => void;
+  onPan: (id: number, pan: number) => void;
   onMute: (id: number) => void;
   onSolo: (id: number) => void;
   onToggleFX: (id: number) => void;
@@ -244,6 +255,24 @@ const ChannelStrip = memo(function ChannelStrip({
         <span className="text-[10px] text-muted truncate w-full text-center">
           {name}
         </span>
+
+        {/* Pan knob */}
+        <div className="flex flex-col items-center gap-0.5 w-full">
+          <input
+            type="range"
+            min={-1}
+            max={1}
+            step={0.01}
+            value={pan}
+            onChange={(e) => onPan(trackId, Number(e.target.value))}
+            onDoubleClick={() => onPan(trackId, 0)}
+            className="w-12 h-2"
+            title={`Pan: ${panDisplay(pan)} (double-click to center)`}
+          />
+          <span className="text-[8px] font-mono text-muted">
+            {panDisplay(pan)}
+          </span>
+        </div>
 
         {/* Fader */}
         <div className="h-24 flex items-center">
@@ -326,6 +355,9 @@ function MasterStrip() {
         <span className="text-[10px] text-accent font-bold truncate w-full text-center">
           MASTER
         </span>
+
+        {/* Spacer to align with pan knob area */}
+        <div className="h-5" />
 
         {/* Master fader */}
         <div className="h-24 flex items-center">
@@ -460,6 +492,7 @@ function MasterStrip() {
 export function Mixer() {
   const tracks = useEngineStore((s) => s.tracks);
   const setTrackVolume = useEngineStore((s) => s.setTrackVolume);
+  const setTrackPan = useEngineStore((s) => s.setTrackPan);
   const toggleMute = useEngineStore((s) => s.toggleMute);
   const toggleSolo = useEngineStore((s) => s.toggleSolo);
 
@@ -468,6 +501,10 @@ export function Mixer() {
   const handleVolume = useCallback(
     (id: number, vol: number) => setTrackVolume(id, vol),
     [setTrackVolume]
+  );
+  const handlePan = useCallback(
+    (id: number, pan: number) => setTrackPan(id, pan),
+    [setTrackPan]
   );
   const handleMute = useCallback(
     (id: number) => toggleMute(id),
@@ -499,11 +536,13 @@ export function Mixer() {
             name={track.sound.name}
             color={track.sound.color}
             volume={track.volume}
+            pan={track.pan}
             muted={track.muted}
             solo={track.solo}
             effects={track.effects}
             fxOpen={openFX.has(track.id)}
             onVolume={handleVolume}
+            onPan={handlePan}
             onMute={handleMute}
             onSolo={handleSolo}
             onToggleFX={handleToggleFX}
