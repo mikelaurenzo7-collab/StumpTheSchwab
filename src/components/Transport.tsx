@@ -4,6 +4,7 @@ import { useEngineStore, PATTERN_LABELS } from "@/store/engine";
 import { PRESETS } from "@/lib/presets";
 import { useCallback, useState } from "react";
 import { SessionManager } from "@/components/SessionManager";
+import { ExportButton } from "@/components/ExportButton";
 
 export function Transport({ onInit }: { onInit: () => Promise<void> }) {
   const bpm = useEngineStore((s) => s.bpm);
@@ -201,6 +202,9 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Export */}
+      <ExportButton />
 
       {/* Sessions */}
       <SessionManager />

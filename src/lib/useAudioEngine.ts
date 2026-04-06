@@ -245,7 +245,15 @@ export function useAudioEngine() {
           sequenceRef.current.dispose();
         }
 
-        const { totalSteps, setCurrentStep } = useEngineStore.getState();
+        const { totalSteps, setCurrentStep, songMode, songArrangement, setCurrentPattern, setSongPosition } = useEngineStore.getState();
+
+        // In song mode, reset to the beginning of the arrangement and load the first pattern
+        if (songMode) {
+          setSongPosition(0);
+          const firstPattern = songArrangement[0] ?? 0;
+          setCurrentPattern(firstPattern);
+        }
+
         const stepIndices = Array.from({ length: totalSteps }, (_, i) => i);
 
         const noteDuration = `${totalSteps}n` as Tone.Unit.Time;
@@ -255,6 +263,23 @@ export function useAudioEngine() {
 
         sequenceRef.current = new Tone.Sequence(
           (time, stepIndex) => {
+            // Song mode: auto-advance pattern at the start of each cycle
+            if (stepIndex === 0) {
+              const state = useEngineStore.getState();
+              if (state.songMode && state.currentStep >= 0) {
+                // We've wrapped around — advance to next pattern
+                const advanced = state.advanceSongPosition();
+                if (!advanced) {
+                  // Song ended — stop transport immediately
+                  Tone.getTransport().stop();
+                  if (sequenceRef.current) {
+                    sequenceRef.current.stop();
+                  }
+                  return;
+                }
+              }
+            }
+
             setCurrentStep(stepIndex);
 
             const currentTracks = useEngineStore.getState().tracks;

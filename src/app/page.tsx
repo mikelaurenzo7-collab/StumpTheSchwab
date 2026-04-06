@@ -4,6 +4,7 @@ import { Transport } from "@/components/Transport";
 import { StepSequencer } from "@/components/StepSequencer";
 import { PianoRoll } from "@/components/PianoRoll";
 import { Mixer } from "@/components/Mixer";
+import { Arranger } from "@/components/Arranger";
 import { useAudioEngine } from "@/lib/useAudioEngine";
 import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
 
@@ -15,6 +16,9 @@ export default function DAW() {
     <div className="flex flex-col h-screen overflow-hidden">
       {/* Top: Transport Bar */}
       <Transport onInit={initAudio} />
+
+      {/* Song Arranger */}
+      <Arranger />
 
       {/* Middle: Step Sequencer */}
       <StepSequencer />
