@@ -6,24 +6,18 @@ import { PianoRoll } from "@/components/PianoRoll";
 import { Mixer } from "@/components/Mixer";
 import { useAudioEngine } from "@/lib/useAudioEngine";
 import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
+import "@/store/history";
 
 export default function DAW() {
-  const { initAudio } = useAudioEngine();
+  const { initAudio, getTrackMeter, getMasterMeter } = useAudioEngine();
   useKeyboardShortcuts(initAudio);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      {/* Top: Transport Bar */}
       <Transport onInit={initAudio} />
-
-      {/* Middle: Step Sequencer */}
       <StepSequencer />
-
-      {/* Piano Roll (appears when a melodic track is selected) */}
       <PianoRoll />
-
-      {/* Bottom: Mixer */}
-      <Mixer />
+      <Mixer getTrackMeter={getTrackMeter} getMasterMeter={getMasterMeter} />
     </div>
   );
 }

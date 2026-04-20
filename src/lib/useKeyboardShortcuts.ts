@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useEngineStore, MAX_PATTERNS } from "@/store/engine";
+import { useHistoryStore } from "@/store/history";
 
 export function useKeyboardShortcuts(onInit: () => Promise<void>) {
   useEffect(() => {
@@ -9,6 +10,19 @@ export function useKeyboardShortcuts(onInit: () => Promise<void>) {
       // Don't capture shortcuts when typing in inputs
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      // Undo: Cmd/Ctrl+Z
+      if ((e.metaKey || e.ctrlKey) && e.code === "KeyZ" && !e.shiftKey) {
+        e.preventDefault();
+        useHistoryStore.getState().undo();
+        return;
+      }
+      // Redo: Cmd/Ctrl+Shift+Z or Cmd/Ctrl+Y
+      if ((e.metaKey || e.ctrlKey) && ((e.code === "KeyZ" && e.shiftKey) || e.code === "KeyY")) {
+        e.preventDefault();
+        useHistoryStore.getState().redo();
+        return;
+      }
 
       const state = useEngineStore.getState();
 

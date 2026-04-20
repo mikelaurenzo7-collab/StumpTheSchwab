@@ -2,6 +2,10 @@ import { create } from "zustand";
 import { DEFAULT_KIT, type TrackSound } from "@/lib/sounds";
 import type { PatternPreset } from "@/lib/presets";
 
+let _checkpoint: (() => void) | null = null;
+export function _setCheckpoint(fn: () => void) { _checkpoint = fn; }
+function pushHistory() { _checkpoint?.(); }
+
 // ── Types ──────────────────────────────────────────────────────
 export type PlaybackState = "stopped" | "playing" | "paused";
 export type FilterType = "lowpass" | "highpass";
@@ -246,7 +250,8 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
   stop: () => set({ playbackState: "stopped", currentStep: -1 }),
   setCurrentStep: (step) => set({ currentStep: step }),
 
-  toggleStep: (trackId, step) =>
+  toggleStep: (trackId, step) => {
+    pushHistory();
     set((state) => ({
       tracks: state.tracks.map((t) =>
         t.id === trackId
@@ -259,45 +264,55 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
             }
           : t
       ),
-    })),
+    }));
+  },
 
-  setStepVelocity: (trackId, step, velocity) =>
+  setStepVelocity: (trackId, step, velocity) => {
+    pushHistory();
     set((state) => ({
       tracks: state.tracks.map((t) =>
         t.id === trackId
           ? { ...t, steps: t.steps.map((s, i) => (i === step ? velocity : s)) }
           : t
       ),
-    })),
+    }));
+  },
 
-  setStepNote: (trackId, step, note) =>
+  setStepNote: (trackId, step, note) => {
+    pushHistory();
     set((state) => ({
       tracks: state.tracks.map((t) =>
         t.id === trackId
           ? { ...t, notes: t.notes.map((n, i) => (i === step ? note : n)) }
           : t
       ),
-    })),
+    }));
+  },
 
-  clearTrack: (trackId) =>
+  clearTrack: (trackId) => {
+    pushHistory();
     set((state) => ({
       tracks: state.tracks.map((t) =>
         t.id === trackId
           ? { ...t, steps: t.steps.map(() => 0), notes: t.notes.map(() => "") }
           : t
       ),
-    })),
+    }));
+  },
 
-  clearAll: () =>
+  clearAll: () => {
+    pushHistory();
     set((state) => ({
       tracks: state.tracks.map((t) => ({
         ...t,
         steps: t.steps.map(() => 0),
         notes: t.notes.map(() => ""),
       })),
-    })),
+    }));
+  },
 
-  setTotalSteps: (totalSteps) =>
+  setTotalSteps: (totalSteps) => {
+    pushHistory();
     set((state) => ({
       totalSteps,
       tracks: state.tracks.map((t) => ({
@@ -318,12 +333,14 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
             .map((_, i) => trackSteps[i] ?? 0)
         ),
       })),
-    })),
+    }));
+  },
 
   // Piano roll
   setPianoRollTrack: (trackId) => set({ pianoRollTrack: trackId }),
 
-  pianoRollToggleNote: (trackId, step, note) =>
+  pianoRollToggleNote: (trackId, step, note) => {
+    pushHistory();
     set((state) => ({
       tracks: state.tracks.map((t) => {
         if (t.id !== trackId) return t;
@@ -346,10 +363,12 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
           notes: t.notes.map((n, i) => (i === step ? note : n)),
         };
       }),
-    })),
+    }));
+  },
 
   // ── Pattern actions ──────────────────────────────────────────
-  setCurrentPattern: (index) =>
+  setCurrentPattern: (index) => {
+    pushHistory();
     set((state) => {
       if (index === state.currentPattern || index < 0 || index >= MAX_PATTERNS) return state;
 
@@ -367,9 +386,11 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         currentPattern: index,
         tracks: applyStepsToTracks(state.tracks, targetSteps, state.totalSteps),
       };
-    }),
+    });
+  },
 
-  copyPattern: (from, to) =>
+  copyPattern: (from, to) => {
+    pushHistory();
     set((state) => {
       if (from === to || from < 0 || to < 0 || from >= MAX_PATTERNS || to >= MAX_PATTERNS) return state;
 
@@ -392,9 +413,11 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
       }
 
       return { patterns: updatedPatterns };
-    }),
+    });
+  },
 
-  clearPattern: (index) =>
+  clearPattern: (index) => {
+    pushHistory();
     set((state) => {
       const emptySteps = Array.from({ length: state.tracks.length }, () =>
         Array(state.totalSteps).fill(0)
@@ -413,9 +436,11 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
       }
 
       return { patterns: updatedPatterns };
-    }),
+    });
+  },
 
-  loadPreset: (preset) =>
+  loadPreset: (preset) => {
+    pushHistory();
     set((state) => {
       const totalSteps = preset.steps;
       const trackCount = state.tracks.length;
@@ -450,7 +475,8 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
           steps: presetSteps[i] ?? Array(totalSteps).fill(0),
         })),
       };
-    }),
+    });
+  },
 
   setTrackVolume: (trackId, volume) =>
     set((state) => ({

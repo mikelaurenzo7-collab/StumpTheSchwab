@@ -1,9 +1,11 @@
 "use client";
 
 import { useEngineStore, PATTERN_LABELS } from "@/store/engine";
+import { useHistoryStore } from "@/store/history";
 import { PRESETS } from "@/lib/presets";
 import { useCallback, useState } from "react";
 import { SessionManager } from "@/components/SessionManager";
+import { useExport } from "@/lib/useExport";
 
 export function Transport({ onInit }: { onInit: () => Promise<void> }) {
   const bpm = useEngineStore((s) => s.bpm);
@@ -23,6 +25,11 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
   const loadPreset = useEngineStore((s) => s.loadPreset);
 
   const [copySource, setCopySource] = useState<number | null>(null);
+  const { exportWAV, exporting } = useExport();
+  const canUndo = useHistoryStore((s) => s.past.length > 0);
+  const canRedo = useHistoryStore((s) => s.future.length > 0);
+  const undo = useHistoryStore((s) => s.undo);
+  const redo = useHistoryStore((s) => s.redo);
 
   const handlePlay = useCallback(async () => {
     await onInit();
@@ -201,6 +208,40 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Undo / Redo */}
+      <div className="flex gap-0.5">
+        <button
+          onClick={undo}
+          disabled={!canUndo}
+          className="w-8 h-8 rounded text-sm transition-colors disabled:opacity-25 bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground"
+          title="Undo (Ctrl+Z)"
+        >
+          ↶
+        </button>
+        <button
+          onClick={redo}
+          disabled={!canRedo}
+          className="w-8 h-8 rounded text-sm transition-colors disabled:opacity-25 bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground"
+          title="Redo (Ctrl+Shift+Z)"
+        >
+          ↷
+        </button>
+      </div>
+
+      {/* Export */}
+      <button
+        onClick={() => exportWAV(2)}
+        disabled={exporting}
+        className={`px-3 py-1.5 rounded text-xs uppercase tracking-wider transition-colors ${
+          exporting
+            ? "bg-accent/50 text-white/50 cursor-wait"
+            : "bg-accent hover:bg-accent-hover text-white"
+        }`}
+        title="Export WAV (2 loops)"
+      >
+        {exporting ? "Bouncing..." : "Export"}
+      </button>
 
       {/* Sessions */}
       <SessionManager />

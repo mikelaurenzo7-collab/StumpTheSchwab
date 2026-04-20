@@ -129,14 +129,18 @@ function applyMasterSettings(chain: MasterChain, master: MasterBus) {
     chain.compressor.attack.value = master.compressorAttack;
     chain.compressor.release.value = master.compressorRelease;
   } else {
+    // Bypass: threshold at max so signal never exceeds it, ratio 1:1
     chain.compressor.threshold.value = 0;
     chain.compressor.ratio.value = 1;
+    chain.compressor.attack.value = 0.003;
+    chain.compressor.release.value = 0.25;
   }
 
   if (master.limiterOn) {
     chain.limiter.threshold.value = master.limiterThreshold;
   } else {
-    chain.limiter.threshold.value = 0;
+    // Bypass: set ceiling so high it never limits
+    chain.limiter.threshold.value = 6;
   }
 }
 
@@ -148,6 +152,8 @@ export function useAudioEngine() {
   const masterChainRef = useRef<MasterChain | null>(null);
   const sequenceRef = useRef<Tone.Sequence | null>(null);
   const initializedRef = useRef(false);
+  const trackMetersRef = useRef<Tone.Meter[]>([]);
+  const masterMeterRef = useRef<Tone.Meter | null>(null);
 
   const initAudio = useCallback(async () => {
     if (initializedRef.current) return;
@@ -165,11 +171,21 @@ export function useAudioEngine() {
     gainNodesRef.current = [];
     panNodesRef.current = [];
     fxChainsRef.current = [];
+    trackMetersRef.current = [];
+
+    // Master meter
+    const masterMeter = new Tone.Meter({ smoothing: 0.8 });
+    masterChain.gain.connect(masterMeter);
+    masterMeterRef.current = masterMeter;
 
     tracks.forEach((track) => {
-      // Signal chain: Synth → FX → Gain → Panner → Master
+      // Signal chain: Synth → FX → Gain → Meter → Panner → Master
       const panner = new Tone.Panner(track.pan).connect(masterChain.gain);
       const gain = new Tone.Gain(track.volume).connect(panner);
+
+      const meter = new Tone.Meter({ smoothing: 0.8 });
+      gain.connect(meter);
+      trackMetersRef.current.push(meter);
 
       const fx = createTrackFX(gain);
       applyTrackFX(fx, track.effects);
@@ -302,6 +318,8 @@ export function useAudioEngine() {
       synthsRef.current.forEach((s) => s.dispose());
       gainNodesRef.current.forEach((g) => g.dispose());
       panNodesRef.current.forEach((p) => p.dispose());
+      trackMetersRef.current.forEach((m) => m.dispose());
+      masterMeterRef.current?.dispose();
       fxChainsRef.current.forEach((fx) => {
         fx.filter.dispose();
         fx.delay.dispose();
@@ -320,5 +338,19 @@ export function useAudioEngine() {
     };
   }, []);
 
-  return { initAudio };
+  const getTrackMeter = useCallback((index: number): number => {
+    const meter = trackMetersRef.current[index];
+    if (!meter) return -Infinity;
+    const val = meter.getValue();
+    return typeof val === "number" ? val : val[0];
+  }, []);
+
+  const getMasterMeter = useCallback((): number => {
+    const meter = masterMeterRef.current;
+    if (!meter) return -Infinity;
+    const val = meter.getValue();
+    return typeof val === "number" ? val : val[0];
+  }, []);
+
+  return { initAudio, getTrackMeter, getMasterMeter };
 }

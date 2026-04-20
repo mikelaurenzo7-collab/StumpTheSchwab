@@ -1,7 +1,7 @@
 "use client";
 
 import { useEngineStore, type TrackEffects, type FilterType } from "@/store/engine";
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // ── Knob-style mini slider ────────────────────────────────────
 function MiniSlider({
@@ -203,6 +203,70 @@ const TrackFXPanel = memo(function TrackFXPanel({
   );
 });
 
+// ── Level Meter ──────────────────────────────────────────────
+function LevelMeter({ getLevel, color }: { getLevel: () => number; color: string }) {
+  const barRef = useRef<HTMLDivElement>(null);
+  const peakRef = useRef<HTMLDivElement>(null);
+  const peakVal = useRef(-Infinity);
+  const peakHold = useRef(0);
+
+  useEffect(() => {
+    let raf: number;
+    const update = () => {
+      const db = getLevel();
+      // Map dB to percentage: -60dB = 0%, 0dB = 100%
+      const pct = Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
+
+      if (barRef.current) {
+        barRef.current.style.height = `${pct}%`;
+        if (db > -6) {
+          barRef.current.style.backgroundColor = "var(--danger)";
+        } else if (db > -12) {
+          barRef.current.style.backgroundColor = "var(--warning)";
+        } else {
+          barRef.current.style.backgroundColor = color;
+        }
+      }
+
+      // Peak hold
+      if (db > peakVal.current) {
+        peakVal.current = db;
+        peakHold.current = 30;
+      } else {
+        peakHold.current--;
+        if (peakHold.current <= 0) {
+          peakVal.current -= 1.5;
+        }
+      }
+
+      if (peakRef.current) {
+        const peakPct = Math.max(0, Math.min(100, ((peakVal.current + 60) / 60) * 100));
+        peakRef.current.style.bottom = `${peakPct}%`;
+        peakRef.current.style.opacity = peakPct > 0 ? "1" : "0";
+      }
+
+      raf = requestAnimationFrame(update);
+    };
+    raf = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(raf);
+  }, [getLevel, color]);
+
+  return (
+    <div className="relative w-2 h-20 bg-surface-2 rounded-sm overflow-hidden">
+      <div
+        ref={barRef}
+        className="absolute bottom-0 left-0 w-full rounded-sm transition-[height] duration-75"
+        style={{ height: "0%", backgroundColor: color }}
+      />
+      <div
+        ref={peakRef}
+        className="absolute left-0 w-full h-px bg-foreground opacity-0"
+        style={{ bottom: "0%" }}
+      />
+    </div>
+  );
+}
+
 // ── Pan display helper ────────────────────────────────────────
 function panDisplay(pan: number): string {
   if (Math.abs(pan) < 0.01) return "C";
@@ -221,6 +285,7 @@ const ChannelStrip = memo(function ChannelStrip({
   solo,
   effects,
   fxOpen,
+  getLevel,
   onVolume,
   onPan,
   onMute,
@@ -236,6 +301,7 @@ const ChannelStrip = memo(function ChannelStrip({
   solo: boolean;
   effects: TrackEffects;
   fxOpen: boolean;
+  getLevel: () => number;
   onVolume: (id: number, vol: number) => void;
   onPan: (id: number, pan: number) => void;
   onMute: (id: number) => void;
@@ -274,8 +340,8 @@ const ChannelStrip = memo(function ChannelStrip({
           </span>
         </div>
 
-        {/* Fader */}
-        <div className="h-24 flex items-center">
+        {/* Fader + Meter */}
+        <div className="h-24 flex items-center gap-1">
           <input
             type="range"
             min={0}
@@ -286,6 +352,7 @@ const ChannelStrip = memo(function ChannelStrip({
             className="h-20 -rotate-90 origin-center"
             style={{ width: "80px" }}
           />
+          <LevelMeter getLevel={getLevel} color={color} />
         </div>
 
         {/* dB readout */}
@@ -341,7 +408,7 @@ const ChannelStrip = memo(function ChannelStrip({
 });
 
 // ── Master Bus Strip ──────────────────────────────────────────
-function MasterStrip() {
+function MasterStrip({ getLevel }: { getLevel: () => number }) {
   const master = useEngineStore((s) => s.master);
   const setMaster = useEngineStore((s) => s.setMaster);
 
@@ -359,8 +426,8 @@ function MasterStrip() {
         {/* Spacer to align with pan knob area */}
         <div className="h-5" />
 
-        {/* Master fader */}
-        <div className="h-24 flex items-center">
+        {/* Master fader + Meter */}
+        <div className="h-24 flex items-center gap-1">
           <input
             type="range"
             min={0}
@@ -371,6 +438,7 @@ function MasterStrip() {
             className="h-20 -rotate-90 origin-center"
             style={{ width: "80px" }}
           />
+          <LevelMeter getLevel={getLevel} color="var(--accent)" />
         </div>
 
         {/* dB readout */}
@@ -489,7 +557,13 @@ function MasterStrip() {
 }
 
 // ── Mixer Panel ────────────────────────────────────────────────
-export function Mixer() {
+export function Mixer({
+  getTrackMeter,
+  getMasterMeter,
+}: {
+  getTrackMeter: (index: number) => number;
+  getMasterMeter: () => number;
+}) {
   const tracks = useEngineStore((s) => s.tracks);
   const setTrackVolume = useEngineStore((s) => s.setTrackVolume);
   const setTrackPan = useEngineStore((s) => s.setTrackPan);
@@ -497,6 +571,11 @@ export function Mixer() {
   const toggleSolo = useEngineStore((s) => s.toggleSolo);
 
   const [openFX, setOpenFX] = useState<Set<number>>(new Set());
+
+  const trackMeterGetters = useMemo(
+    () => tracks.map((_, i) => () => getTrackMeter(i)),
+    [tracks, getTrackMeter]
+  );
 
   const handleVolume = useCallback(
     (id: number, vol: number) => setTrackVolume(id, vol),
@@ -529,7 +608,7 @@ export function Mixer() {
   return (
     <div className="border-t border-border bg-surface px-4 py-3">
       <div className="flex items-start gap-2 overflow-x-auto">
-        {tracks.map((track) => (
+        {tracks.map((track, i) => (
           <ChannelStrip
             key={track.id}
             trackId={track.id}
@@ -541,6 +620,7 @@ export function Mixer() {
             solo={track.solo}
             effects={track.effects}
             fxOpen={openFX.has(track.id)}
+            getLevel={trackMeterGetters[i]}
             onVolume={handleVolume}
             onPan={handlePan}
             onMute={handleMute}
@@ -550,7 +630,7 @@ export function Mixer() {
         ))}
 
         {/* Master bus */}
-        <MasterStrip />
+        <MasterStrip getLevel={getMasterMeter} />
       </div>
     </div>
   );
