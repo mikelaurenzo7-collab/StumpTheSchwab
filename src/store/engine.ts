@@ -55,6 +55,10 @@ export interface Pattern {
   steps: number[][]; // [trackIndex][stepIndex]
 }
 
+export interface ArrangementSlot {
+  patternId: number;
+}
+
 export const PATTERN_LABELS = ["A", "B", "C", "D", "E", "F", "G", "H"] as const;
 export const MAX_PATTERNS = PATTERN_LABELS.length;
 
@@ -78,6 +82,11 @@ export interface EngineState {
 
   // Piano roll
   pianoRollTrack: number | null; // which track has piano roll open, null = closed
+
+  // Arrangement
+  arrangement: ArrangementSlot[];
+  arrangementMode: boolean;
+  arrangementPosition: number;
 
   // Actions — transport
   setBpm: (bpm: number) => void;
@@ -116,6 +125,15 @@ export interface EngineState {
 
   // Actions — master bus
   setMaster: <K extends keyof MasterBus>(key: K, value: MasterBus[K]) => void;
+
+  // Actions — arrangement
+  setArrangementMode: (mode: boolean) => void;
+  addArrangementSlot: (patternId: number) => void;
+  removeArrangementSlot: (position: number) => void;
+  setArrangementSlotPattern: (position: number, patternId: number) => void;
+  clearArrangement: () => void;
+  advanceArrangement: () => boolean;
+  setArrangementPosition: (position: number) => void;
 
   // Actions — persistence
   saveSession: (name: string) => void;
@@ -182,6 +200,8 @@ interface SessionData {
   totalSteps: number;
   tracks: { steps: number[]; notes: string[]; volume: number; muted: boolean; solo: boolean; effects: TrackEffects }[];
   master: MasterBus;
+  arrangement?: ArrangementSlot[];
+  arrangementMode?: boolean;
 }
 
 function serializeSession(state: EngineState): SessionData {
@@ -198,6 +218,8 @@ function serializeSession(state: EngineState): SessionData {
       effects: t.effects,
     })),
     master: state.master,
+    arrangement: state.arrangement,
+    arrangementMode: state.arrangementMode,
   };
 }
 
@@ -236,6 +258,11 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
   master: { ...DEFAULT_MASTER },
   pianoRollTrack: null,
 
+  // Arrangement
+  arrangement: [{ patternId: 0 }, { patternId: 0 }, { patternId: 0 }, { patternId: 0 }],
+  arrangementMode: false,
+  arrangementPosition: 0,
+
   // Patterns: 8 slots, all empty, first one is active
   patterns: PATTERN_LABELS.map((label) =>
     createEmptyPattern(label, DEFAULT_KIT.length, INITIAL_STEPS)
@@ -245,9 +272,26 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
   setBpm: (bpm) => set({ bpm: Math.max(30, Math.min(300, bpm)) }),
   setSwing: (swing) => set({ swing: Math.max(0, Math.min(1, swing)) }),
 
-  play: () => set({ playbackState: "playing" }),
+  play: () => {
+    const state = get();
+    if (state.arrangementMode && state.playbackState === "stopped" && state.arrangement.length > 0) {
+      const firstPatternId = state.arrangement[0].patternId;
+      const updatedPatterns = state.patterns.map((p, i) =>
+        i === state.currentPattern ? { ...p, steps: snapshotSteps(state.tracks) } : p
+      );
+      set({
+        playbackState: "playing",
+        arrangementPosition: 0,
+        currentPattern: firstPatternId,
+        patterns: updatedPatterns,
+        tracks: applyStepsToTracks(state.tracks, updatedPatterns[firstPatternId].steps, state.totalSteps),
+      });
+    } else {
+      set({ playbackState: "playing" });
+    }
+  },
   pause: () => set({ playbackState: "paused" }),
-  stop: () => set({ playbackState: "stopped", currentStep: -1 }),
+  stop: () => set({ playbackState: "stopped", currentStep: -1, arrangementPosition: 0 }),
   setCurrentStep: (step) => set({ currentStep: step }),
 
   toggleStep: (trackId, step) => {
@@ -520,6 +564,62 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
       master: { ...state.master, [key]: value },
     })),
 
+  // Arrangement
+  setArrangementMode: (mode) => set({ arrangementMode: mode }),
+
+  addArrangementSlot: (patternId) => {
+    pushHistory();
+    set((state) => ({
+      arrangement: [...state.arrangement, { patternId }],
+    }));
+  },
+
+  removeArrangementSlot: (position) => {
+    pushHistory();
+    set((state) => {
+      const updated = state.arrangement.filter((_, i) => i !== position);
+      return { arrangement: updated.length > 0 ? updated : [{ patternId: 0 }] };
+    });
+  },
+
+  setArrangementSlotPattern: (position, patternId) => {
+    pushHistory();
+    set((state) => ({
+      arrangement: state.arrangement.map((slot, i) =>
+        i === position ? { patternId } : slot
+      ),
+    }));
+  },
+
+  clearArrangement: () => {
+    pushHistory();
+    set({ arrangement: [{ patternId: 0 }] });
+  },
+
+  advanceArrangement: () => {
+    const state = get();
+    if (!state.arrangementMode) return true;
+
+    const nextPos = state.arrangementPosition + 1;
+    if (nextPos >= state.arrangement.length) return false;
+
+    const nextPatternId = state.arrangement[nextPos].patternId;
+    const updatedPatterns = state.patterns.map((p, i) =>
+      i === state.currentPattern ? { ...p, steps: snapshotSteps(state.tracks) } : p
+    );
+
+    set({
+      arrangementPosition: nextPos,
+      currentPattern: nextPatternId,
+      patterns: updatedPatterns,
+      tracks: applyStepsToTracks(state.tracks, updatedPatterns[nextPatternId].steps, state.totalSteps),
+    });
+
+    return true;
+  },
+
+  setArrangementPosition: (position) => set({ arrangementPosition: position }),
+
   // Persistence
   saveSession: (name) => {
     try {
@@ -549,6 +649,9 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
           effects: data.tracks[i]?.effects ?? t.effects,
         })),
         master: data.master,
+        arrangement: data.arrangement ?? [{ patternId: 0 }, { patternId: 0 }, { patternId: 0 }, { patternId: 0 }],
+        arrangementMode: data.arrangementMode ?? false,
+        arrangementPosition: 0,
       }));
       return true;
     } catch {

@@ -1,6 +1,7 @@
 "use client";
 
 import { Transport } from "@/components/Transport";
+import { ArrangementView } from "@/components/ArrangementView";
 import { StepSequencer } from "@/components/StepSequencer";
 import { PianoRoll } from "@/components/PianoRoll";
 import { Mixer } from "@/components/Mixer";
@@ -15,6 +16,7 @@ export default function DAW() {
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       <Transport onInit={initAudio} />
+      <ArrangementView />
       <StepSequencer />
       <PianoRoll />
       <Mixer getTrackMeter={getTrackMeter} getMasterMeter={getMasterMeter} />

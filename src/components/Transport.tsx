@@ -24,6 +24,9 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
   const copyPattern = useEngineStore((s) => s.copyPattern);
   const loadPreset = useEngineStore((s) => s.loadPreset);
 
+  const arrangementMode = useEngineStore((s) => s.arrangementMode);
+  const setArrangementMode = useEngineStore((s) => s.setArrangementMode);
+
   const [copySource, setCopySource] = useState<number | null>(null);
   const { exportWAV, exporting } = useExport();
   const canUndo = useHistoryStore((s) => s.past.length > 0);
@@ -47,15 +50,15 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
 
   const handlePatternClick = useCallback(
     (index: number) => {
+      if (arrangementMode && playbackState !== "stopped") return;
       if (copySource !== null) {
-        // Paste mode: copy from source to clicked target
         copyPattern(copySource, index);
         setCopySource(null);
       } else {
         setCurrentPattern(index);
       }
     },
-    [copySource, copyPattern, setCurrentPattern]
+    [arrangementMode, playbackState, copySource, copyPattern, setCurrentPattern]
   );
 
   const handleCopy = useCallback(() => {
@@ -134,6 +137,35 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
           <option value={32}>32</option>
           <option value={64}>64</option>
         </select>
+      </div>
+
+      {/* Separator */}
+      <div className="w-px h-6 bg-border mx-1" />
+
+      {/* Mode Toggle */}
+      <div className="flex rounded-md overflow-hidden border border-border">
+        <button
+          onClick={() => setArrangementMode(false)}
+          className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+            !arrangementMode
+              ? "bg-accent text-white"
+              : "bg-surface-2 text-muted hover:text-foreground"
+          }`}
+          title="Pattern mode — loop single pattern"
+        >
+          Pat
+        </button>
+        <button
+          onClick={() => setArrangementMode(true)}
+          className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+            arrangementMode
+              ? "bg-accent text-white"
+              : "bg-surface-2 text-muted hover:text-foreground"
+          }`}
+          title="Song mode — play arrangement"
+        >
+          Song
+        </button>
       </div>
 
       {/* Separator */}
@@ -231,14 +263,14 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
 
       {/* Export */}
       <button
-        onClick={() => exportWAV(2)}
+        onClick={() => exportWAV()}
         disabled={exporting}
         className={`px-3 py-1.5 rounded text-xs uppercase tracking-wider transition-colors ${
           exporting
             ? "bg-accent/50 text-white/50 cursor-wait"
             : "bg-accent hover:bg-accent-hover text-white"
         }`}
-        title="Export WAV (2 loops)"
+        title={arrangementMode ? "Export full arrangement" : "Export WAV (2 loops)"}
       >
         {exporting ? "Bouncing..." : "Export"}
       </button>

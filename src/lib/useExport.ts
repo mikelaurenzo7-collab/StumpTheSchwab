@@ -87,17 +87,25 @@ function encodeWAV(buffer: AudioBuffer): Blob {
 export function useExport() {
   const [exporting, setExporting] = useState(false);
 
-  const exportWAV = useCallback(async (loops: number = 2) => {
+  const exportWAV = useCallback(async () => {
     setExporting(true);
 
     try {
       const state = useEngineStore.getState();
-      const { bpm, swing, totalSteps, tracks, master } = state;
+      const { bpm, swing, totalSteps, tracks, master, arrangementMode, arrangement, patterns, currentPattern } = state;
 
       const beatsPerStep = 4 / totalSteps;
       const secondsPerBeat = 60 / bpm;
       const loopDuration = totalSteps * beatsPerStep * secondsPerBeat;
+
+      const isArrangement = arrangementMode && arrangement.length > 0;
+      const loops = isArrangement ? arrangement.length : 2;
       const totalDuration = loopDuration * loops;
+
+      // Snapshot current live steps into patterns for arrangement accuracy
+      const livePatterns = patterns.map((p, i) =>
+        i === currentPattern ? { ...p, steps: tracks.map((t) => [...t.steps]) } : p
+      );
 
       const buffer = await Tone.Offline(({ transport }) => {
         transport.bpm.value = bpm;
@@ -119,7 +127,7 @@ export function useExport() {
         const hasSolo = tracks.some((t: Track) => t.solo);
         const noteDuration = `${totalSteps}n` as Tone.Unit.Time;
 
-        tracks.forEach((track: Track) => {
+        tracks.forEach((track: Track, trackIndex: number) => {
           const audible = hasSolo ? track.solo && !track.muted : !track.muted;
           if (!audible) return;
 
@@ -156,26 +164,51 @@ export function useExport() {
           const synth = createOfflineSynth(track.sound);
           synth.connect(filter);
 
-          const stepIndices = Array.from({ length: totalSteps }, (_, i) => i);
+          if (isArrangement) {
+            // Build flat step array from all arrangement patterns
+            const allSteps: number[] = arrangement.flatMap(
+              (slot) => livePatterns[slot.patternId].steps[trackIndex]
+            );
+            const stepIndices = Array.from({ length: allSteps.length }, (_, i) => i);
 
-          const seq = new Tone.Sequence(
-            (time, stepIndex) => {
-              const velocity = track.steps[stepIndex];
-              if (!velocity) return;
-              const noteOverride = track.notes[stepIndex] || undefined;
-              if (synth instanceof Tone.NoiseSynth) {
-                synth.triggerAttackRelease(noteDuration as string, time, velocity);
-              } else {
-                const note = noteOverride || track.sound.note;
-                (synth as Tone.Synth).triggerAttackRelease(note, noteDuration as string, time, velocity);
-              }
-            },
-            stepIndices,
-            "16n"
-          );
+            const seq = new Tone.Sequence(
+              (time, stepIndex) => {
+                const velocity = allSteps[stepIndex];
+                if (!velocity) return;
+                const noteOverride = track.notes[stepIndex % totalSteps] || undefined;
+                if (synth instanceof Tone.NoiseSynth) {
+                  synth.triggerAttackRelease(noteDuration as string, time, velocity);
+                } else {
+                  const note = noteOverride || track.sound.note;
+                  (synth as Tone.Synth).triggerAttackRelease(note, noteDuration as string, time, velocity);
+                }
+              },
+              stepIndices,
+              "16n"
+            );
+            seq.loop = false;
+            seq.start(0);
+          } else {
+            const stepIndices = Array.from({ length: totalSteps }, (_, i) => i);
 
-          seq.start(0);
-          seq.loop = true;
+            const seq = new Tone.Sequence(
+              (time, stepIndex) => {
+                const velocity = track.steps[stepIndex];
+                if (!velocity) return;
+                const noteOverride = track.notes[stepIndex] || undefined;
+                if (synth instanceof Tone.NoiseSynth) {
+                  synth.triggerAttackRelease(noteDuration as string, time, velocity);
+                } else {
+                  const note = noteOverride || track.sound.note;
+                  (synth as Tone.Synth).triggerAttackRelease(note, noteDuration as string, time, velocity);
+                }
+              },
+              stepIndices,
+              "16n"
+            );
+            seq.start(0);
+            seq.loop = true;
+          }
         });
 
         transport.start();

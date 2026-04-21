@@ -269,8 +269,26 @@ export function useAudioEngine() {
         transport.bpm.value = useEngineStore.getState().bpm;
         transport.swing = useEngineStore.getState().swing;
 
+        let lastStep = -1;
+        let arrangementEnded = false;
+
         sequenceRef.current = new Tone.Sequence(
           (time, stepIndex) => {
+            if (arrangementEnded) return;
+
+            if (stepIndex === 0 && lastStep >= 0) {
+              const s = useEngineStore.getState();
+              if (s.arrangementMode) {
+                const continued = s.advanceArrangement();
+                if (!continued) {
+                  arrangementEnded = true;
+                  setTimeout(() => useEngineStore.getState().stop(), 0);
+                  return;
+                }
+              }
+            }
+            lastStep = stepIndex;
+
             setCurrentStep(stepIndex);
 
             const currentTracks = useEngineStore.getState().tracks;
