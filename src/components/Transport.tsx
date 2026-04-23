@@ -24,6 +24,7 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
   const copyPattern = useEngineStore((s) => s.copyPattern);
   const loadPreset = useEngineStore((s) => s.loadPreset);
 
+  const arrangementMode = useEngineStore((s) => s.arrangementMode);
   const [copySource, setCopySource] = useState<number | null>(null);
   const { exportWAV, exporting } = useExport();
   const canUndo = useHistoryStore((s) => s.past.length > 0);
@@ -238,7 +239,7 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
             ? "bg-accent/50 text-white/50 cursor-wait"
             : "bg-accent hover:bg-accent-hover text-white"
         }`}
-        title="Export WAV (2 loops)"
+        title={arrangementMode ? "Export arrangement WAV" : "Export WAV (2 loops)"}
       >
         {exporting ? "Bouncing..." : "Export"}
       </button>

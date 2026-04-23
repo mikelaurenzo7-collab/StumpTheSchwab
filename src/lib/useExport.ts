@@ -92,12 +92,40 @@ export function useExport() {
 
     try {
       const state = useEngineStore.getState();
-      const { bpm, swing, totalSteps, tracks, master } = state;
+      const { bpm, swing, totalSteps, tracks, patterns, currentPattern, arrangement, arrangementMode, master } = state;
 
       const beatsPerStep = 4 / totalSteps;
       const secondsPerBeat = 60 / bpm;
       const loopDuration = totalSteps * beatsPerStep * secondsPerBeat;
-      const totalDuration = loopDuration * loops;
+
+      const useArrangement = arrangementMode && arrangement.length > 0;
+
+      // Build the sequence of pattern data to render
+      interface PatternSlice { steps: number[][]; notes: string[][] }
+      const slices: PatternSlice[] = [];
+
+      if (useArrangement) {
+        // Snapshot current pattern into patterns array for reading
+        const livePatterns = patterns.map((p, i) =>
+          i === currentPattern
+            ? { steps: tracks.map((t) => t.steps), notes: tracks.map((t) => t.notes) }
+            : { steps: p.steps, notes: p.notes ?? p.steps.map(() => []) }
+        );
+        for (const block of arrangement) {
+          const pat = livePatterns[block.patternIndex];
+          if (!pat) continue;
+          for (let r = 0; r < block.repeats; r++) {
+            slices.push(pat);
+          }
+        }
+      } else {
+        const liveSlice = { steps: tracks.map((t) => t.steps), notes: tracks.map((t) => t.notes) };
+        for (let r = 0; r < loops; r++) {
+          slices.push(liveSlice);
+        }
+      }
+
+      const totalDuration = loopDuration * slices.length;
 
       const buffer = await Tone.Offline(({ transport }) => {
         transport.bpm.value = bpm;
@@ -119,7 +147,7 @@ export function useExport() {
         const hasSolo = tracks.some((t: Track) => t.solo);
         const noteDuration = `${totalSteps}n` as Tone.Unit.Time;
 
-        tracks.forEach((track: Track) => {
+        tracks.forEach((track: Track, trackIndex: number) => {
           const audible = hasSolo ? track.solo && !track.muted : !track.muted;
           if (!audible) return;
 
@@ -156,13 +184,20 @@ export function useExport() {
           const synth = createOfflineSynth(track.sound);
           synth.connect(filter);
 
-          const stepIndices = Array.from({ length: totalSteps }, (_, i) => i);
+          // Build a flat step array across all slices
+          const totalSeqSteps = totalSteps * slices.length;
+          const stepIndices = Array.from({ length: totalSeqSteps }, (_, i) => i);
 
           const seq = new Tone.Sequence(
-            (time, stepIndex) => {
-              const velocity = track.steps[stepIndex];
+            (time, globalStep) => {
+              const sliceIdx = Math.floor(globalStep / totalSteps);
+              const localStep = globalStep % totalSteps;
+              const slice = slices[sliceIdx];
+              if (!slice) return;
+
+              const velocity = slice.steps[trackIndex]?.[localStep] ?? 0;
               if (!velocity) return;
-              const noteOverride = track.notes[stepIndex] || undefined;
+              const noteOverride = slice.notes[trackIndex]?.[localStep] || undefined;
               if (synth instanceof Tone.NoiseSynth) {
                 synth.triggerAttackRelease(noteDuration as string, time, velocity);
               } else {
@@ -174,8 +209,8 @@ export function useExport() {
             "16n"
           );
 
+          seq.loop = false;
           seq.start(0);
-          seq.loop = true;
         });
 
         transport.start();

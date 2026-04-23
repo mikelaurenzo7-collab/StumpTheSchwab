@@ -53,6 +53,12 @@ export interface Track {
 export interface Pattern {
   name: string;
   steps: number[][]; // [trackIndex][stepIndex]
+  notes: string[][]; // [trackIndex][stepIndex]
+}
+
+export interface ArrangementBlock {
+  patternIndex: number;
+  repeats: number;
 }
 
 export const PATTERN_LABELS = ["A", "B", "C", "D", "E", "F", "G", "H"] as const;
@@ -78,6 +84,11 @@ export interface EngineState {
 
   // Piano roll
   pianoRollTrack: number | null; // which track has piano roll open, null = closed
+
+  // Arrangement
+  arrangement: ArrangementBlock[];
+  arrangementMode: boolean;
+  arrangementPosition: { blockIndex: number; repeat: number } | null;
 
   // Actions — transport
   setBpm: (bpm: number) => void;
@@ -116,6 +127,15 @@ export interface EngineState {
 
   // Actions — master bus
   setMaster: <K extends keyof MasterBus>(key: K, value: MasterBus[K]) => void;
+
+  // Actions — arrangement
+  setArrangementMode: (on: boolean) => void;
+  addArrangementBlock: (patternIndex: number) => void;
+  removeArrangementBlock: (index: number) => void;
+  moveArrangementBlock: (from: number, direction: -1 | 1) => void;
+  setBlockRepeats: (index: number, repeats: number) => void;
+  clearArrangement: () => void;
+  setArrangementPosition: (pos: { blockIndex: number; repeat: number } | null) => void;
 
   // Actions — persistence
   saveSession: (name: string) => void;
@@ -180,11 +200,21 @@ interface SessionData {
   bpm: number;
   swing: number;
   totalSteps: number;
-  tracks: { steps: number[]; notes: string[]; volume: number; muted: boolean; solo: boolean; effects: TrackEffects }[];
+  tracks: { steps: number[]; notes: string[]; volume: number; pan: number; muted: boolean; solo: boolean; effects: TrackEffects }[];
+  patterns: { name: string; steps: number[][]; notes: string[][] }[];
+  currentPattern: number;
+  arrangement: ArrangementBlock[];
   master: MasterBus;
 }
 
 function serializeSession(state: EngineState): SessionData {
+  // Snapshot current edits into the active pattern before saving
+  const patternsToSave = state.patterns.map((p, i) =>
+    i === state.currentPattern
+      ? { name: p.name, steps: snapshotSteps(state.tracks), notes: snapshotNotes(state.tracks) }
+      : { name: p.name, steps: p.steps, notes: p.notes ?? p.steps.map(() => []) }
+  );
+
   return {
     bpm: state.bpm,
     swing: state.swing,
@@ -193,10 +223,14 @@ function serializeSession(state: EngineState): SessionData {
       steps: t.steps,
       notes: t.notes,
       volume: t.volume,
+      pan: t.pan,
       muted: t.muted,
       solo: t.solo,
       effects: t.effects,
     })),
+    patterns: patternsToSave,
+    currentPattern: state.currentPattern,
+    arrangement: state.arrangement,
     master: state.master,
   };
 }
@@ -206,6 +240,7 @@ function createEmptyPattern(name: string, trackCount: number, totalSteps: number
   return {
     name,
     steps: Array.from({ length: trackCount }, () => Array(totalSteps).fill(0)),
+    notes: Array.from({ length: trackCount }, () => Array(totalSteps).fill("")),
   };
 }
 
@@ -213,14 +248,18 @@ function snapshotSteps(tracks: Track[]): number[][] {
   return tracks.map((t) => [...t.steps]);
 }
 
-function applyStepsToTracks(tracks: Track[], patternSteps: number[][], totalSteps: number): Track[] {
+function snapshotNotes(tracks: Track[]): string[][] {
+  return tracks.map((t) => [...t.notes]);
+}
+
+function applyPatternToTracks(tracks: Track[], patternSteps: number[][], patternNotes: string[][], totalSteps: number): Track[] {
   return tracks.map((t, i) => {
-    const src = patternSteps[i] ?? [];
+    const srcSteps = patternSteps[i] ?? [];
+    const srcNotes = patternNotes[i] ?? [];
     return {
       ...t,
-      steps: Array(totalSteps)
-        .fill(0)
-        .map((_, j) => src[j] ?? 0),
+      steps: Array(totalSteps).fill(0).map((_, j) => srcSteps[j] ?? 0),
+      notes: Array(totalSteps).fill("").map((_, j) => srcNotes[j] ?? ""),
     };
   });
 }
@@ -241,6 +280,11 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
     createEmptyPattern(label, DEFAULT_KIT.length, INITIAL_STEPS)
   ),
   currentPattern: 0,
+
+  // Arrangement
+  arrangement: [],
+  arrangementMode: false,
+  arrangementPosition: null,
 
   setBpm: (bpm) => set({ bpm: Math.max(30, Math.min(300, bpm)) }),
   setSwing: (swing) => set({ swing: Math.max(0, Math.min(1, swing)) }),
@@ -317,20 +361,16 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
       totalSteps,
       tracks: state.tracks.map((t) => ({
         ...t,
-        steps: Array(totalSteps)
-          .fill(0)
-          .map((_, i) => t.steps[i] ?? 0),
-        notes: Array(totalSteps)
-          .fill("")
-          .map((_, i) => t.notes[i] ?? ""),
+        steps: Array(totalSteps).fill(0).map((_, i) => t.steps[i] ?? 0),
+        notes: Array(totalSteps).fill("").map((_, i) => t.notes[i] ?? ""),
       })),
-      // Resize all patterns too
       patterns: state.patterns.map((p) => ({
         ...p,
         steps: p.steps.map((trackSteps) =>
-          Array(totalSteps)
-            .fill(0)
-            .map((_, i) => trackSteps[i] ?? 0)
+          Array(totalSteps).fill(0).map((_, i) => trackSteps[i] ?? 0)
+        ),
+        notes: (p.notes ?? p.steps.map(() => [])).map((trackNotes) =>
+          Array(totalSteps).fill("").map((_, i) => trackNotes[i] ?? "")
         ),
       })),
     }));
@@ -372,19 +412,17 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
     set((state) => {
       if (index === state.currentPattern || index < 0 || index >= MAX_PATTERNS) return state;
 
-      // Save current steps into current pattern slot
       const updatedPatterns = state.patterns.map((p, i) =>
         i === state.currentPattern
-          ? { ...p, steps: snapshotSteps(state.tracks) }
+          ? { ...p, steps: snapshotSteps(state.tracks), notes: snapshotNotes(state.tracks) }
           : p
       );
 
-      // Load target pattern's steps into tracks
-      const targetSteps = updatedPatterns[index].steps;
+      const target = updatedPatterns[index];
       return {
         patterns: updatedPatterns,
         currentPattern: index,
-        tracks: applyStepsToTracks(state.tracks, targetSteps, state.totalSteps),
+        tracks: applyPatternToTracks(state.tracks, target.steps, target.notes, state.totalSteps),
       };
     });
   },
@@ -394,21 +432,18 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
     set((state) => {
       if (from === to || from < 0 || to < 0 || from >= MAX_PATTERNS || to >= MAX_PATTERNS) return state;
 
-      // If copying from the active pattern, snapshot current live steps
-      const sourceSteps =
-        from === state.currentPattern
-          ? snapshotSteps(state.tracks)
-          : state.patterns[from].steps.map((s) => [...s]);
+      const isLive = from === state.currentPattern;
+      const sourceSteps = isLive ? snapshotSteps(state.tracks) : state.patterns[from].steps.map((s) => [...s]);
+      const sourceNotes = isLive ? snapshotNotes(state.tracks) : (state.patterns[from].notes ?? state.patterns[from].steps.map(() => [])).map((n) => [...n]);
 
       const updatedPatterns = state.patterns.map((p, i) =>
-        i === to ? { ...p, steps: sourceSteps } : p
+        i === to ? { ...p, steps: sourceSteps, notes: sourceNotes } : p
       );
 
-      // If we copied into the active pattern, also update tracks
       if (to === state.currentPattern) {
         return {
           patterns: updatedPatterns,
-          tracks: applyStepsToTracks(state.tracks, sourceSteps, state.totalSteps),
+          tracks: applyPatternToTracks(state.tracks, sourceSteps, sourceNotes, state.totalSteps),
         };
       }
 
@@ -419,19 +454,21 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
   clearPattern: (index) => {
     pushHistory();
     set((state) => {
-      const emptySteps = Array.from({ length: state.tracks.length }, () =>
-        Array(state.totalSteps).fill(0)
-      );
+      const emptySteps = Array.from({ length: state.tracks.length }, () => Array(state.totalSteps).fill(0));
+      const emptyNotes = Array.from({ length: state.tracks.length }, () => Array(state.totalSteps).fill(""));
 
       const updatedPatterns = state.patterns.map((p, i) =>
-        i === index ? { ...p, steps: emptySteps } : p
+        i === index ? { ...p, steps: emptySteps, notes: emptyNotes } : p
       );
 
-      // If clearing active pattern, also clear tracks
       if (index === state.currentPattern) {
         return {
           patterns: updatedPatterns,
-          tracks: state.tracks.map((t) => ({ ...t, steps: t.steps.map(() => 0) })),
+          tracks: state.tracks.map((t) => ({
+            ...t,
+            steps: t.steps.map(() => 0),
+            notes: t.notes.map(() => ""),
+          })),
         };
       }
 
@@ -445,17 +482,14 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
       const totalSteps = preset.steps;
       const trackCount = state.tracks.length;
 
-      // Build steps array, pad/truncate to match track count and step count
       const presetSteps = Array.from({ length: trackCount }, (_, trackIdx) => {
         const src = preset.tracks[trackIdx] ?? [];
-        return Array(totalSteps)
-          .fill(0)
-          .map((_, stepIdx) => src[stepIdx] ?? 0);
+        return Array(totalSteps).fill(0).map((_, stepIdx) => src[stepIdx] ?? 0);
       });
+      const emptyNotes = Array.from({ length: trackCount }, () => Array(totalSteps).fill(""));
 
-      // Save into current pattern slot and apply to tracks
       const updatedPatterns = state.patterns.map((p, i) =>
-        i === state.currentPattern ? { ...p, steps: presetSteps } : p
+        i === state.currentPattern ? { ...p, steps: presetSteps, notes: emptyNotes } : p
       );
 
       return {
@@ -465,14 +499,16 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         patterns: updatedPatterns.map((p) => ({
           ...p,
           steps: p.steps.map((trackSteps) =>
-            Array(totalSteps)
-              .fill(0)
-              .map((_, i) => trackSteps[i] ?? 0)
+            Array(totalSteps).fill(0).map((_, i) => trackSteps[i] ?? 0)
+          ),
+          notes: (p.notes ?? p.steps.map(() => [])).map((trackNotes) =>
+            Array(totalSteps).fill("").map((_, i) => trackNotes[i] ?? "")
           ),
         })),
         tracks: state.tracks.map((t, i) => ({
           ...t,
           steps: presetSteps[i] ?? Array(totalSteps).fill(0),
+          notes: emptyNotes[i] ?? Array(totalSteps).fill(""),
         })),
       };
     });
@@ -520,6 +556,50 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
       master: { ...state.master, [key]: value },
     })),
 
+  // ── Arrangement actions ─────────────────────────────────────
+  setArrangementMode: (on) => set({ arrangementMode: on, arrangementPosition: null }),
+
+  addArrangementBlock: (patternIndex) => {
+    pushHistory();
+    set((state) => ({
+      arrangement: [...state.arrangement, { patternIndex, repeats: 1 }],
+    }));
+  },
+
+  removeArrangementBlock: (index) => {
+    pushHistory();
+    set((state) => ({
+      arrangement: state.arrangement.filter((_, i) => i !== index),
+    }));
+  },
+
+  moveArrangementBlock: (from, direction) => {
+    pushHistory();
+    set((state) => {
+      const to = from + direction;
+      if (to < 0 || to >= state.arrangement.length) return state;
+      const arr = [...state.arrangement];
+      [arr[from], arr[to]] = [arr[to], arr[from]];
+      return { arrangement: arr };
+    });
+  },
+
+  setBlockRepeats: (index, repeats) => {
+    pushHistory();
+    set((state) => ({
+      arrangement: state.arrangement.map((b, i) =>
+        i === index ? { ...b, repeats: Math.max(1, Math.min(64, repeats)) } : b
+      ),
+    }));
+  },
+
+  clearArrangement: () => {
+    pushHistory();
+    set({ arrangement: [], arrangementPosition: null });
+  },
+
+  setArrangementPosition: (pos) => set({ arrangementPosition: pos }),
+
   // Persistence
   saveSession: (name) => {
     try {
@@ -539,15 +619,27 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         totalSteps: data.totalSteps,
         playbackState: "stopped",
         currentStep: -1,
+        currentPattern: data.currentPattern ?? 0,
         tracks: state.tracks.map((t, i) => ({
           ...t,
           steps: data.tracks[i]?.steps ?? t.steps,
           notes: data.tracks[i]?.notes ?? t.notes.map(() => ""),
           volume: data.tracks[i]?.volume ?? t.volume,
+          pan: data.tracks[i]?.pan ?? t.pan,
           muted: data.tracks[i]?.muted ?? t.muted,
           solo: data.tracks[i]?.solo ?? t.solo,
           effects: data.tracks[i]?.effects ?? t.effects,
         })),
+        patterns: data.patterns
+          ? data.patterns.map((p) => ({
+              name: p.name,
+              steps: p.steps,
+              notes: p.notes ?? p.steps.map(() => []),
+            }))
+          : state.patterns,
+        arrangement: data.arrangement ?? [],
+        arrangementMode: false,
+        arrangementPosition: null,
         master: data.master,
       }));
       return true;

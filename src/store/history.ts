@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { useEngineStore, _setCheckpoint, type Track, type Pattern, type MasterBus } from "./engine";
+import { useEngineStore, _setCheckpoint, type Track, type Pattern, type MasterBus, type ArrangementBlock } from "./engine";
 
 const MAX_HISTORY = 50;
 
@@ -11,6 +11,7 @@ interface Snapshot {
   patterns: Pattern[];
   currentPattern: number;
   master: MasterBus;
+  arrangement: ArrangementBlock[];
 }
 
 interface HistoryState {
@@ -39,9 +40,11 @@ function captureSnapshot(): Snapshot {
     patterns: s.patterns.map((p) => ({
       ...p,
       steps: p.steps.map((row) => [...row]),
+      notes: (p.notes ?? p.steps.map(() => [])).map((row) => [...row]),
     })),
     currentPattern: s.currentPattern,
     master: { ...s.master },
+    arrangement: s.arrangement.map((b) => ({ ...b })),
   };
 }
 
@@ -54,6 +57,7 @@ function restoreSnapshot(snapshot: Snapshot) {
     currentPattern: snapshot.currentPattern,
     patterns: snapshot.patterns,
     master: snapshot.master,
+    arrangement: snapshot.arrangement,
     tracks: state.tracks.map((t, i) => ({
       ...t,
       steps: snapshot.tracks[i]?.steps ?? t.steps,

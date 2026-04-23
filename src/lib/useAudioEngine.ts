@@ -153,6 +153,7 @@ export function useAudioEngine() {
   const sequenceRef = useRef<Tone.Sequence | null>(null);
   const initializedRef = useRef(false);
   const trackMetersRef = useRef<Tone.Meter[]>([]);
+  const arrangeRef = useRef<{ blockIndex: number; currentRepeat: number; started: boolean } | null>(null);
   const masterMeterRef = useRef<Tone.Meter | null>(null);
 
   const initAudio = useCallback(async () => {
@@ -261,32 +262,86 @@ export function useAudioEngine() {
           sequenceRef.current.dispose();
         }
 
-        const { totalSteps, setCurrentStep } = useEngineStore.getState();
+        const { totalSteps, setCurrentStep, arrangementMode, arrangement, setArrangementPosition } = useEngineStore.getState();
         const stepIndices = Array.from({ length: totalSteps }, (_, i) => i);
-
         const noteDuration = `${totalSteps}n` as Tone.Unit.Time;
 
         transport.bpm.value = useEngineStore.getState().bpm;
         transport.swing = useEngineStore.getState().swing;
 
+        const useArrangement = arrangementMode && arrangement.length > 0;
+        if (useArrangement) {
+          arrangeRef.current = { blockIndex: 0, currentRepeat: 0, started: false };
+          setArrangementPosition({ blockIndex: 0, repeat: 0 });
+        } else {
+          arrangeRef.current = null;
+          setArrangementPosition(null);
+        }
+
         sequenceRef.current = new Tone.Sequence(
           (time, stepIndex) => {
+            const s = useEngineStore.getState();
+
+            if (useArrangement && arrangeRef.current) {
+              if (stepIndex === 0 && arrangeRef.current.started) {
+                arrangeRef.current.currentRepeat++;
+                const block = s.arrangement[arrangeRef.current.blockIndex];
+                if (block && arrangeRef.current.currentRepeat >= block.repeats) {
+                  arrangeRef.current.blockIndex++;
+                  arrangeRef.current.currentRepeat = 0;
+
+                  if (arrangeRef.current.blockIndex >= s.arrangement.length) {
+                    s.stop();
+                    s.setArrangementPosition(null);
+                    return;
+                  }
+                }
+                s.setArrangementPosition({
+                  blockIndex: arrangeRef.current.blockIndex,
+                  repeat: arrangeRef.current.currentRepeat,
+                });
+              }
+              arrangeRef.current.started = true;
+            }
+
             setCurrentStep(stepIndex);
 
-            const currentTracks = useEngineStore.getState().tracks;
+            const currentTracks = s.tracks;
             const hasSolo = currentTracks.some((t: Track) => t.solo);
 
+            let stepSource: number[][] | null = null;
+            let noteSource: string[][] | null = null;
+
+            if (useArrangement && arrangeRef.current) {
+              const block = s.arrangement[arrangeRef.current.blockIndex];
+              if (block) {
+                const patIdx = block.patternIndex;
+                if (patIdx === s.currentPattern) {
+                  stepSource = currentTracks.map((t) => t.steps);
+                  noteSource = currentTracks.map((t) => t.notes);
+                } else {
+                  const pat = s.patterns[patIdx];
+                  if (pat) {
+                    stepSource = pat.steps;
+                    noteSource = pat.notes ?? pat.steps.map(() => []);
+                  }
+                }
+              }
+            }
+
             currentTracks.forEach((track: Track, trackIndex: number) => {
-              const velocity = track.steps[stepIndex];
+              const velocity = stepSource
+                ? (stepSource[trackIndex]?.[stepIndex] ?? 0)
+                : track.steps[stepIndex];
               if (!velocity) return;
-              const audible = hasSolo
-                ? track.solo && !track.muted
-                : !track.muted;
+              const audible = hasSolo ? track.solo && !track.muted : !track.muted;
               if (!audible) return;
 
               const synth = synthsRef.current[trackIndex];
               if (synth) {
-                const noteOverride = track.notes?.[stepIndex] || undefined;
+                const noteOverride = noteSource
+                  ? (noteSource[trackIndex]?.[stepIndex] || undefined)
+                  : (track.notes?.[stepIndex] || undefined);
                 triggerSynth(synth, track.sound, time, velocity, noteDuration as string, noteOverride);
               }
             });
@@ -301,6 +356,8 @@ export function useAudioEngine() {
         transport.pause();
       } else {
         transport.stop();
+        arrangeRef.current = null;
+        useEngineStore.getState().setArrangementPosition(null);
         if (sequenceRef.current) {
           sequenceRef.current.stop();
           sequenceRef.current.dispose();

@@ -93,6 +93,13 @@ export function useKeyboardShortcuts(onInit: () => Promise<void>) {
           state.setBpm(state.bpm - (e.shiftKey ? 10 : 1));
           break;
         }
+
+        // Tab: Toggle arrangement mode
+        case "Tab": {
+          e.preventDefault();
+          state.setArrangementMode(!state.arrangementMode);
+          break;
+        }
       }
     };
 
