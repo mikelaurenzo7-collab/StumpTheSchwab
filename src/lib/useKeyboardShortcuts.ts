@@ -93,6 +93,7 @@ export function useKeyboardShortcuts(onInit: () => Promise<void>) {
           state.setBpm(state.bpm - (e.shiftKey ? 10 : 1));
           break;
         }
+
       }
     };
 

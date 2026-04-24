@@ -5,7 +5,7 @@ import * as Tone from "tone";
 import { useEngineStore, type Track, type TrackEffects, type MasterBus } from "@/store/engine";
 import type { TrackSound } from "@/lib/sounds";
 
-type SynthNode =
+export type SynthNode =
   | Tone.MembraneSynth
   | Tone.MetalSynth
   | Tone.NoiseSynth
@@ -28,7 +28,7 @@ interface MasterChain {
   limiter: Tone.Limiter;
 }
 
-function createSynth(sound: TrackSound): SynthNode {
+export function createSynth(sound: TrackSound): SynthNode {
   const opts = (sound.options ?? {}) as Record<string, unknown>;
   switch (sound.synth) {
     case "membrane":
@@ -47,7 +47,7 @@ function createSynth(sound: TrackSound): SynthNode {
   }
 }
 
-function triggerSynth(synth: SynthNode, sound: TrackSound, time: number, velocity: number, duration: string, noteOverride?: string) {
+export function triggerSynth(synth: SynthNode, sound: TrackSound, time: number, velocity: number, duration: string, noteOverride?: string) {
   if (synth instanceof Tone.NoiseSynth) {
     synth.triggerAttackRelease(duration, time, velocity);
   } else {
@@ -279,6 +279,8 @@ export function useAudioEngine() {
             currentTracks.forEach((track: Track, trackIndex: number) => {
               const velocity = track.steps[stepIndex];
               if (!velocity) return;
+              const probability = track.probabilities?.[stepIndex] ?? 1.0;
+              if (probability < 1.0 && Math.random() > probability) return;
               const audible = hasSolo
                 ? track.solo && !track.muted
                 : !track.muted;

@@ -25,6 +25,7 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
   const loadPreset = useEngineStore((s) => s.loadPreset);
 
   const [copySource, setCopySource] = useState<number | null>(null);
+  const [exportLoops, setExportLoops] = useState(2);
   const { exportWAV, exporting } = useExport();
   const canUndo = useHistoryStore((s) => s.past.length > 0);
   const canRedo = useHistoryStore((s) => s.future.length > 0);
@@ -48,7 +49,6 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
   const handlePatternClick = useCallback(
     (index: number) => {
       if (copySource !== null) {
-        // Paste mode: copy from source to clicked target
         copyPattern(copySource, index);
         setCopySource(null);
       } else {
@@ -60,7 +60,7 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
 
   const handleCopy = useCallback(() => {
     if (copySource !== null) {
-      setCopySource(null); // Cancel copy
+      setCopySource(null);
     } else {
       setCopySource(currentPattern);
     }
@@ -230,18 +230,31 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
       </div>
 
       {/* Export */}
-      <button
-        onClick={() => exportWAV(2)}
-        disabled={exporting}
-        className={`px-3 py-1.5 rounded text-xs uppercase tracking-wider transition-colors ${
-          exporting
-            ? "bg-accent/50 text-white/50 cursor-wait"
-            : "bg-accent hover:bg-accent-hover text-white"
-        }`}
-        title="Export WAV (2 loops)"
-      >
-        {exporting ? "Bouncing..." : "Export"}
-      </button>
+      <div className="flex items-center gap-1">
+        <select
+          value={exportLoops}
+          onChange={(e) => setExportLoops(Number(e.target.value))}
+          className="bg-surface-2 border border-border rounded px-1.5 py-1 text-[10px] font-mono text-muted focus:outline-none focus:border-accent w-14"
+          title="Number of loops to export"
+        >
+          <option value={1}>1x</option>
+          <option value={2}>2x</option>
+          <option value={4}>4x</option>
+          <option value={8}>8x</option>
+        </select>
+        <button
+          onClick={() => exportWAV(exportLoops)}
+          disabled={exporting}
+          className={`px-3 py-1.5 rounded text-xs uppercase tracking-wider transition-colors font-bold ${
+            exporting
+              ? "bg-accent/50 text-white/50 cursor-wait"
+              : "bg-accent hover:bg-accent-hover text-white"
+          }`}
+          title="Export pattern as WAV"
+        >
+          {exporting ? "Bouncing..." : "Export"}
+        </button>
+      </div>
 
       {/* Sessions */}
       <SessionManager />

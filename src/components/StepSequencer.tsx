@@ -1,38 +1,55 @@
 "use client";
 
-import { useEngineStore, nextVelocity } from "@/store/engine";
+import { useEngineStore, nextVelocity, nextProbability } from "@/store/engine";
 import { useCallback, memo } from "react";
 
-// ── Velocity labels for tooltip ──────────────────────────────
 const velLabel = (v: number) =>
   v >= 1 ? "Full" : v >= 0.75 ? "High" : v >= 0.5 ? "Med" : "Soft";
+
+const probLabel = (p: number) =>
+  p >= 1 ? "100%" : p >= 0.75 ? "75%" : p >= 0.5 ? "50%" : "25%";
 
 // ── Single Step Cell ───────────────────────────────────────────
 const StepCell = memo(function StepCell({
   velocity,
+  probability,
   isCurrent,
   color,
   onClick,
   onRightClick,
+  onCtrlClick,
   beatStart,
 }: {
   velocity: number;
+  probability: number;
   isCurrent: boolean;
   color: string;
   onClick: () => void;
   onRightClick: () => void;
+  onCtrlClick: () => void;
   beatStart: boolean;
 }) {
   const active = velocity > 0;
+  const hasProb = active && probability < 1;
 
   return (
     <button
-      onClick={onClick}
+      onClick={(e) => {
+        if (e.ctrlKey || e.metaKey) {
+          onCtrlClick();
+        } else {
+          onClick();
+        }
+      }}
       onContextMenu={(e) => {
         e.preventDefault();
         onRightClick();
       }}
-      title={active ? `${velLabel(velocity)} (${Math.round(velocity * 100)}%) — right-click to adjust` : ""}
+      title={
+        active
+          ? `${velLabel(velocity)} (${Math.round(velocity * 100)}%)${hasProb ? ` — ${probLabel(probability)} chance` : ""} — right-click: velocity, ctrl-click: probability`
+          : "ctrl-click: add with probability"
+      }
       className={`
         relative w-8 h-8 rounded-sm transition-all duration-75 border overflow-hidden
         ${beatStart ? "ml-1" : ""}
@@ -43,6 +60,7 @@ const StepCell = memo(function StepCell({
         }
         ${isCurrent && !active ? "ring-1 ring-accent/50" : ""}
         ${isCurrent && active ? "ring-1 ring-white/60 scale-105" : ""}
+        ${hasProb ? "ring-1 ring-white/20" : ""}
       `}
     >
       {active && (
@@ -55,6 +73,14 @@ const StepCell = memo(function StepCell({
           }}
         />
       )}
+      {hasProb && (
+        <span
+          className="absolute bottom-0 left-0.5 text-[7px] font-mono leading-none text-white/80 font-bold"
+          style={{ textShadow: "0 0 3px rgba(0,0,0,0.8)" }}
+        >
+          {Math.round(probability * 100)}
+        </span>
+      )}
     </button>
   );
 });
@@ -65,11 +91,13 @@ const TrackRow = memo(function TrackRow({
   name,
   color,
   steps,
+  probabilities,
   melodic,
   pianoRollOpen,
   currentStep,
   onToggleStep,
   onCycleVelocity,
+  onCtrlClick,
   onClearTrack,
   onTogglePianoRoll,
 }: {
@@ -77,17 +105,19 @@ const TrackRow = memo(function TrackRow({
   name: string;
   color: string;
   steps: number[];
+  probabilities: number[];
   melodic: boolean;
   pianoRollOpen: boolean;
   currentStep: number;
   onToggleStep: (trackId: number, step: number) => void;
   onCycleVelocity: (trackId: number, step: number) => void;
+  onCtrlClick: (trackId: number, step: number) => void;
   onClearTrack: (trackId: number) => void;
   onTogglePianoRoll: (trackId: number) => void;
 }) {
   return (
     <div className="flex items-center gap-0.5 group">
-      {/* Track label — click to open piano roll for melodic tracks */}
+      {/* Track label */}
       <div
         className={`w-20 shrink-0 flex items-center gap-1.5 pr-2 ${
           melodic ? "cursor-pointer hover:opacity-80" : ""
@@ -113,11 +143,13 @@ const TrackRow = memo(function TrackRow({
           <StepCell
             key={stepIdx}
             velocity={velocity}
+            probability={probabilities[stepIdx] ?? 1.0}
             isCurrent={currentStep === stepIdx}
             color={color}
             beatStart={stepIdx > 0 && stepIdx % 4 === 0}
             onClick={() => onToggleStep(trackId, stepIdx)}
             onRightClick={() => onCycleVelocity(trackId, stepIdx)}
+            onCtrlClick={() => onCtrlClick(trackId, stepIdx)}
           />
         ))}
       </div>
@@ -140,6 +172,7 @@ export function StepSequencer() {
   const currentStep = useEngineStore((s) => s.currentStep);
   const toggleStep = useEngineStore((s) => s.toggleStep);
   const setStepVelocity = useEngineStore((s) => s.setStepVelocity);
+  const setStepProbability = useEngineStore((s) => s.setStepProbability);
   const clearTrack = useEngineStore((s) => s.clearTrack);
   const pianoRollTrack = useEngineStore((s) => s.pianoRollTrack);
   const setPianoRollTrack = useEngineStore((s) => s.setPianoRollTrack);
@@ -160,6 +193,18 @@ export function StepSequencer() {
       }
     },
     [setStepVelocity]
+  );
+
+  const handleCtrlClick = useCallback(
+    (trackId: number, step: number) => {
+      const track = useEngineStore.getState().tracks[trackId];
+      if (track.steps[step] > 0) {
+        setStepProbability(trackId, step, nextProbability(track.probabilities[step]));
+      } else {
+        toggleStep(trackId, step);
+      }
+    },
+    [toggleStep, setStepProbability]
   );
 
   const handleClear = useCallback(
@@ -202,11 +247,13 @@ export function StepSequencer() {
             name={track.sound.name}
             color={track.sound.color}
             steps={track.steps}
+            probabilities={track.probabilities}
             melodic={track.sound.melodic}
             pianoRollOpen={pianoRollTrack === track.id}
             currentStep={currentStep}
             onToggleStep={handleToggle}
             onCycleVelocity={handleCycleVelocity}
+            onCtrlClick={handleCtrlClick}
             onClearTrack={handleClear}
             onTogglePianoRoll={handleTogglePianoRoll}
           />

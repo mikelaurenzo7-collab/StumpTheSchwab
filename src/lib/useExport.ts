@@ -162,6 +162,8 @@ export function useExport() {
             (time, stepIndex) => {
               const velocity = track.steps[stepIndex];
               if (!velocity) return;
+              const probability = track.probabilities?.[stepIndex] ?? 1.0;
+              if (probability < 1.0 && Math.random() > probability) return;
               const noteOverride = track.notes[stepIndex] || undefined;
               if (synth instanceof Tone.NoiseSynth) {
                 synth.triggerAttackRelease(noteDuration as string, time, velocity);
@@ -185,7 +187,7 @@ export function useExport() {
       const url = URL.createObjectURL(wav);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `stumptheschwab-${Date.now()}.wav`;
+      a.download = `sts-${bpm}bpm-${totalSteps}steps${loops > 1 ? `-${loops}x` : ""}.wav`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

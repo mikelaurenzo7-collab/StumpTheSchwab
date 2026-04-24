@@ -28,6 +28,9 @@ src/
 - Zustand store is the single source of truth for sequencer state, playback, and mixer
 - Synths are created once on init and reused; gain nodes handle per-track volume/mute/solo
 - Step sequencer reads latest store state each tick for real-time responsiveness
+- Undo/redo uses snapshot-based history stack in Zustand (discrete actions push immediately, continuous controls throttle at 500ms)
+- WAV export uses `Tone.Offline` to render the pattern offline, then converts to 16-bit PCM WAV
+- Step probability: each step has a 0–100% trigger chance, rolled per tick during playback and export
 
 ## Design Tokens
 Dark theme defined in `globals.css` — accent purple (#8b5cf6), track colors per instrument in `lib/sounds.ts`.
