@@ -1022,20 +1022,14 @@ export function Mixer({
   }, []);
 
   return (
-    <div className="px-4 py-3">
-      {/* Master visualizer — spectrum bars + oscilloscope overlay. */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-4 rounded-[1.25rem] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015)),rgba(8,12,18,0.68)] px-4 py-3">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-cyan">
-            Perform / Mix
-          </p>
-          <h2 className="text-lg font-black tracking-tight text-white">
-            Color, motion, level
-          </h2>
-        </div>
-        <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-foreground/72">
-          <span className="pill-badge rounded-full px-2.5 py-1">{tracks.length} channels</span>
-          <span className="pill-badge rounded-full px-2.5 py-1">{openFX.size} FX open</span>
+    <div className="px-3 py-3">
+      {/* Master visualizer header — spectrum + oscilloscope */}
+      <div className="mb-3 flex flex-wrap items-center gap-4 rounded-lg border border-border bg-surface-2 px-3 py-2">
+        <div className="flex items-baseline gap-3">
+          <h2 className="text-[13px] font-bold tracking-tight text-foreground">Master</h2>
+          <span className="text-[10px] font-mono text-muted">
+            {tracks.length} ch · {openFX.size} FX
+          </span>
         </div>
         <div className="min-w-0 flex-1">
         <SpectrumAnalyzer
