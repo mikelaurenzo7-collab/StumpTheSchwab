@@ -960,7 +960,7 @@ export function Mixer({
         </div>
       </div>
 
-      <div className="rounded-[1.5rem] border border-white/[0.06] bg-black/10 p-3">
+      <div className="panel-soft rounded-[1.5rem] p-3">
         <div className="flex items-start gap-2 overflow-x-auto">
         {tracks.map((track, i) => (
           <ChannelStrip

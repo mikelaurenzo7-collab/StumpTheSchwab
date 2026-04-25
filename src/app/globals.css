@@ -20,6 +20,8 @@
   --shadow-soft: 0 18px 48px rgba(0, 0, 0, 0.26);
   --shadow-panel: 0 28px 90px rgba(0, 0, 0, 0.34);
   --shadow-pop: 0 32px 120px rgba(0, 0, 0, 0.44);
+  --shadow-cyan-soft: 0 18px 36px rgba(34, 211, 238, 0.08);
+  --shadow-accent-soft: 0 20px 44px rgba(155, 92, 255, 0.12);
   --ring-strong: rgba(192, 132, 252, 0.42);
 }
 
@@ -207,6 +209,14 @@ button:disabled {
   background: rgba(255, 255, 255, 0.05);
   color: var(--muted);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.shadow-cyan-soft {
+  box-shadow: var(--shadow-cyan-soft);
+}
+
+.shadow-accent-soft {
+  box-shadow: var(--shadow-accent-soft);
 }
 
 button:disabled,

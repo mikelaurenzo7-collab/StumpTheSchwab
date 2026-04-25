@@ -769,7 +769,7 @@ export function GeneratorModal() {
                 </>
               )}
 
-              <div className="rounded-2xl border border-cyan/15 bg-cyan/5 p-3 shadow-[0_18px_36px_rgba(34,211,238,0.08)]">
+              <div className="shadow-cyan-soft rounded-2xl border border-cyan/15 bg-cyan/5 p-3">
                 <div className="mb-2 text-[9px] font-black uppercase tracking-[0.22em] text-cyan">
                   Next moves from this groove
                 </div>
@@ -838,7 +838,7 @@ export function GeneratorModal() {
               )}
 
               {lastResult && !error && (
-                 <div className="mt-4 rounded-2xl border border-accent/30 bg-accent/10 p-3 shadow-[0_20px_44px_rgba(155,92,255,0.12)]">
+                 <div className="shadow-accent-soft mt-4 rounded-2xl border border-accent/30 bg-accent/10 p-3">
                   <div className="mb-1.5 flex items-center justify-between gap-3">
                     <span className="text-xs font-bold text-accent">
                       {lastResult.refined ? "✦ Mutated:" : "✓ Applied:"} v{lastResult.version} · {lastResult.beat.name}

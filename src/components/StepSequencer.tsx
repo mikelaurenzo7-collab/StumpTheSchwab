@@ -443,7 +443,7 @@ export function StepSequencer() {
         </div>
       </div>
 
-      <div className="inline-flex flex-col gap-2 rounded-[1.5rem] border border-white/[0.05] bg-black/10 p-3">
+      <div className="panel-soft inline-flex flex-col gap-2 rounded-[1.5rem] p-3">
         {/* Step numbers */}
         <div className="flex items-center gap-2">
           <div className="w-28 shrink-0" />
