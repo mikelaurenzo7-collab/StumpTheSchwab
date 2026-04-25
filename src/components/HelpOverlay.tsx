@@ -99,23 +99,24 @@ export function HelpOverlay() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md"
       onClick={() => setOpen(false)}
     >
       <div
-        className="bg-surface border border-border rounded-xl shadow-2xl p-6 max-w-3xl w-[90%] max-h-[85vh] overflow-y-auto"
+        className="panel max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-[1.8rem] p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-base font-bold text-foreground">Keyboard Shortcuts</h2>
-            <p className="text-xs text-muted mt-0.5">
+            <p className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-accent-hover">Shortcut map</p>
+            <h2 className="text-xl font-black tracking-[-0.03em] text-foreground">Keyboard Shortcuts</h2>
+            <p className="mt-0.5 text-xs text-muted">
               Make better music, faster.
             </p>
           </div>
           <button
             onClick={() => setOpen(false)}
-            className="text-muted hover:text-foreground text-xl leading-none px-2"
+            className="button-secondary rounded-full px-3 py-1 text-xl leading-none"
             title="Close (Esc)"
           >
             ×
@@ -125,11 +126,11 @@ export function HelpOverlay() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           {SHORTCUTS.map((group) => (
             <div key={group.title}>
-              <h3 className="text-[10px] font-bold uppercase tracking-wider text-accent mb-2">
-                {group.title}
-              </h3>
-              <ul className="flex flex-col gap-1.5">
-                {group.items.map((item, i) => (
+                <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-accent">
+                  {group.title}
+                </h3>
+                <ul className="flex flex-col gap-1.5 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3">
+                  {group.items.map((item, i) => (
                   <li
                     key={i}
                     className="flex items-center justify-between gap-3 text-xs"
@@ -147,7 +148,7 @@ export function HelpOverlay() {
           ))}
         </div>
 
-        <div className="mt-6 pt-4 border-t border-border flex items-center justify-between text-[10px] text-muted">
+        <div className="mt-6 flex items-center justify-between border-t border-white/[0.06] pt-4 text-[10px] text-muted">
           <span>
             Tip: right-click a step to cycle velocity, ctrl-click to set
             probability.

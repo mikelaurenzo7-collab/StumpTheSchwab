@@ -132,11 +132,11 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       : `${tapTimes.length}/6`;
 
   return (
-    <div className="glass-control flex items-center gap-3 rounded-3xl px-3 py-3 flex-wrap">
+    <div className="glass-control relative flex flex-wrap items-center gap-3 rounded-[1.8rem] px-3 py-3">
       {/* AI Generate */}
       <button
         onClick={() => useUiStore.getState().setGeneratorOpen(true)}
-        className="group rounded-2xl bg-gradient-to-br from-accent via-accent-dim to-cyan px-4 py-3 text-xs font-black uppercase tracking-[0.2em] text-white shadow-lg shadow-accent/30 transition-all hover:scale-[1.02] hover:shadow-accent/50 flex items-center gap-2"
+        className="button-primary group flex items-center gap-2 rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-[0.2em]"
         title="Generate or mutate a groove (G)"
       >
         <span className="text-base leading-none transition-transform group-hover:rotate-12">✦</span>
@@ -146,7 +146,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Play/Pause */}
       <button
         onClick={handlePlay}
-        className="h-12 w-12 rounded-2xl bg-white text-background flex items-center justify-center transition-all font-mono text-lg shadow-lg shadow-white/10 hover:scale-105"
+        className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/20 bg-white text-lg font-mono text-background shadow-lg shadow-white/10 hover:scale-105"
         title={playbackState === "playing" ? "Pause (Space)" : "Play (Space)"}
       >
         {playbackState === "playing" ? "⏸" : "▶"}
@@ -155,35 +155,38 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Stop */}
       <button
         onClick={handleStop}
-        className="h-12 w-12 rounded-2xl bg-white/[0.08] hover:bg-white/[0.14] text-foreground flex items-center justify-center transition-colors font-mono text-lg"
+        className="button-secondary flex h-12 w-12 items-center justify-center rounded-2xl font-mono text-lg text-foreground"
         title="Stop"
       >
         ⏹
       </button>
 
       {/* BPM */}
-      <div className="flex items-center gap-2 rounded-2xl bg-black/20 px-3 py-2">
-        <label className="text-[10px] font-black text-muted uppercase tracking-[0.2em]">BPM</label>
+      <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
+        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">BPM</div>
+        <div className="flex items-center gap-2">
         <input
           type="number"
           min={30}
           max={300}
           value={bpm}
           onChange={(e) => setBpm(Number(e.target.value))}
-          className="w-16 bg-white/[0.08] border border-white/10 rounded-xl px-2 py-1.5 text-center text-sm font-mono text-foreground focus:outline-none focus:border-accent"
+          className="control-input w-16 rounded-xl px-2 py-1.5 text-center text-sm font-mono"
         />
         <button
           onClick={handleTap}
-          className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/[0.08] hover:bg-white/[0.14] text-muted hover:text-foreground transition-colors min-w-[3rem]"
+          className="button-secondary min-w-[3rem] rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider"
           title="Tap to set BPM — tap repeatedly at the desired tempo"
         >
           {tapHint}
         </button>
+        </div>
       </div>
 
       {/* Swing */}
-      <div className="flex items-center gap-2 rounded-2xl bg-black/20 px-3 py-2">
-        <label className="text-[10px] font-black text-muted uppercase tracking-[0.2em]">Swing</label>
+      <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
+        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Swing</div>
+        <div className="flex items-center gap-2">
         <input
           type="range"
           min={0}
@@ -196,29 +199,33 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
         <span className="text-xs font-mono text-muted w-8">
           {Math.round(swing * 100)}%
         </span>
+        </div>
       </div>
 
       {/* Steps */}
-      <div className="flex items-center gap-2 rounded-2xl bg-black/20 px-3 py-2">
-        <label className="text-[10px] font-black text-muted uppercase tracking-[0.2em]">Steps</label>
+      <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
+        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Steps</div>
+        <div className="flex items-center gap-2">
         <select
           value={totalSteps}
           onChange={(e) => setTotalSteps(Number(e.target.value))}
-          className="bg-white/[0.08] border border-white/10 rounded-xl px-2 py-1.5 text-sm font-mono text-foreground focus:outline-none focus:border-accent"
+          className="control-select rounded-xl px-2 py-1.5 text-sm font-mono"
         >
           <option value={8}>8</option>
           <option value={16}>16</option>
           <option value={32}>32</option>
           <option value={64}>64</option>
         </select>
+        </div>
       </div>
 
       {/* Separator */}
       <div className="w-px h-8 bg-white/10 mx-1" />
 
       {/* Pattern Selector */}
-      <div className="flex items-center gap-1.5 rounded-2xl bg-black/20 px-3 py-2">
-        <span className="text-[10px] font-black text-muted uppercase tracking-[0.2em]">Pattern</span>
+      <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
+        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Pattern bank</div>
+        <div className="flex items-center gap-1.5">
         <div className="flex gap-0.5">
           {PATTERN_LABELS.map((label, i) => (
             <button
@@ -245,11 +252,11 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
         {/* Copy button */}
         <button
           onClick={handleCopy}
-            className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors ${
-              copySource !== null
+            className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+               copySource !== null
                 ? "bg-warning text-black"
-                : "bg-white/[0.08] text-muted hover:bg-white/[0.14]"
-            }`}
+                : "button-secondary"
+             }`}
           title={copySource !== null ? "Cancel copy" : "Copy current pattern"}
         >
           {copySource !== null ? "ESC" : "CPY"}
@@ -262,7 +269,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
             value={renameDraft}
             onChange={(e) => setRenameDraft(e.target.value)}
             onBlur={commitRename}
-            onKeyDown={(e) => {
+             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
                 commitRename();
@@ -270,28 +277,30 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
                 e.preventDefault();
                 cancelRename();
               }
-            }}
-            maxLength={16}
-            placeholder={PATTERN_LABELS[currentPattern]}
-            className="bg-white/[0.08] border border-accent rounded-xl px-2 py-1 text-xs font-medium text-foreground w-24 focus:outline-none"
-          />
-        ) : (
-          <button
-            onClick={startRename}
-             className="text-xs font-medium text-muted hover:text-foreground px-1 truncate max-w-[8rem]"
-            title="Click to rename this pattern"
-          >
-            {currentPatternName}
-          </button>
-        )}
+             }}
+             maxLength={16}
+             placeholder={PATTERN_LABELS[currentPattern]}
+             className="control-input w-24 rounded-xl border-accent px-2 py-1 text-xs font-medium"
+           />
+         ) : (
+           <button
+             onClick={startRename}
+              className="button-ghost max-w-[8rem] truncate rounded-xl px-2 py-1 text-xs font-medium"
+             title="Click to rename this pattern"
+           >
+             {currentPatternName}
+           </button>
+         )}
+        </div>
       </div>
 
       {/* Separator */}
       <div className="w-px h-8 bg-white/10 mx-1" />
 
       {/* Preset Loader */}
-      <div className="flex items-center gap-2 rounded-2xl bg-black/20 px-3 py-2">
-        <label className="text-[10px] font-black text-muted uppercase tracking-[0.2em]">Preset</label>
+      <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
+        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Preset</div>
+        <div className="flex items-center gap-2">
         <select
           value=""
           onChange={(e) => {
@@ -300,7 +309,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
               loadPreset(PRESETS[idx]);
             }
           }}
-          className="bg-white/[0.08] border border-white/10 rounded-xl px-2 py-1.5 text-sm font-mono text-foreground focus:outline-none focus:border-accent"
+          className="control-select rounded-xl px-2 py-1.5 text-sm font-mono"
         >
           <option value="" disabled>
             Load...
@@ -311,6 +320,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
             </option>
           ))}
         </select>
+        </div>
       </div>
 
       {/* Spacer */}
@@ -321,7 +331,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
         <button
           onClick={undo}
           disabled={!canUndo}
-          className="w-9 h-9 rounded-xl text-sm transition-colors disabled:opacity-25 bg-white/[0.08] text-muted hover:bg-white/[0.14] hover:text-foreground"
+          className="button-secondary h-9 w-9 rounded-xl text-sm disabled:opacity-25"
           title="Undo (Ctrl+Z)"
         >
           ↶
@@ -329,7 +339,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
         <button
           onClick={redo}
           disabled={!canRedo}
-          className="w-9 h-9 rounded-xl text-sm transition-colors disabled:opacity-25 bg-white/[0.08] text-muted hover:bg-white/[0.14] hover:text-foreground"
+          className="button-secondary h-9 w-9 rounded-xl text-sm disabled:opacity-25"
           title="Redo (Ctrl+Shift+Z)"
         >
           ↷
@@ -341,7 +351,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
         <select
           value={exportFormat}
           onChange={(e) => setExportFormat(e.target.value as "wav" | "midi")}
-          className="bg-white/[0.08] border border-white/10 rounded-xl px-2 py-1.5 text-[10px] font-mono text-muted focus:outline-none focus:border-accent"
+          className="control-select rounded-xl px-2 py-1.5 text-[10px] font-mono text-muted"
           title="Export format"
         >
           <option value="wav">WAV</option>
@@ -351,7 +361,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
           <select
             value={exportLoops}
             onChange={(e) => setExportLoops(Number(e.target.value))}
-              className="bg-white/[0.08] border border-white/10 rounded-xl px-2 py-1.5 text-[10px] font-mono text-muted focus:outline-none focus:border-accent w-14"
+              className="control-select w-14 rounded-xl px-2 py-1.5 text-[10px] font-mono text-muted"
             title="Number of loops to export (WAV only)"
           >
             <option value={1}>1x</option>
@@ -369,11 +379,11 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
             }
           }}
           disabled={exporting || exportingMidi}
-           className={`px-4 py-2 rounded-xl text-xs uppercase tracking-wider transition-colors font-bold ${
-            exporting || exportingMidi
-              ? "bg-accent/50 text-white/50 cursor-wait"
-              : "bg-white text-background hover:bg-accent-hover hover:text-white"
-           }`}
+            className={`rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors ${
+             exporting || exportingMidi
+               ? "bg-accent/50 text-white/50 cursor-wait"
+               : "button-secondary bg-white text-background hover:bg-accent-hover hover:text-white"
+            }`}
           title={
             exportFormat === "midi"
               ? "Export pattern as a Standard MIDI File (.mid) — drag into any DAW"
@@ -390,7 +400,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Humanize */}
       <button
         onClick={() => humanize(null, 0.15)}
-        className="px-3 py-2 rounded-xl bg-white/[0.08] hover:bg-accent-dim/30 text-muted hover:text-accent text-xs uppercase tracking-wider transition-colors"
+        className="button-secondary rounded-xl px-3 py-2 text-xs uppercase tracking-wider hover:text-accent"
         title="Humanize all tracks — randomize velocities slightly for a more natural feel (H)"
       >
         Humanize
@@ -399,7 +409,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Clear */}
       <button
         onClick={clearAll}
-        className="px-3 py-2 rounded-xl bg-white/[0.08] hover:bg-danger/20 text-muted hover:text-danger text-xs uppercase tracking-wider transition-colors"
+        className="button-secondary rounded-xl px-3 py-2 text-xs uppercase tracking-wider hover:bg-danger/20 hover:text-danger"
       >
         Clear All
       </button>
@@ -407,7 +417,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Help */}
       <button
         onClick={() => useUiStore.getState().toggleHelp()}
-        className="w-9 h-9 rounded-full bg-white/[0.08] hover:bg-white/[0.14] text-muted hover:text-foreground text-sm transition-colors"
+        className="button-secondary h-9 w-9 rounded-full text-sm"
         title="Keyboard shortcuts (?)"
       >
         ?

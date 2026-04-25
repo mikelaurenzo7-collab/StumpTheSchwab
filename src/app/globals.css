@@ -16,6 +16,12 @@
   --muted: #8d85a6;
   --glow: rgba(155, 92, 255, 0.35);
   --cyan: #22d3ee;
+  --shadow-soft: 0 18px 48px rgba(0, 0, 0, 0.26);
+  --shadow-panel: 0 28px 90px rgba(0, 0, 0, 0.34);
+  --shadow-pop: 0 32px 120px rgba(0, 0, 0, 0.44);
+  --shadow-cyan-soft: 0 18px 36px rgba(34, 211, 238, 0.08);
+  --shadow-accent-soft: 0 20px 44px rgba(155, 92, 255, 0.12);
+  --ring-strong: rgba(192, 132, 252, 0.42);
 }
 
 @theme inline {
@@ -42,11 +48,16 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  min-height: 100dvh;
+  color-scheme: dark;
   background-image:
-    radial-gradient(circle at 18% 12%, rgba(155, 92, 255, 0.2), transparent 28rem),
+    radial-gradient(circle at 16% 10%, rgba(155, 92, 255, 0.22), transparent 30rem),
     radial-gradient(circle at 82% 8%, rgba(34, 211, 238, 0.12), transparent 24rem),
-    linear-gradient(135deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 100%);
-  background-size: auto, auto, 38px 38px;
+    radial-gradient(circle at 50% 110%, rgba(76, 29, 149, 0.28), transparent 28rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 20rem),
+    linear-gradient(135deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 100%);
+  background-size: auto, auto, auto, auto, 38px 38px;
+  background-attachment: fixed;
 }
 
 button,
@@ -54,6 +65,13 @@ input,
 select,
 textarea {
   font: inherit;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    opacity 180ms ease;
 }
 
 button {
@@ -69,24 +87,150 @@ button:disabled {
   color: white;
 }
 
+.panel,
+.panel-soft,
+.glass-control,
+.control-input,
+.control-select,
+.control-textarea,
+.button-primary,
+.button-secondary,
+.button-ghost,
+.pill-badge {
+  backdrop-filter: blur(18px);
+}
+
 .panel {
+  position: relative;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
-    rgba(17, 16, 26, 0.88);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    linear-gradient(135deg, rgba(155, 92, 255, 0.08), transparent 42%),
+    rgba(17, 16, 26, 0.84);
+  box-shadow: var(--shadow-panel), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.panel::before,
+.panel-soft::before,
+.glass-control::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 26%);
+  opacity: 0.8;
 }
 
 .panel-soft {
+  position: relative;
   border: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(17, 16, 26, 0.62);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)),
+    rgba(17, 16, 26, 0.68);
+  box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .glass-control {
+  position: relative;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.055);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+    rgba(9, 8, 15, 0.56);
+  box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.button-primary,
+.button-secondary,
+.button-ghost,
+.control-input,
+.control-select,
+.control-textarea {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.button-primary {
+  background: linear-gradient(135deg, var(--accent), #7c3aed 52%, var(--cyan));
+  color: white;
+  box-shadow: 0 18px 36px rgba(155, 92, 255, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.button-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+  box-shadow: 0 22px 44px rgba(155, 92, 255, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.button-secondary {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.button-secondary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.05)),
+    rgba(255, 255, 255, 0.06);
+  color: var(--foreground);
+}
+
+.button-ghost {
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--muted);
+}
+
+.button-ghost:hover:not(:disabled) {
+  color: var(--foreground);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.control-input,
+.control-select,
+.control-textarea {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
+    rgba(0, 0, 0, 0.24);
+  color: var(--foreground);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.control-input::placeholder,
+.control-textarea::placeholder {
+  color: rgba(141, 133, 166, 0.82);
+}
+
+.pill-badge {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.shadow-cyan-soft {
+  box-shadow: var(--shadow-cyan-soft);
+}
+
+.shadow-accent-soft {
+  box-shadow: var(--shadow-accent-soft);
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.45;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--ring-strong);
+  box-shadow: 0 0 0 3px rgba(192, 132, 252, 0.24);
 }
 
 /* Scrollbar styling */
@@ -125,5 +269,22 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius: 50%;
   background: var(--accent);
   margin-top: -4px;
+  box-shadow: 0 0 0 4px rgba(155, 92, 255, 0.14), 0 0 16px var(--glow);
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.05);
+  filter: brightness(1.08);
+}
+input[type="range"]::-moz-range-track {
+  background: linear-gradient(90deg, rgba(155, 92, 255, 0.55), rgba(34, 211, 238, 0.3));
+  height: 4px;
+  border-radius: 2px;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
   box-shadow: 0 0 0 4px rgba(155, 92, 255, 0.14), 0 0 16px var(--glow);
 }

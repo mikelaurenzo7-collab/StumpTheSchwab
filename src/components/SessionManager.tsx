@@ -75,21 +75,21 @@ export function SessionManager() {
           setShowPanel(!showPanel);
           if (!showPanel) refreshSessions();
         }}
-        className="px-3 py-1.5 rounded bg-surface-2 hover:bg-surface-3 text-muted hover:text-foreground text-xs uppercase tracking-wider transition-colors"
+        className="button-secondary rounded-xl px-3 py-1.5 text-xs uppercase tracking-wider"
       >
         Sessions
       </button>
 
       {/* Flash notification */}
       {flash && (
-        <div className="absolute top-full mt-1 right-0 px-2 py-1 bg-accent text-white text-xs rounded whitespace-nowrap z-50">
+        <div className="button-primary absolute right-0 top-full z-50 mt-1 whitespace-nowrap rounded-xl px-2 py-1 text-xs">
           {flash}
         </div>
       )}
 
       {/* Panel */}
       {showPanel && (
-        <div className="absolute top-full mt-1 right-0 w-64 bg-surface border border-border rounded-lg shadow-xl z-50 p-3 flex flex-col gap-3">
+        <div className="panel absolute right-0 top-full z-50 mt-2 flex w-72 flex-col gap-3 rounded-[1.35rem] p-3">
           {/* Save */}
           <div className="flex gap-1">
             <input
@@ -98,12 +98,12 @@ export function SessionManager() {
               onChange={(e) => setSaveName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSave()}
               placeholder="Session name..."
-              className="flex-1 bg-surface-2 border border-border rounded px-2 py-1 text-xs text-foreground placeholder-muted focus:outline-none focus:border-accent"
+              className="control-input flex-1 rounded-xl px-3 py-2 text-xs"
             />
             <button
               onClick={handleSave}
               disabled={!saveName.trim()}
-              className="px-2 py-1 bg-accent hover:bg-accent-hover disabled:opacity-30 text-white text-xs rounded transition-colors"
+              className="button-primary rounded-xl px-3 py-2 text-xs font-bold"
             >
               Save
             </button>
@@ -115,11 +115,11 @@ export function SessionManager() {
               {sessions.map((name) => (
                 <div
                   key={name}
-                  className="flex items-center justify-between gap-1 px-2 py-1.5 bg-surface-2 rounded hover:bg-surface-3 group"
+                  className="group flex items-center justify-between gap-1 rounded-xl border border-white/[0.06] bg-white/[0.04] px-2 py-1.5 hover:bg-white/[0.08]"
                 >
                   <button
                     onClick={() => handleLoad(name)}
-                    className="flex-1 text-left text-xs text-foreground truncate"
+                    className="flex-1 truncate text-left text-xs text-foreground"
                   >
                     {name}
                   </button>

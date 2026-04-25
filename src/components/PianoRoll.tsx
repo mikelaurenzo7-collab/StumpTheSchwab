@@ -98,34 +98,34 @@ export function PianoRoll() {
 
   return (
     <div
-      className="border-t border-border bg-background"
+      className="border-t border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent),rgba(5,4,10,0.92)]"
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-surface border-b border-border">
+      <div className="flex items-center justify-between border-b border-white/[0.06] bg-black/20 px-4 py-3">
         <div className="flex items-center gap-2">
           <div
-            className="w-2.5 h-2.5 rounded-full"
+            className="h-2.5 w-2.5 rounded-full shadow-[0_0_18px_currentColor]"
             style={{ backgroundColor: track.sound.color }}
           />
           <span className="text-sm font-medium text-foreground">
             {track.sound.name} — Piano Roll
           </span>
-          <span className="text-xs text-muted">
+          <span className="pill-badge rounded-full px-2 py-1 text-[10px] font-semibold">
             Click to place notes. Drag to paint.
           </span>
         </div>
         <button
           onClick={() => setPianoRollTrack(null)}
-          className="text-muted hover:text-foreground text-sm px-2 py-0.5 rounded hover:bg-surface-2 transition-colors"
+          className="button-secondary rounded-xl px-3 py-1 text-sm"
         >
           Close
         </button>
       </div>
 
       {/* Grid */}
-      <div className="overflow-auto max-h-64 p-2">
+      <div className="max-h-64 overflow-auto p-3">
         <div className="inline-flex flex-col gap-0">
           {/* Step numbers header */}
           <div className="flex items-center gap-0">
