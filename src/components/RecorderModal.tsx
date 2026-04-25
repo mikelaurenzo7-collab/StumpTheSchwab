@@ -84,13 +84,13 @@ export function RecorderModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-xl border border-white/10 bg-zinc-900 p-6 shadow-2xl">
+      <div className="w-full max-w-sm rounded-xl border border-border bg-zinc-900 p-6 shadow-2xl">
         <div className="flex items-center justify-between mb-6 text-zinc-100">
           <div className="flex items-center gap-2">
             <span className="text-yellow-500 text-lg">●</span>
             <h2 className="font-semibold text-lg">Record Sample</h2>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-white/5 hover:text-white transition-colors">
+          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-surface-3 hover:text-white transition-colors">
             ✕
           </button>
         </div>

@@ -17,13 +17,13 @@ export function GroovePanel() {
   const activeTemplate = grooveTemplates.find((g) => g.id === activeGroove);
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-white/10 bg-[#0a0f18]/80 p-4 backdrop-blur">
+    <div className="flex flex-col gap-4 rounded-lg border border-border bg-[#0a0f18]/80 p-4 backdrop-blur">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white/90">Groove & Feel</h3>
+        <h3 className="text-sm font-semibold text-foreground">Groove & Feel</h3>
         {activeGroove && activeGroove !== "none" && (
           <button
             onClick={() => setActiveGroove(null)}
-            className="rounded px-2 py-1 text-xs text-white/60 hover:bg-white/5 hover:text-white/90"
+            className="rounded px-2 py-1 text-xs text-muted hover:bg-surface-3 hover:text-foreground"
           >
             Clear
           </button>
@@ -36,7 +36,7 @@ export function GroovePanel() {
         <select
           value={activeGroove ?? "none"}
           onChange={(e) => setActiveGroove(e.target.value === "none" ? null : e.target.value)}
-          className="rounded border border-white/10 bg-[#070b12] px-3 py-2 text-sm text-white/90 hover:border-white/20 focus:border-teal-400/50 focus:outline-none"
+          className="rounded border border-border bg-[#070b12] px-3 py-2 text-sm text-foreground hover:border-white/20 focus:border-teal-400/50 focus:outline-none"
         >
           {grooveTemplates.map((groove) => (
             <option key={groove.id} value={groove.id}>
@@ -48,9 +48,9 @@ export function GroovePanel() {
 
       {/* Active Groove Details */}
       {activeTemplate && activeTemplate.id !== "none" && (
-        <div className="rounded border border-white/5 bg-white/[0.02] p-3 text-xs text-white/70">
+        <div className="rounded border border-white/5 bg-surface-3 p-3 text-xs text-white/70">
           <div className="mb-2 flex items-center justify-between">
-            <span className="font-medium text-white/90">{activeTemplate.name}</span>
+            <span className="font-medium text-foreground">{activeTemplate.name}</span>
             <button
               onClick={() => applyGrooveToPattern(currentPattern, activeTemplate.id)}
               className="rounded bg-teal-500/20 px-2 py-1 text-teal-400 hover:bg-teal-500/30"
@@ -74,8 +74,8 @@ export function GroovePanel() {
 
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-white/60">Velocity</span>
-            <span className="text-white/80">{Math.round(globalVelocityHumanize * 100)}%</span>
+            <span className="text-muted">Velocity</span>
+            <span className="text-soft">{Math.round(globalVelocityHumanize * 100)}%</span>
           </div>
           <input
             type="range"
@@ -92,8 +92,8 @@ export function GroovePanel() {
 
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-white/60">Timing</span>
-            <span className="text-white/80">{Math.round(globalTimingHumanize * 100)}%</span>
+            <span className="text-muted">Timing</span>
+            <span className="text-soft">{Math.round(globalTimingHumanize * 100)}%</span>
           </div>
           <input
             type="range"

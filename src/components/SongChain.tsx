@@ -74,10 +74,10 @@ export function SongChain() {
 
   if (!songMode) {
     return (
-      <div className="rounded-[1.4rem] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015)),rgba(8,12,18,0.7)] p-4">
+      <div className="rounded-lg border border-border bg-surface-2 p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted">
               Arrangement lane
             </div>
             <p className="mt-1 text-sm font-semibold text-foreground">
@@ -91,14 +91,14 @@ export function SongChain() {
             Off
           </span>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-foreground/75">
+        <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/75">
           <span className="pill-badge rounded-full px-2.5 py-1">Loop-aware</span>
           <span className="pill-badge rounded-full px-2.5 py-1">Drag reorder</span>
           <span className="pill-badge rounded-full px-2.5 py-1">Pattern chain</span>
         </div>
         <button
           onClick={handleToggle}
-          className="button-primary mt-4 w-full rounded-2xl px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em]"
+          className="button-primary mt-4 w-full rounded-lg px-4 py-3 text-[10px] font-bold uppercase tracking-[0.18em]"
           title="Enable Song Mode to chain patterns into an arrangement"
         >
           Enable Song Mode
@@ -111,26 +111,26 @@ export function SongChain() {
 
   return (
     <div className="space-y-3">
-      <div className="rounded-[1.35rem] border border-accent/25 bg-[linear-gradient(180deg,rgba(139,92,246,0.16),rgba(139,92,246,0.06)),rgba(13,17,26,0.78)] p-3.5">
+      <div className="rounded-lg border border-accent/25 bg-[linear-gradient(180deg,rgba(139,92,246,0.16),rgba(139,92,246,0.06)),rgba(13,17,26,0.78)] p-3.5">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-[9px] font-black uppercase tracking-[0.22em] text-accent-hover">
+            <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-accent-hover">
               Arrangement live
             </div>
-            <div className="mt-1 text-sm font-black text-white">
+            <div className="mt-1 text-sm font-semibold text-foreground">
               Song mode is driving the timeline
             </div>
           </div>
           <button
             onClick={handleToggle}
-            className="button-primary rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em]"
+            className="button-primary rounded-full px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em]"
             title="Disable Song Mode"
           >
             Song Mode On
           </button>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-accent-hover/90">
+        <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-accent-hover/90">
           <span className="pill-badge rounded-full px-2.5 py-1">{chain.length} {chain.length === 1 ? "pattern" : "patterns"}</span>
           <span className="pill-badge rounded-full px-2.5 py-1">Current {PATTERN_LABELS[currentPattern]}</span>
           <span className="pill-badge rounded-full px-2.5 py-1">{isPlaying ? `Playing slot ${chainPosition + 1}` : "Idle"}</span>
@@ -138,7 +138,7 @@ export function SongChain() {
 
         <button
           onClick={handleAddCurrent}
-          className="button-secondary mt-3 w-full rounded-2xl px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-foreground"
+          className="button-secondary mt-3 w-full rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-foreground"
           title={`Append pattern ${PATTERN_LABELS[currentPattern]} to the chain`}
         >
           Add current pattern {PATTERN_LABELS[currentPattern]}
@@ -146,8 +146,8 @@ export function SongChain() {
       </div>
 
       {/* Direct add buttons */}
-      <div className="rounded-[1.25rem] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015)),rgba(8,12,18,0.62)] p-3">
-        <div className="mb-2 text-[9px] font-black uppercase tracking-[0.22em] text-muted">
+      <div className="rounded-lg border border-border bg-surface-2 p-3">
+        <div className="mb-2 text-[9px] font-bold uppercase tracking-[0.18em] text-muted">
           Pattern palette
         </div>
         <div className="grid grid-cols-4 gap-1.5">
@@ -155,10 +155,10 @@ export function SongChain() {
             <button
               key={label}
               onClick={() => addToChain(i)}
-              className={`rounded-xl border px-2 py-2 text-[10px] font-black transition-colors ${
+              className={`rounded-xl border px-2 py-2 text-[10px] font-bold transition-colors ${
                 i === currentPattern
                   ? "border-accent/60 bg-accent text-white shadow-sm shadow-accent/40"
-                  : "border-white/[0.06] bg-black/20 text-muted/80 hover:border-white/14"
+                  : "border-border bg-background-2 text-muted/80 hover:border-border-strong"
                }`}
               title={`Append ${patterns[i]?.name ?? label}`}
             >
@@ -169,9 +169,9 @@ export function SongChain() {
       </div>
 
       {/* Chain visualization */}
-      <div className="rounded-[1.25rem] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015)),rgba(8,12,18,0.62)] p-3">
+      <div className="rounded-lg border border-border bg-surface-2 p-3">
         <div className="mb-2 flex items-center justify-between">
-          <div className="text-[9px] font-black uppercase tracking-[0.22em] text-muted">
+          <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted">
             Timeline
           </div>
           {chain.length > 0 && (
@@ -193,7 +193,7 @@ export function SongChain() {
         </div>
 
         {chain.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-4 text-center text-xs leading-relaxed text-muted">
+          <div className="rounded-lg border border-dashed border-border bg-background-2 p-4 text-center text-xs leading-relaxed text-muted">
             Empty timeline. Add patterns above to build an arrangement that advances at each loop.
           </div>
         ) : (
@@ -219,18 +219,18 @@ export function SongChain() {
                   aria-describedby={dragFrom !== null ? "song-chain-drag-status" : undefined}
                   aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown Delete"
                   aria-label={`${position + 1}. ${patternName}${customName ? `, pattern ${PATTERN_LABELS[patternIdx]}` : ""}${isCurrent ? ", currently playing" : ""}. Click or press Enter to remove. Use Alt plus arrow keys to reorder.`}
-                  className={`group flex w-full items-center gap-3 rounded-2xl border px-3 py-2 text-left transition-all ${
+                  className={`group flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-all ${
                     isCurrent
                       ? "border-accent/50 bg-[linear-gradient(180deg,rgba(139,92,246,0.2),rgba(139,92,246,0.08)),rgba(12,16,25,0.82)] shadow-sm shadow-accent/30"
                       : isDropTarget
                         ? "border-accent bg-accent/20"
                         : isDragging
                           ? "border-white/5 bg-surface-3/50 opacity-40"
-                          : "border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015)),rgba(8,12,18,0.72)] hover:border-danger/30 hover:bg-danger/10"
+                          : "border-border bg-surface-2 hover:border-danger/30 hover:bg-danger/10"
                   }`}
                   title={`${position + 1}. ${patternName}${customName ? ` (${PATTERN_LABELS[patternIdx]})` : ""} — drag to reorder · click to remove`}
                 >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-black/25 text-[10px] font-black text-muted">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background-2 text-[10px] font-bold text-muted">
                     {position + 1}
                   </span>
                   <span className="min-w-0 flex-1">
@@ -242,7 +242,7 @@ export function SongChain() {
                       {isCurrent ? " · playing" : ""}
                     </span>
                   </span>
-                  <span className="rounded-full border border-white/[0.08] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-muted transition-colors group-hover:border-danger/30 group-hover:text-danger group-focus-visible:text-danger">
+                  <span className="rounded-full border border-border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-muted transition-colors group-hover:border-danger/30 group-hover:text-danger group-focus-visible:text-danger">
                     Drag · Remove
                   </span>
                 </button>

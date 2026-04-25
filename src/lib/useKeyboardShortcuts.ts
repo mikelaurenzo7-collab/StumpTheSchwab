@@ -28,6 +28,13 @@ export function useKeyboardShortcuts(
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
 
+      // Command palette: Cmd/Ctrl+K
+      if ((e.metaKey || e.ctrlKey) && e.code === "KeyK") {
+        e.preventDefault();
+        useUiStore.getState().togglePalette();
+        return;
+      }
+
       // Help overlay: ? toggles. Match by key not code so it works on
       // any layout (US: shift+/, intl layouts vary).
       if (e.key === "?" && !e.metaKey && !e.ctrlKey && !e.altKey) {

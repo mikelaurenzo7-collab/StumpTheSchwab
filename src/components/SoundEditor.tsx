@@ -70,7 +70,7 @@ function Knob({
   format?: (v: number) => string;
 }) {
   return (
-    <div className="flex flex-col items-center gap-1 rounded-[0.7rem] border border-white/[0.06] bg-black/15 px-2 py-2">
+    <div className="flex flex-col items-center gap-1 rounded-md border border-border bg-background-2 px-2 py-2">
       <span className="text-[9px] font-bold uppercase tracking-wider text-muted">{label}</span>
       <input
         type="range"
@@ -81,7 +81,7 @@ function Knob({
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full"
       />
-      <span className="text-[10px] font-mono text-foreground/78">
+      <span className="text-[10px] font-mono text-soft">
         {format ? format(value) : value.toFixed(step < 0.01 ? 3 : step < 0.1 ? 2 : step < 1 ? 1 : 0)}
       </span>
     </div>
@@ -136,7 +136,7 @@ function EnvelopeSection({ options, patch, prefix = "envelope" }: {
   const env = (options[prefix] as Record<string, unknown> | undefined) ?? {};
   const setEnv = (k: string, v: unknown) => patch({ [prefix]: { ...env, [k]: v } });
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-black/20 p-2">
+    <div className="rounded-xl border border-border bg-background-2 p-2">
       <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-cyan">
         {prefix === "envelope" ? "Amp Envelope" : prefix === "modulationEnvelope" ? "Mod Envelope" : "Filter Envelope"}
       </div>
@@ -181,15 +181,15 @@ export function SoundEditor({ trackId, onClose }: { trackId: number; onClose: ()
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="panel-soft relative max-h-[90vh] w-[min(720px,95vw)] overflow-y-auto rounded-[1.5rem] border border-white/[0.08] bg-[rgba(10,14,22,0.96)] p-5 shadow-2xl"
+        className="panel-soft relative max-h-[90vh] w-[min(720px,95vw)] overflow-y-auto rounded-xl border border-border bg-surface-2 p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-3 w-3 rounded-full" style={{ backgroundColor: sound.color }} />
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-cyan">Sound Editor</p>
-              <h2 className="text-lg font-black tracking-tight text-white">{sound.name}</h2>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan">Sound Editor</p>
+              <h2 className="text-lg font-bold tracking-tight text-white">{sound.name}</h2>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -211,7 +211,7 @@ export function SoundEditor({ trackId, onClose }: { trackId: number; onClose: ()
         </div>
 
         {/* Voice swap */}
-        <div className="mb-4 rounded-xl border border-white/[0.06] bg-black/20 p-3">
+        <div className="mb-4 rounded-xl border border-border bg-background-2 p-3">
           <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-accent">Voice</div>
           <div className="grid grid-cols-4 gap-1.5">
             {SYNTH_TYPES.map((s) => (
@@ -237,7 +237,7 @@ export function SoundEditor({ trackId, onClose }: { trackId: number; onClose: ()
           <div className="flex flex-col gap-3">
             {/* Oscillator / source */}
             {(synth === "synth" || synth === "monosynth" || synth === "membrane") && (
-              <div className="rounded-xl border border-white/[0.06] bg-black/20 p-3">
+              <div className="rounded-xl border border-border bg-background-2 p-3">
                 <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-accent">Oscillator</div>
                 <Select
                   label="Type"
@@ -249,7 +249,7 @@ export function SoundEditor({ trackId, onClose }: { trackId: number; onClose: ()
             )}
 
             {synth === "noise" && (
-              <div className="rounded-xl border border-white/[0.06] bg-black/20 p-3">
+              <div className="rounded-xl border border-border bg-background-2 p-3">
                 <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-accent">Noise Source</div>
                 <Select
                   label="Color"
@@ -262,7 +262,7 @@ export function SoundEditor({ trackId, onClose }: { trackId: number; onClose: ()
 
             {/* Membrane-specific: pitch decay + octaves */}
             {synth === "membrane" && (
-              <div className="rounded-xl border border-white/[0.06] bg-black/20 p-3">
+              <div className="rounded-xl border border-border bg-background-2 p-3">
                 <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-accent">Pitch Sweep</div>
                 <div className="grid grid-cols-2 gap-1.5">
                   <Knob label="Pitch Decay" value={getNum(options, ["pitchDecay"], 0.05)} min={0.001} max={0.5} step={0.001} onChange={(v) => patch({ pitchDecay: v })} format={(v) => `${(v * 1000).toFixed(0)}ms`} />
@@ -273,7 +273,7 @@ export function SoundEditor({ trackId, onClose }: { trackId: number; onClose: ()
 
             {/* Metal-specific: frequency, harmonicity, mod index, resonance, octaves */}
             {synth === "metal" && (
-              <div className="rounded-xl border border-white/[0.06] bg-black/20 p-3">
+              <div className="rounded-xl border border-border bg-background-2 p-3">
                 <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-accent">Metal Voice</div>
                 <div className="grid grid-cols-3 gap-1.5">
                   <Knob label="Frequency" value={getNum(options, ["frequency"], 200)} min={20} max={1000} step={1} onChange={(v) => patch({ frequency: v })} format={(v) => `${v.toFixed(0)}Hz`} />
@@ -287,7 +287,7 @@ export function SoundEditor({ trackId, onClose }: { trackId: number; onClose: ()
 
             {/* AM/FM: harmonicity + modulation index */}
             {(synth === "am" || synth === "fm") && (
-              <div className="rounded-xl border border-white/[0.06] bg-black/20 p-3">
+              <div className="rounded-xl border border-border bg-background-2 p-3">
                 <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-accent">{synth === "fm" ? "FM" : "AM"} Modulation</div>
                 <div className="grid grid-cols-3 gap-1.5">
                   <Knob label="Harmonicity" value={getNum(options, ["harmonicity"], 3)} min={0.1} max={12} step={0.1} onChange={(v) => patch({ harmonicity: v })} format={(v) => v.toFixed(2)} />
@@ -299,7 +299,7 @@ export function SoundEditor({ trackId, onClose }: { trackId: number; onClose: ()
 
             {/* MonoSynth filter */}
             {synth === "monosynth" && (
-              <div className="rounded-xl border border-white/[0.06] bg-black/20 p-3">
+              <div className="rounded-xl border border-border bg-background-2 p-3">
                 <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-accent">Filter</div>
                 <div className="grid grid-cols-3 gap-1.5">
                   <Select label="Type" value={getStr(options, ["filter", "type"], "lowpass")} options={FILTER_TYPES} onChange={(v) => patch({ filter: { ...((options.filter as Record<string, unknown>) ?? {}), type: v } })} />

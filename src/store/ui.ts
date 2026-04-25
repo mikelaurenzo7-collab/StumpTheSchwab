@@ -8,6 +8,10 @@ interface UiState {
   generatorOpen: boolean;
   setGeneratorOpen: (on: boolean) => void;
   toggleGenerator: () => void;
+
+  paletteOpen: boolean;
+  setPaletteOpen: (on: boolean) => void;
+  togglePalette: () => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -18,4 +22,8 @@ export const useUiStore = create<UiState>((set) => ({
   generatorOpen: false,
   setGeneratorOpen: (generatorOpen) => set({ generatorOpen }),
   toggleGenerator: () => set((s) => ({ generatorOpen: !s.generatorOpen })),
+
+  paletteOpen: false,
+  setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
+  togglePalette: () => set((s) => ({ paletteOpen: !s.paletteOpen })),
 }));

@@ -63,9 +63,9 @@ export function SampleBrowser() {
 
   return (
     <>
-    <div className="flex flex-col gap-4 rounded-lg border border-white/10 bg-[#0a0f18]/80 p-4 backdrop-blur">
+    <div className="flex flex-col gap-4 rounded-lg border border-border bg-[#0a0f18]/80 p-4 backdrop-blur">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white/90">Sample Browser</h3>
+        <h3 className="text-sm font-semibold text-foreground">Sample Browser</h3>
         <div className="flex gap-2">
           <button
             onClick={() => setShowRecorder(true)}
@@ -85,7 +85,7 @@ export function SampleBrowser() {
       {/* Upload Section */}
       {showUpload && (
         <div className="flex flex-col gap-2 rounded border border-purple-400/20 bg-purple-500/5 p-3">
-          <label className="text-xs font-medium text-white/80">Upload Audio Files</label>
+          <label className="text-xs font-medium text-soft">Upload Audio Files</label>
           <input
             ref={fileInputRef}
             type="file"
@@ -106,7 +106,7 @@ export function SampleBrowser() {
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         placeholder="Search samples..."
-        className="rounded border border-white/10 bg-[#070b12] px-3 py-2 text-sm text-white/90 placeholder:text-white/30 focus:border-purple-400/50 focus:outline-none"
+        className="rounded border border-border bg-[#070b12] px-3 py-2 text-sm text-foreground placeholder:text-white/30 focus:border-purple-400/50 focus:outline-none"
       />
 
       {/* Category Filter */}
@@ -143,14 +143,14 @@ export function SampleBrowser() {
       </div>
 
       {/* Target Track Selector */}
-      <div className="flex flex-col gap-2 rounded border border-white/10 bg-white/[0.02] p-3">
+      <div className="flex flex-col gap-2 rounded border border-border bg-surface-3 p-3">
         <label className="text-xs font-medium text-white/70">Load samples to track:</label>
         <select
           value={selectedTrack === null ? "" : selectedTrack}
           onChange={(e) =>
             setSelectedTrack(e.target.value === "" ? null : parseInt(e.target.value))
           }
-          className="rounded border border-white/10 bg-[#070b12] px-3 py-2 text-sm text-white/90"
+          className="rounded border border-border bg-[#070b12] px-3 py-2 text-sm text-foreground"
         >
           <option value="">Select a track...</option>
           {tracks.map((track) => (
@@ -164,7 +164,7 @@ export function SampleBrowser() {
       {/* Sample List */}
       <div className="flex max-h-[400px] flex-col gap-2 overflow-y-auto">
         {displaySamples.length === 0 ? (
-          <div className="rounded border border-dashed border-white/10 p-8 text-center text-sm text-white/40">
+          <div className="rounded border border-dashed border-border p-8 text-center text-sm text-white/40">
             {searchQuery
               ? `No samples found for "${searchQuery}"`
               : "No samples in this category. Upload some to get started!"}
@@ -173,11 +173,11 @@ export function SampleBrowser() {
           displaySamples.map((sample) => (
             <div
               key={sample.id}
-              className="flex items-center justify-between rounded border border-white/10 bg-white/[0.02] p-3 hover:bg-white/[0.04]"
+              className="flex items-center justify-between rounded border border-border bg-surface-3 p-3 hover:bg-surface-3"
             >
               <div className="flex-1">
-                <div className="text-sm font-medium text-white/90">{sample.name}</div>
-                <div className="mt-0.5 flex items-center gap-2 text-xs text-white/60">
+                <div className="text-sm font-medium text-foreground">{sample.name}</div>
+                <div className="mt-0.5 flex items-center gap-2 text-xs text-muted">
                   <span className="rounded bg-purple-500/20 px-1.5 py-0.5 text-purple-400">
                     {sample.category}
                   </span>
@@ -189,7 +189,7 @@ export function SampleBrowser() {
                     {sample.tags.map((tag) => (
                       <span
                         key={tag}
-                        className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-white/50"
+                        className="rounded bg-surface-3 px-1.5 py-0.5 text-[10px] text-white/50"
                       >
                         {tag}
                       </span>
@@ -204,7 +204,7 @@ export function SampleBrowser() {
                   disabled={selectedTrack === null}
                   className={`rounded px-3 py-1.5 text-xs font-medium ${
                     selectedTrack === null
-                      ? "cursor-not-allowed bg-white/5 text-white/30"
+                      ? "cursor-not-allowed bg-surface-3 text-white/30"
                       : "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"
                   }`}
                 >

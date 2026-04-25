@@ -12,6 +12,8 @@ import { GroovePanel } from "@/components/GroovePanel";
 import { AutomationEditor } from "@/components/AutomationEditor";
 import { PerformanceMode } from "@/components/PerformanceMode";
 import { SampleBrowser } from "@/components/SampleBrowser";
+import { StatusBar } from "@/components/StatusBar";
+import { CommandPalette } from "@/components/CommandPalette";
 import { useAudioEngine } from "@/lib/useAudioEngine";
 import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
 import { useAutoSave } from "@/lib/useAutoSave";
@@ -212,6 +214,9 @@ export default function DAW() {
 
       <HelpOverlay />
       <GeneratorModal />
+      <CommandPalette onInit={initAudio} />
+
+      <StatusBar getMasterMeter={getMasterMeter} />
 
       <style jsx global>{`
         .kbd {
@@ -255,7 +260,7 @@ function SectionHeader({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
     <div className="mb-2 flex items-baseline justify-between">
       <h2 className="text-[13px] font-bold tracking-tight text-foreground">{title}</h2>
-      <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-muted">
+      <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted">
         {eyebrow}
       </span>
     </div>

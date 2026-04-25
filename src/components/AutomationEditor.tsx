@@ -72,9 +72,9 @@ export function AutomationEditor() {
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-white/10 bg-[#0a0f18]/80 p-4 backdrop-blur">
+    <div className="flex flex-col gap-3 rounded-lg border border-border bg-[#0a0f18]/80 p-4 backdrop-blur">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white/90">Automation</h3>
+        <h3 className="text-sm font-semibold text-foreground">Automation</h3>
         <button
           onClick={() => setShowAddLane(!showAddLane)}
           className="rounded bg-teal-500/20 px-3 py-1.5 text-xs text-teal-400 hover:bg-teal-500/30"
@@ -86,11 +86,11 @@ export function AutomationEditor() {
       {/* Add Lane Form */}
       {showAddLane && (
         <div className="flex flex-col gap-2 rounded border border-teal-400/20 bg-teal-500/5 p-3">
-          <label className="text-xs font-medium text-white/80">Parameter</label>
+          <label className="text-xs font-medium text-soft">Parameter</label>
           <select
             value={newTarget}
             onChange={(e) => setNewTarget(e.target.value as AutomationTarget)}
-            className="rounded border border-white/10 bg-[#070b12] px-2 py-1.5 text-sm text-white/90"
+            className="rounded border border-border bg-[#070b12] px-2 py-1.5 text-sm text-foreground"
           >
             <option value="bpm">Global BPM</option>
             <option value="master.volume">Master Volume</option>
@@ -119,7 +119,7 @@ export function AutomationEditor() {
             </button>
             <button
               onClick={() => setShowAddLane(false)}
-              className="flex-1 rounded bg-white/10 px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/20"
+              className="flex-1 rounded bg-white/10 px-3 py-1.5 text-xs font-medium text-soft hover:bg-white/20"
             >
               Cancel
             </button>
@@ -130,7 +130,7 @@ export function AutomationEditor() {
       {/* Automation Lanes List */}
       <div className="flex flex-col gap-2">
         {automationLanes.length === 0 ? (
-          <div className="rounded border border-dashed border-white/10 p-8 text-center text-sm text-white/40">
+          <div className="rounded border border-dashed border-border p-8 text-center text-sm text-white/40">
             No automation lanes yet. Add one to get started.
           </div>
         ) : (
@@ -294,8 +294,8 @@ function AutomationLaneItem({
         isSelected
           ? "border-teal-400/50 bg-teal-500/5"
           : lane.enabled
-            ? "border-white/10 bg-white/[0.02]"
-            : "border-white/5 bg-white/[0.01] opacity-50"
+            ? "border-border bg-surface-3"
+            : "border-white/5 bg-surface-3 opacity-50"
       }`}
       onClick={onSelect}
     >
@@ -312,7 +312,7 @@ function AutomationLaneItem({
           >
             {lane.enabled && "✓"}
           </button>
-          <span className="text-sm font-medium text-white/90">{formatTarget(lane.target)}</span>
+          <span className="text-sm font-medium text-foreground">{formatTarget(lane.target)}</span>
         </div>
         <button
           onClick={(e) => {
@@ -329,12 +329,12 @@ function AutomationLaneItem({
         ref={canvasRef}
         width={300}
         height={80}
-        className="w-full cursor-crosshair rounded border border-white/10 bg-black/20"
+        className="w-full cursor-crosshair rounded border border-border bg-background-2"
         onClick={handleCanvasClick}
         onDoubleClick={handleCanvasDoubleClick}
       />
 
-      <div className="flex items-center justify-between text-xs text-white/60">
+      <div className="flex items-center justify-between text-xs text-muted">
         <span>{formatValue(lane.min, lane.target)}</span>
         <span>{lane.points.length} points</span>
         <span>{formatValue(lane.max, lane.target)}</span>

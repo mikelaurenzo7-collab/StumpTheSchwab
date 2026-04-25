@@ -119,7 +119,7 @@ const TrackFXPanel = memo(function TrackFXPanel({
   );
 
   return (
-    <div className="panel-soft flex flex-col gap-2 rounded-[1.1rem] p-2">
+    <div className="panel-soft flex flex-col gap-2 rounded-md p-2">
       {/* Color bar */}
       <div className="h-0.5 w-full rounded" style={{ backgroundColor: color }} />
 
@@ -435,7 +435,7 @@ function LevelMeter({ getLevel, color }: { getLevel: () => number; color: string
   }, [getLevel, color]);
 
   return (
-    <div className="relative h-24 w-2.5 overflow-hidden rounded-full border border-white/[0.06] bg-surface-2/80">
+    <div className="relative h-24 w-2.5 overflow-hidden rounded-full border border-border bg-surface-2/80">
       <div
         ref={barRef}
         className="absolute bottom-0 left-0 w-full rounded-full transition-[height] duration-75"
@@ -539,9 +539,9 @@ const ChannelStrip = memo(function ChannelStrip({
 
   return (
     <div className="flex snap-start flex-col items-center gap-1.5">
-      <div className="panel-soft flex w-[4.9rem] flex-col items-center gap-2.5 rounded-[1.35rem] px-2.5 py-3">
+      <div className="panel-soft flex w-[4.9rem] flex-col items-center gap-2.5 rounded-lg px-2.5 py-3">
         {/* Track color dot + name */}
-        <div className="flex w-full flex-col items-center gap-1 rounded-[1rem] border border-white/[0.06] bg-black/15 px-2 py-2">
+        <div className="flex w-full flex-col items-center gap-1 rounded-md border border-border bg-background-2 px-2 py-2">
           <div
             className="rounded-full transition-all duration-100"
             style={{
@@ -551,7 +551,7 @@ const ChannelStrip = memo(function ChannelStrip({
               boxShadow: flashing ? `0 0 12px 2px ${color}` : "none",
             }}
           />
-          <span className="w-full truncate text-center text-[10px] font-semibold text-foreground/82">
+          <span className="w-full truncate text-center text-[10px] font-semibold text-soft">
             {hasSample ? sampleName ?? "Sample" : name}
           </span>
         </div>
@@ -612,7 +612,7 @@ const ChannelStrip = memo(function ChannelStrip({
         </div>
 
         {/* Pan knob */}
-        <div className="flex w-full flex-col items-center gap-0.5 rounded-[0.95rem] border border-white/[0.06] bg-black/10 px-1.5 py-2">
+        <div className="flex w-full flex-col items-center gap-0.5 rounded-md border border-border bg-background-2 px-1.5 py-2">
           <input
             type="range"
             min={-1}
@@ -630,7 +630,7 @@ const ChannelStrip = memo(function ChannelStrip({
         </div>
 
         {/* Fader + Meter */}
-        <div className="flex h-28 items-center gap-1 rounded-[1rem] border border-white/[0.06] bg-black/10 px-1.5 py-2">
+        <div className="flex h-28 items-center gap-1 rounded-md border border-border bg-background-2 px-1.5 py-2">
           <input
             type="range"
             min={0}
@@ -710,10 +710,10 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="ml-1 flex flex-col items-center gap-1.5 border-l border-white/[0.06] pl-3">
-      <div className="panel-soft flex w-[5rem] flex-col items-center gap-2.5 rounded-[1.35rem] px-2.5 py-3">
+    <div className="ml-1 flex flex-col items-center gap-1.5 border-l border-border pl-3">
+      <div className="panel-soft flex w-[5rem] flex-col items-center gap-2.5 rounded-lg px-2.5 py-3">
         {/* Master label and Auto-Mix */}
-        <div className="flex w-full flex-col items-center gap-1 rounded-[1rem] border border-white/[0.06] bg-black/15 px-2 py-2">
+        <div className="flex w-full flex-col items-center gap-1 rounded-md border border-border bg-background-2 px-2 py-2">
           <div className="h-2 w-2 rounded-full bg-accent" />
           <span className="w-full truncate text-center text-[10px] font-bold text-accent">
             MASTER
@@ -729,7 +729,7 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
         </button>
 
         {/* Master fader + Meter */}
-        <div className="flex h-28 items-center gap-1 rounded-[1rem] border border-white/[0.06] bg-black/10 px-1.5 py-2">
+        <div className="flex h-28 items-center gap-1 rounded-md border border-border bg-background-2 px-1.5 py-2">
           <input
             type="range"
             min={0}
@@ -802,7 +802,7 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
 
       {/* Expanded master controls */}
       {expanded && (
-        <div className="panel-soft flex flex-col gap-2 rounded-[1.1rem] p-2">
+        <div className="panel-soft flex flex-col gap-2 rounded-md p-2">
           <div className="h-0.5 w-full rounded bg-accent" />
 
           {/* EQ */}
@@ -1039,7 +1039,7 @@ export function Mixer({
         </div>
       </div>
 
-      <div className="panel-soft rounded-[1.5rem] p-3">
+      <div className="panel-soft rounded-xl p-3">
         <div className="flex items-start gap-3 overflow-x-auto pb-1 [scroll-snap-type:x_mandatory]">
         {tracks.map((track, i) => (
           <ChannelStrip

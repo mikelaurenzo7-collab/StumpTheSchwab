@@ -46,9 +46,9 @@ const StepCell = memo(function StepCell({
   const active = velocity > 0;
   const hasProb = active && probability < 1;
   const hasNudge = active && nudge !== 0;
-  let activeStateClass = "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.015)),rgba(6,10,16,0.92)] hover:border-accent/35 hover:bg-white/[0.08]";
+  let activeStateClass = "border-border bg-surface-2 hover:border-accent/35 hover:bg-surface-3";
   if (active) {
-    activeStateClass = "border-white/14 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02)),rgba(10,15,23,0.94)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_26px_rgba(0,0,0,0.26)]";
+    activeStateClass = "border-border-strong bg-surface-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_26px_rgba(0,0,0,0.26)]";
   }
 
   return (
@@ -94,7 +94,7 @@ const StepCell = memo(function StepCell({
           : "Click or drag to paint · double-click: shape step"
       }
       className={`
-        relative h-10 w-10 rounded-[0.95rem] border overflow-hidden select-none transition-all duration-75
+        relative h-10 w-10 rounded-md border overflow-hidden select-none transition-all duration-75
         ${beatStart ? "ml-1" : ""}
         ${activeStateClass}
         ${isCurrent && !active ? "ring-2 ring-accent/70 border-accent/40 bg-accent/10" : ""}
@@ -104,7 +104,7 @@ const StepCell = memo(function StepCell({
     >
       {active && (
         <div
-          className="absolute inset-x-1 bottom-1 rounded-[0.7rem] transition-all duration-75"
+          className="absolute inset-x-1 bottom-1 rounded-md transition-all duration-75"
           style={{
             background: `linear-gradient(180deg, ${color}, ${color}cc)`,
             height: `${Math.max(velocity * 100, 18)}%`,
@@ -114,11 +114,11 @@ const StepCell = memo(function StepCell({
         />
       )}
       {active && (
-        <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-white/80" />
+        <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-surface-30" />
       )}
       {hasProb && (
         <span
-          className="absolute bottom-1 left-1 text-[8px] font-mono leading-none text-white/90 font-bold"
+          className="absolute bottom-1 left-1 text-[8px] font-mono leading-none text-foreground font-bold"
           style={{ textShadow: "0 0 3px rgba(0,0,0,0.8)" }}
         >
           {Math.round(probability * 100)}
@@ -185,10 +185,10 @@ const TrackRow = memo(function TrackRow({
   onCloseEuclidean: () => void;
 }) {
   return (
-    <div className="relative min-w-max rounded-[1.45rem] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015)),rgba(8,12,18,0.62)] p-2.5 shadow-[0_14px_32px_rgba(0,0,0,0.18)]">
+    <div className="relative min-w-max rounded-lg border border-border bg-surface-2 p-2.5 shadow-[0_14px_32px_rgba(0,0,0,0.18)]">
       {/* Track label */}
       <div
-        className={`sticky left-0 z-20 flex w-40 shrink-0 items-center gap-2 rounded-[1rem] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02)),rgba(11,16,24,0.92)] px-3 py-2 pr-2 backdrop-blur-md ${
+        className={`sticky left-0 z-20 flex w-40 shrink-0 items-center gap-2 rounded-md border border-border bg-surface-2 px-3 py-2 pr-2 backdrop-blur-sm ${
           melodic ? "cursor-pointer hover:opacity-80" : ""
         }`}
         onClick={() => melodic && onTogglePianoRoll(trackId)}
@@ -202,7 +202,7 @@ const TrackRow = memo(function TrackRow({
           style={{ backgroundColor: color }}
         />
         <div className="min-w-0">
-          <span className={`block truncate text-sm font-black tracking-[-0.02em] ${pianoRollOpen ? "text-accent" : "text-foreground"}`}>
+          <span className={`block truncate text-sm font-semibold tracking-tight ${pianoRollOpen ? "text-accent" : "text-foreground"}`}>
             {name}
             {melodic && <span className="ml-1 text-[10px] opacity-60">♪</span>}
           </span>
@@ -234,7 +234,7 @@ const TrackRow = memo(function TrackRow({
 
       {/* Core groove actions stay visible so editing is discoverable without hover. */}
       <div
-        className="sticky right-0 z-20 ml-2 flex items-center gap-1 rounded-[1rem] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02)),rgba(11,16,24,0.92)] px-2 py-1.5 backdrop-blur-md"
+        className="sticky right-0 z-20 ml-2 flex items-center gap-1 rounded-md border border-border bg-surface-2 px-2 py-1.5 backdrop-blur-sm"
       >
         <button
           onClick={() => onCopyTrack(trackId)}
@@ -422,43 +422,40 @@ export function StepSequencer() {
           onClose={() => setDetailStep(null)}
         />
       )}
-      <div className="border-b border-white/[0.06] px-4 py-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-accent-hover">
-            Compose
-          </p>
-          <h2 className="text-2xl font-black tracking-[-0.04em] text-white">
+      <div className="flex items-center justify-between gap-3 border-b border-border bg-surface px-4 py-2.5">
+        <div className="flex items-baseline gap-3">
+          <h2 className="text-[13px] font-bold tracking-tight text-foreground">
             Step canvas
           </h2>
-            <p className="mt-1 text-sm text-foreground/70">
-              Clear lanes, anchored controls, and a stickier ruler so the groove stays readable while you work.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
-            <span className="pill-badge rounded-full px-3 py-1.5">{tracks.length} lanes</span>
-            <span className="pill-badge rounded-full px-3 py-1.5">{totalSteps} steps</span>
-            <span className="pill-badge rounded-full px-3 py-1.5">{activeTrackCount} active</span>
-            <span className="pill-badge rounded-full px-3 py-1.5">Playhead {currentStep + 1}</span>
-          </div>
+          <span className="text-[11px] font-mono text-muted">
+            {tracks.length} lanes · {totalSteps} steps · {activeTrackCount} active
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-[10px] font-mono text-muted">
+          <span className="text-accent">▸</span>
+          <span>{currentStep + 1}/{totalSteps}</span>
         </div>
       </div>
 
-      <section aria-label="Sequencer workflow tips" className="border-b border-white/[0.05] px-4 py-3">
-        <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-foreground/72">
-          <span className="pill-badge rounded-full px-3 py-1.5">Drag to paint</span>
-          <span className="pill-badge rounded-full px-3 py-1.5">Double-click to shape</span>
-          <span className="pill-badge rounded-full px-3 py-1.5">Ctrl-click for chance</span>
-          <span className="pill-badge rounded-full px-3 py-1.5">Fill lanes with Euclid</span>
-        </div>
+      <section
+        aria-label="Sequencer workflow tips"
+        className="flex items-center gap-3 border-b border-border bg-surface px-4 py-1.5 text-[10px] text-muted"
+      >
+        <span><kbd className="kbd">drag</kbd> paint</span>
+        <span className="opacity-50">·</span>
+        <span><kbd className="kbd">dbl-click</kbd> shape</span>
+        <span className="opacity-50">·</span>
+        <span><kbd className="kbd">ctrl-click</kbd> chance</span>
+        <span className="opacity-50">·</span>
+        <span><kbd className="kbd">E</kbd> Euclid fill</span>
       </section>
 
       <div className="min-h-0 flex-1 px-4 pb-4 pt-3">
-        <div className="h-full overflow-auto rounded-[1.5rem] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015)),rgba(6,10,16,0.7)]">
+        <div className="h-full overflow-auto rounded-xl border border-border bg-surface-2">
           <div className="min-w-max p-3">
-            <div className="sticky top-0 z-30 mb-3 rounded-[1.1rem] border border-white/[0.08] bg-[rgba(8,13,20,0.9)] px-3 py-2 backdrop-blur-xl">
+            <div className="sticky top-0 z-30 mb-3 rounded-md border border-border bg-surface-2 px-3 py-2 backdrop-blur-sm">
               <div className="flex items-center gap-2">
-                <div className="w-40 shrink-0 text-[10px] font-black uppercase tracking-[0.22em] text-muted/90">
+                <div className="w-40 shrink-0 text-[10px] font-bold uppercase tracking-[0.18em] text-muted/90">
                   Track / controls
                 </div>
                 <div className="flex items-center gap-0.5">
@@ -466,14 +463,14 @@ export function StepSequencer() {
                     <div
                       key={i}
                       className={`w-10 text-center text-[10px] font-mono ${
-                        currentStep === i ? "font-black text-accent" : "text-muted/60"
+                        currentStep === i ? "font-bold text-accent" : "text-muted/60"
                       } ${i > 0 && i % 4 === 0 ? "ml-1" : ""}`}
                     >
                       {i + 1}
                     </div>
                   ))}
                 </div>
-                <div className="ml-3 text-[10px] font-black uppercase tracking-[0.22em] text-muted/90">
+                <div className="ml-3 text-[10px] font-bold uppercase tracking-[0.18em] text-muted/90">
                   Edit tools
                 </div>
               </div>

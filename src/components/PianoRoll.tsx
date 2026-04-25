@@ -98,12 +98,12 @@ export function PianoRoll() {
 
   return (
     <div
-      className="border-t border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent),rgba(7,11,18,0.94)]"
+      className="border-t border-border bg-surface-2"
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
       {/* Header */}
-      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-white/[0.06] bg-[rgba(9,14,22,0.9)] px-4 py-3 backdrop-blur-xl">
+      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-surface-2 px-4 py-3 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <div
             className="h-2.5 w-2.5 rounded-full shadow-[0_0_18px_currentColor]"
@@ -126,9 +126,9 @@ export function PianoRoll() {
 
       {/* Grid */}
       <div className="max-h-72 overflow-auto px-4 pb-4 pt-3">
-        <div className="inline-flex flex-col gap-0 rounded-[1.2rem] border border-white/[0.07] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015)),rgba(8,12,18,0.68)] p-3">
+        <div className="inline-flex flex-col gap-0 rounded-lg border border-border bg-surface-2 p-3">
           {/* Step numbers header */}
-          <div className="sticky top-0 z-10 mb-2 flex items-center gap-0 rounded-[0.9rem] bg-[rgba(8,13,20,0.92)] py-1 backdrop-blur-xl">
+          <div className="sticky top-0 z-10 mb-2 flex items-center gap-0 rounded-[0.9rem] bg-surface-2 py-1 backdrop-blur-sm">
             <div className="w-14 shrink-0" />
             <div className="flex items-center gap-0">
               {track.steps.map((_, i) => (

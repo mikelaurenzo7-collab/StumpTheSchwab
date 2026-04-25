@@ -42,10 +42,10 @@ export function PerformanceMode() {
   };
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-white/10 bg-[#0a0f18]/80 p-4 backdrop-blur">
+    <div className="flex flex-col gap-4 rounded-lg border border-border bg-[#0a0f18]/80 p-4 backdrop-blur">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h3 className="text-sm font-semibold text-white/90">Performance Mode</h3>
+          <h3 className="text-sm font-semibold text-foreground">Performance Mode</h3>
           <button
             onClick={() => setPerformanceMode(!performanceMode)}
             className={`rounded px-3 py-1.5 text-xs font-medium ${
@@ -66,7 +66,7 @@ export function PerformanceMode() {
       </div>
 
       {!performanceMode && (
-        <div className="rounded border border-dashed border-white/10 p-6 text-center text-sm text-white/50">
+        <div className="rounded border border-dashed border-border p-6 text-center text-sm text-white/50">
           Enable Performance Mode to trigger scenes live during playback
         </div>
       )}
@@ -74,16 +74,16 @@ export function PerformanceMode() {
       {/* Create Scene Form */}
       {showCreateScene && (
         <div className="flex flex-col gap-3 rounded border border-orange-400/20 bg-orange-500/5 p-4">
-          <label className="text-xs font-medium text-white/80">Scene Name</label>
+          <label className="text-xs font-medium text-soft">Scene Name</label>
           <input
             type="text"
             value={newSceneName}
             onChange={(e) => setNewSceneName(e.target.value)}
             placeholder="e.g., Verse, Chorus, Drop"
-            className="rounded border border-white/10 bg-[#070b12] px-3 py-2 text-sm text-white/90 placeholder:text-white/30 focus:border-orange-400/50 focus:outline-none"
+            className="rounded border border-border bg-[#070b12] px-3 py-2 text-sm text-foreground placeholder:text-white/30 focus:border-orange-400/50 focus:outline-none"
           />
 
-          <label className="text-xs font-medium text-white/80">Pattern Slots</label>
+          <label className="text-xs font-medium text-soft">Pattern Slots</label>
           <div className="grid grid-cols-8 gap-2">
             {newSceneSlots.map((slot, idx) => (
               <select
@@ -95,7 +95,7 @@ export function PerformanceMode() {
                   updated[idx] = value;
                   setNewSceneSlots(updated);
                 }}
-                className="rounded border border-white/10 bg-[#070b12] px-2 py-1.5 text-xs text-white/90"
+                className="rounded border border-border bg-[#070b12] px-2 py-1.5 text-xs text-foreground"
               >
                 <option value="">—</option>
                 {patterns.map((_, i) => (
@@ -107,14 +107,14 @@ export function PerformanceMode() {
             ))}
           </div>
 
-          <label className="text-xs font-medium text-white/80">Duration (bars)</label>
+          <label className="text-xs font-medium text-soft">Duration (bars)</label>
           <input
             type="number"
             min="1"
             max="32"
             value={newSceneDuration}
             onChange={(e) => setNewSceneDuration(parseInt(e.target.value))}
-            className="w-24 rounded border border-white/10 bg-[#070b12] px-3 py-2 text-sm text-white/90 focus:border-orange-400/50 focus:outline-none"
+            className="w-24 rounded border border-border bg-[#070b12] px-3 py-2 text-sm text-foreground focus:border-orange-400/50 focus:outline-none"
           />
 
           <div className="flex gap-2">
@@ -126,7 +126,7 @@ export function PerformanceMode() {
             </button>
             <button
               onClick={() => setShowCreateScene(false)}
-              className="flex-1 rounded bg-white/10 px-3 py-2 text-xs font-medium text-white/80 hover:bg-white/20"
+              className="flex-1 rounded bg-white/10 px-3 py-2 text-xs font-medium text-soft hover:bg-white/20"
             >
               Cancel
             </button>
@@ -138,7 +138,7 @@ export function PerformanceMode() {
       {performanceMode && (
         <div className="flex flex-col gap-2">
           {scenes.length === 0 ? (
-            <div className="rounded border border-dashed border-white/10 p-8 text-center text-sm text-white/40">
+            <div className="rounded border border-dashed border-border p-8 text-center text-sm text-white/40">
               No scenes yet. Create your first scene to start performing.
             </div>
           ) : (
@@ -152,7 +152,7 @@ export function PerformanceMode() {
                   className={`flex items-center gap-3 rounded border p-3 transition-colors ${
                     isActive
                       ? "border-orange-400/50 bg-orange-500/10"
-                      : "border-white/10 bg-white/[0.02] hover:bg-white/[0.04]"
+                      : "border-border bg-surface-3 hover:bg-surface-3"
                   }`}
                 >
                   <button
@@ -160,18 +160,18 @@ export function PerformanceMode() {
                     disabled={!isPlaying}
                     className={`flex h-12 w-12 items-center justify-center rounded font-bold transition-all ${
                       !isPlaying
-                        ? "cursor-not-allowed bg-white/5 text-white/30"
+                        ? "cursor-not-allowed bg-surface-3 text-white/30"
                         : isActive
                           ? "bg-orange-500 text-white shadow-lg shadow-orange-500/30"
-                          : "bg-white/10 text-white/80 hover:bg-white/20"
+                          : "bg-white/10 text-soft hover:bg-white/20"
                     }`}
                   >
                     {isActive ? "■" : "▶"}
                   </button>
 
                   <div className="flex-1">
-                    <div className="text-sm font-medium text-white/90">{scene.name}</div>
-                    <div className="mt-1 flex items-center gap-2 text-xs text-white/60">
+                    <div className="text-sm font-medium text-foreground">{scene.name}</div>
+                    <div className="mt-1 flex items-center gap-2 text-xs text-muted">
                       <span>
                         {scene.patternSlots.filter((s) => s !== null).length}{" "}
                         {scene.patternSlots.filter((s) => s !== null).length === 1

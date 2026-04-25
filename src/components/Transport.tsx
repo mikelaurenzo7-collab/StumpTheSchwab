@@ -134,11 +134,11 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       : `${tapTimes.length}/6`;
 
   return (
-    <div className="glass-control relative flex flex-wrap items-center gap-2.5 rounded-[1.45rem] px-2.5 py-2.5">
+    <div className="glass-control relative flex flex-wrap items-center gap-2.5 rounded-lg px-2.5 py-2.5">
       {/* AI Generate */}
       <button
         onClick={() => useUiStore.getState().setGeneratorOpen(true)}
-        className="button-primary group flex items-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-[10px] font-black uppercase tracking-[0.18em]"
+        className="button-primary group flex items-center gap-2 rounded-md px-3.5 py-2.5 text-[10px] font-bold uppercase tracking-[0.18em]"
         title="Generate or mutate a groove (G)"
       >
         <span className="text-base leading-none transition-transform group-hover:rotate-12">✦</span>
@@ -148,7 +148,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Play/Pause */}
       <button
         onClick={handlePlay}
-        className="flex h-11 w-11 items-center justify-center rounded-[1rem] border border-white/20 bg-white text-lg font-mono text-background shadow-lg shadow-white/10 hover:scale-105"
+        className="flex h-11 w-11 items-center justify-center rounded-md border border-white/20 bg-white text-lg font-mono text-background shadow-lg shadow-white/10 hover:scale-105"
         title={playbackState === "playing" ? "Pause (Space)" : "Play (Space)"}
       >
         {playbackState === "playing" ? "⏸" : "▶"}
@@ -157,15 +157,15 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Stop */}
       <button
         onClick={handleStop}
-        className="button-secondary flex h-11 w-11 items-center justify-center rounded-[1rem] font-mono text-lg text-foreground"
+        className="button-secondary flex h-11 w-11 items-center justify-center rounded-md font-mono text-lg text-foreground"
         title="Stop"
       >
         ⏹
       </button>
 
       {/* BPM */}
-      <div className="rounded-[1rem] border border-white/[0.08] bg-black/20 px-2.5 py-2">
-        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">BPM</div>
+      <div className="rounded-md border border-border bg-background-2 px-2.5 py-2">
+        <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-muted">BPM</div>
         <div className="flex items-center gap-2">
         <input
           type="number"
@@ -186,8 +186,8 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       </div>
 
       {/* Swing */}
-      <div className="rounded-[1rem] border border-white/[0.08] bg-black/20 px-2.5 py-2">
-        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Swing</div>
+      <div className="rounded-md border border-border bg-background-2 px-2.5 py-2">
+        <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-muted">Swing</div>
         <div className="flex items-center gap-2">
         <input
           type="range"
@@ -205,8 +205,8 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       </div>
 
       {/* Steps */}
-      <div className="rounded-[1rem] border border-white/[0.08] bg-black/20 px-2.5 py-2">
-        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Steps</div>
+      <div className="rounded-md border border-border bg-background-2 px-2.5 py-2">
+        <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-muted">Steps</div>
         <div className="flex items-center gap-2">
         <select
           value={totalSteps}
@@ -225,8 +225,8 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       <div className="mx-1 h-7 w-px bg-white/10" />
 
       {/* Pattern Selector */}
-      <div className="rounded-[1rem] border border-white/[0.08] bg-black/20 px-2.5 py-2">
-        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Pattern bank</div>
+      <div className="rounded-md border border-border bg-background-2 px-2.5 py-2">
+        <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-muted">Pattern bank</div>
         <div className="flex items-center gap-1.5">
         <div className="flex gap-0.5">
           {PATTERN_LABELS.map((label, i) => (
@@ -238,7 +238,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
                   ? "bg-accent text-white shadow-sm shadow-accent/40"
                 : copySource === i
                   ? "bg-warning text-black animate-pulse"
-                    : "bg-white/[0.08] text-muted hover:bg-white/[0.14] hover:text-foreground"
+                    : "bg-surface-3 text-muted hover:bg-surface-3 hover:text-foreground"
               }`}
               title={
                 copySource !== null
@@ -300,8 +300,8 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       <div className="mx-1 h-7 w-px bg-white/10" />
 
       {/* Preset Loader */}
-      <div className="rounded-[1rem] border border-white/[0.08] bg-black/20 px-2.5 py-2">
-        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Preset</div>
+      <div className="rounded-md border border-border bg-background-2 px-2.5 py-2">
+        <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-muted">Preset</div>
         <div className="flex items-center gap-2">
         <select
           value=""
@@ -394,7 +394,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
               type="button"
               onClick={() => setIncludeMasterPrint((value) => !value)}
               aria-pressed={includeMasterPrint}
-              className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
+              className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${
                 includeMasterPrint
                   ? "bg-accent text-white shadow-sm shadow-accent/30"
                   : "button-secondary"

@@ -90,18 +90,18 @@ export function SessionManager() {
 
       {/* Panel */}
       {showPanel && (
-        <div className="panel absolute right-0 top-full z-50 mt-2 flex w-80 flex-col gap-3 rounded-[1.45rem] p-3">
-          <div className="rounded-[1.1rem] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02)),rgba(10,16,24,0.72)] p-3">
+        <div className="panel absolute right-0 top-full z-50 mt-2 flex w-80 flex-col gap-3 rounded-lg p-3">
+          <div className="rounded-md border border-border bg-surface-2 p-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-cyan">
+                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-cyan">
                   Session vault
                 </p>
-                <h3 className="mt-1 text-sm font-black tracking-tight text-white">
+                <h3 className="mt-1 text-sm font-bold tracking-tight text-white">
                   Save takes, recover ideas fast
                 </h3>
               </div>
-              <span className="pill-badge rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em]">
+              <span className="pill-badge rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.18em]">
                 {sessions.length} saved
               </span>
             </div>
@@ -128,11 +128,11 @@ export function SessionManager() {
 
           {/* Saved sessions list */}
           {sessions.length > 0 ? (
-            <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-[1.1rem] border border-white/[0.06] bg-black/15 p-1.5">
+            <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-md border border-border bg-background-2 p-1.5">
               {sessions.map((name) => (
                 <div
                   key={name}
-                  className="group flex items-center justify-between gap-2 rounded-xl border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.015)),rgba(8,12,18,0.65)] px-2.5 py-2 hover:border-cyan/20 hover:bg-white/[0.08]"
+                  className="group flex items-center justify-between gap-2 rounded-xl border border-border bg-surface-2 px-2.5 py-2 hover:border-cyan/20 hover:bg-surface-3"
                 >
                   <button
                     onClick={() => handleLoad(name)}
@@ -141,13 +141,13 @@ export function SessionManager() {
                     <span className="block truncate text-xs font-semibold text-foreground">
                       {name}
                     </span>
-                    <span className="block text-[9px] uppercase tracking-[0.16em] text-muted/70">
+                    <span className="block text-[9px] uppercase tracking-[0.18em] text-muted/70">
                       Click to load
                     </span>
                   </button>
                   <button
                     onClick={() => handleDelete(name)}
-                    className="rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-muted/0 transition-colors group-hover:text-muted hover:bg-danger/15 hover:text-danger"
+                    className="rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-muted/0 transition-colors group-hover:text-muted hover:bg-danger/15 hover:text-danger"
                   >
                     Del
                   </button>
@@ -155,12 +155,12 @@ export function SessionManager() {
               ))}
             </div>
           ) : (
-            <div className="rounded-[1.1rem] border border-dashed border-white/10 bg-black/10 px-4 py-5 text-center text-xs text-muted">
+            <div className="rounded-md border border-dashed border-border bg-background-2 px-4 py-5 text-center text-xs text-muted">
               No saved sessions yet
             </div>
           )}
 
-          <div className="flex items-center justify-between text-[9px] uppercase tracking-[0.16em] text-muted/60">
+          <div className="flex items-center justify-between text-[9px] uppercase tracking-[0.18em] text-muted/60">
             <span>Autosaving every 10s</span>
             <span>Local only</span>
           </div>

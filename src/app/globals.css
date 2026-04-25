@@ -332,4 +332,7 @@ input[type="checkbox"] {
 .bg-surface-3 { background-color: var(--surface-3); }
 
 .border-border { border-color: var(--border); }
+.border-border-strong { border-color: var(--border-strong); }
 .border-accent { border-color: var(--accent); }
+
+.bg-background-2 { background-color: var(--background-2); }
