@@ -247,9 +247,9 @@ export const MixDoctorPanel = memo(function MixDoctorPanel({
         style={{ maxHeight: "80vh", animation: "slide-in-right 0.22s cubic-bezier(0.22,1,0.36,1) both" }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-surface-2">
+        <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/60 bg-surface-2/80">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-accent" />
+            <div className="w-2 h-2 rounded-full bg-accent" style={{ boxShadow: "0 0 6px var(--accent-glow)" }} />
             <span className="text-[12px] font-bold tracking-wider text-foreground">
               MIX DOCTOR
             </span>
@@ -276,7 +276,17 @@ export const MixDoctorPanel = memo(function MixDoctorPanel({
                 : "bg-accent text-white hover:bg-accent-hover"
             }`}
           >
-            {loading ? "Analyzing…" : "Analyze my mix"}
+            {loading ? (
+              <span className="flex items-center gap-1.5">
+                <span className="animate-pulse">✦</span>
+                Analyzing…
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5">
+                <span>✦</span>
+                Analyze my mix
+              </span>
+            )}
           </button>
           {lastRun && !loading && (
             <span className="text-[9px] text-muted">
@@ -301,7 +311,7 @@ export const MixDoctorPanel = memo(function MixDoctorPanel({
           {loading && (
             <div className="flex flex-col gap-2 animate-pulse">
               {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-16 rounded bg-surface-2" />
+                <div key={i} className="h-16 rounded-lg shimmer" />
               ))}
               <p className="text-center text-[10px] text-muted">
                 listening to your mix…

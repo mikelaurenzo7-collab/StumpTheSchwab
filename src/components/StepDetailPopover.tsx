@@ -96,17 +96,18 @@ export function StepDetailPopover({ trackId, step, anchorRect, onClose }: StepDe
   return (
     <div
       ref={ref}
-      className="fixed z-50 bg-surface border border-border rounded-lg shadow-xl p-3 select-none"
-      style={{ left, top, width: popoverWidth }}
+      className="fixed z-50 bg-surface-raised border border-border/70 rounded-xl shadow-2xl p-3 select-none"
+      style={{ left, top, width: popoverWidth, animation: "fade-in-up 0.15s ease-out both" }}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center gap-1.5 mb-2">
+        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: track.sound.color }} />
         <span className="text-[10px] font-bold text-muted uppercase tracking-wider">
           {track.sound.name} · Step {step + 1}
         </span>
         <button
           onClick={onClose}
-          className="w-4 h-4 flex items-center justify-center text-muted hover:text-foreground text-xs"
+          className="ml-auto w-4 h-4 flex items-center justify-center text-muted hover:text-foreground text-xs"
         >
           ✕
         </button>

@@ -209,14 +209,21 @@ export function GeneratorModal() {
       onClick={() => !loading && setOpen(false)}
     >
       <div
-        className="bg-surface border border-border rounded-xl shadow-2xl p-6 max-w-2xl w-[90%] max-h-[85vh] overflow-y-auto"
+        className="bg-surface border border-border/60 rounded-2xl shadow-2xl p-6 max-w-2xl w-[90%] max-h-[85vh] overflow-y-auto"
+        style={{ animation: "fade-in-up 0.22s cubic-bezier(0.22,1,0.36,1) both" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between mb-4">
           <div>
             <h2 className="text-base font-bold text-foreground flex items-center gap-2">
-              <span className="text-accent">✦</span>
-              {mode === "create" ? "Generate Beat with Claude" : "Refine with Claude"}
+              <span
+                className={`text-lg leading-none transition-all ${loading ? "animate-pulse" : ""}`}
+                style={{ color: "var(--accent)", filter: loading ? "drop-shadow(0 0 6px var(--accent-glow))" : "none" }}
+              >
+                ✦
+              </span>
+              {mode === "create" ? "Generate Beat" : "Refine Beat"}
+              <span className="text-[10px] font-normal text-muted/70 ml-1 tracking-normal">powered by Claude</span>
             </h2>
             <p className="text-xs text-muted mt-1">
               {mode === "create"
@@ -271,7 +278,7 @@ export function GeneratorModal() {
                     key={s}
                     onClick={() => handleSuggestion(s)}
                     disabled={loading}
-                    className="px-2 py-1 rounded text-[10px] bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="px-2.5 py-1 rounded-full text-[10px] border border-border/40 bg-surface-2 text-muted hover:border-accent/40 hover:text-foreground hover:bg-surface-3 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                   >
                     {s}
                   </button>
@@ -315,7 +322,7 @@ export function GeneratorModal() {
                     key={s}
                     onClick={() => handleRefineChip(s)}
                     disabled={loading}
-                    className="px-2 py-1 rounded text-[10px] bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="px-2.5 py-1 rounded-full text-[10px] border border-border/40 bg-surface-2 text-muted hover:border-accent/40 hover:text-foreground hover:bg-surface-3 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                   >
                     {s}
                   </button>
@@ -377,11 +384,13 @@ export function GeneratorModal() {
                   ? description.trim().length === 0
                   : refineDraft.trim().length === 0)
               }
-              className={`px-4 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-colors ${
+              className={`px-5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
                 loading
-                  ? "bg-accent/40 text-white/60 cursor-wait"
-                  : "bg-accent hover:bg-accent-hover text-white disabled:bg-surface-2 disabled:text-muted/50 disabled:cursor-not-allowed"
+                  ? "bg-accent/30 text-white/60 cursor-wait"
+                  : "bg-gradient-to-r from-accent to-accent-hover text-white disabled:from-surface-2 disabled:to-surface-2 disabled:text-muted/50 disabled:cursor-not-allowed hover:shadow-lg"
               }`}
+              style={!loading && !(mode === "create" ? description.trim().length === 0 : refineDraft.trim().length === 0)
+                ? { boxShadow: "0 0 16px var(--accent-glow)" } : undefined}
             >
               {loading
                 ? mode === "refine"
@@ -396,13 +405,13 @@ export function GeneratorModal() {
 
         {/* Result / error */}
         {error && (
-          <div className="mt-4 p-3 bg-danger/10 border border-danger/30 rounded text-xs text-danger whitespace-pre-wrap">
+          <div className="mt-4 p-3 bg-danger/8 border border-danger/25 rounded-xl text-xs text-danger whitespace-pre-wrap">
             {error}
           </div>
         )}
 
         {lastResult && !error && (
-          <div className="mt-4 p-3 bg-accent/10 border border-accent/30 rounded">
+          <div className="mt-4 p-3.5 bg-accent/8 border border-accent/25 rounded-xl" style={{ animation: "fade-in-up 0.2s ease-out both" }}>
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-bold text-accent">
                 {lastResult.refined ? "✦ Refined: " : "✓ Applied: "}

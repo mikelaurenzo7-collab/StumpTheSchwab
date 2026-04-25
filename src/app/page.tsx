@@ -12,6 +12,7 @@ import { MixDoctorPanel } from "@/components/MixDoctorPanel";
 import { useAudioEngine } from "@/lib/useAudioEngine";
 import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
 import { useAutoSave } from "@/lib/useAutoSave";
+import { useUiStore } from "@/store/ui";
 import "@/store/history";
 
 export default function DAW() {
@@ -33,6 +34,17 @@ export default function DAW() {
     if (typeof window === "undefined") return false;
     try { return localStorage.getItem("sts_session___autosave") !== null; } catch { return false; }
   });
+
+  const accentTheme = useUiStore((s) => s.accentTheme);
+
+  // Apply accent theme class to <body>
+  useEffect(() => {
+    const THEMES = ["theme-warm", "theme-cobalt", "theme-lime"];
+    document.body.classList.remove(...THEMES);
+    if (accentTheme !== "violet") {
+      document.body.classList.add(`theme-${accentTheme}`);
+    }
+  }, [accentTheme]);
 
   const [mixDoctorOpen, setMixDoctorOpen] = useState(false);
   // Live conflict state bubbled up from the Sonic X-Ray canvas so the Mix

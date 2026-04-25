@@ -61,7 +61,7 @@ export function SongChain() {
       <div className="flex items-center gap-2 px-4 py-1.5 bg-surface/60 border-b border-border">
         <button
           onClick={handleToggle}
-          className="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground transition-colors"
+          className="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider border border-border/50 bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground hover:border-border transition-colors"
           title="Enable Song Mode to chain patterns into an arrangement"
         >
           Song Mode
@@ -80,6 +80,7 @@ export function SongChain() {
       <button
         onClick={handleToggle}
         className="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-accent text-white hover:bg-accent-hover transition-colors"
+        style={{ boxShadow: "0 0 10px var(--accent-glow)" }}
         title="Disable Song Mode"
       >
         Song Mode
@@ -133,11 +134,12 @@ export function SongChain() {
                 onDrop={(e) => handleDrop(e, position)}
                 onDragEnd={handleDragEnd}
                 onClick={() => removeFromChain(position)}
+                style={isCurrent ? { boxShadow: "0 0 12px var(--success-glow)" } : undefined}
                 className={`group relative h-6 rounded text-[10px] font-bold transition-all ${
                   customName ? "px-1.5 min-w-[1.75rem]" : "w-7"
                 } ${
                   isCurrent
-                    ? "bg-accent text-white shadow-sm shadow-accent/40 scale-110"
+                    ? "bg-success text-white shadow-sm shadow-accent/40 scale-110"
                     : isDropTarget
                       ? "bg-accent/40 text-white ring-2 ring-accent"
                       : isDragging

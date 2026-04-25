@@ -2,7 +2,7 @@
 
 import { useEngineStore, PATTERN_LABELS } from "@/store/engine";
 import { useHistoryStore } from "@/store/history";
-import { useUiStore } from "@/store/ui";
+import { useUiStore, THEME_LABELS, type AccentTheme } from "@/store/ui";
 import { PRESETS } from "@/lib/presets";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SessionManager } from "@/components/SessionManager";
@@ -49,6 +49,9 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
   const canRedo = useHistoryStore((s) => s.future.length > 0);
   const undo = useHistoryStore((s) => s.undo);
   const redo = useHistoryStore((s) => s.redo);
+  const accentTheme = useUiStore((s) => s.accentTheme);
+  const setAccentTheme = useUiStore((s) => s.setAccentTheme);
+  const currentStep = useEngineStore((s) => s.currentStep);
 
   const handlePlay = useCallback(async () => {
     await onInit();
@@ -131,71 +134,123 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       ? "Tap again"
       : `${tapTimes.length}/6`;
 
+  // Derive bar:beat from currentStep for the beat counter
+  const bar  = currentStep >= 0 ? Math.floor(currentStep / 4) + 1 : 1;
+  const beat = currentStep >= 0 ? (currentStep % 4) + 1 : 1;
+  const playing = playbackState === "playing";
+
   return (
-    <div className="flex items-center gap-3 px-4 py-3 bg-surface border-b border-border flex-wrap">
-      {/* Logo */}
-      <div className="font-bold text-accent text-lg tracking-tight mr-1 select-none">
-        STS
+    <div
+      className="transport-glow flex items-center gap-2.5 px-4 py-2.5 border-b border-border flex-wrap"
+      style={{ background: "linear-gradient(180deg, var(--surface), var(--surface-2))" }}
+    >
+      {/* ── Logo ─────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 pr-3 mr-0.5 border-r border-border h-[30px] select-none">
+        <div
+          className="w-7 h-7 rounded-[7px] grid place-items-center text-white font-extrabold font-mono text-[12px] shrink-0"
+          style={{
+            background: "radial-gradient(circle at 30% 25%, var(--accent-hover), var(--accent) 55%, var(--accent-dim))",
+            boxShadow: "0 0 0 1px rgba(255,255,255,.08) inset, 0 4px 12px -4px var(--accent-glow)",
+          }}
+        >
+          S
+        </div>
+        <div className="flex flex-col leading-none">
+          <b className="text-[12px] font-extrabold tracking-tight">StumpTheSchwab</b>
+          <span className="text-[8px] font-mono text-muted tracking-[0.22em] mt-0.5">STUDIO</span>
+        </div>
       </div>
 
-      {/* AI Generate */}
+      {/* ── AI Generate ──────────────────────────────────────── */}
       <button
         onClick={() => useUiStore.getState().setGeneratorOpen(true)}
-        className="px-3 py-2 rounded-lg bg-gradient-to-br from-accent to-accent-dim hover:from-accent-hover hover:to-accent text-white text-xs font-bold uppercase tracking-wider transition-all shadow-sm shadow-accent/30 flex items-center gap-1.5"
+        className="px-3 py-2 rounded-lg text-white text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 border border-accent/60"
+        style={{
+          background: "linear-gradient(180deg, var(--accent-hover), var(--accent-dim))",
+          boxShadow: "0 1px 0 rgba(255,255,255,.18) inset, 0 6px 16px -8px var(--accent-glow)",
+        }}
         title="Generate a beat with Claude (G)"
       >
         <span className="text-sm leading-none">✦</span>
         Generate
       </button>
 
-      {/* Play/Pause */}
+      {/* ── Play / Pause ─────────────────────────────────────── */}
       <button
         onClick={handlePlay}
-        className={`w-10 h-10 rounded-lg text-white flex items-center justify-center transition-all font-mono text-lg ${
-          playbackState === "playing"
-            ? "bg-success hover:bg-success/90"
-            : "bg-accent hover:bg-accent-hover"
-        }`}
-        style={playbackState === "playing"
-          ? { boxShadow: "0 0 16px var(--success-glow)" }
-          : undefined}
-        title={playbackState === "playing" ? "Pause (Space)" : "Play (Space)"}
+        className="w-[38px] h-[38px] rounded-[9px] text-white flex items-center justify-center transition-all font-mono text-base border"
+        style={playing ? {
+          background: "var(--success)",
+          borderColor: "var(--success)",
+          boxShadow: "0 1px 0 rgba(255,255,255,.18) inset, 0 0 20px var(--success-glow)",
+          animation: "play-pulse 2s ease-in-out infinite",
+        } : {
+          background: "linear-gradient(180deg, var(--accent-hover), var(--accent-dim))",
+          borderColor: "var(--accent)",
+          boxShadow: "0 1px 0 rgba(255,255,255,.18) inset, 0 8px 22px -10px var(--accent-glow)",
+        }}
+        title={playing ? "Pause (Space)" : "Play (Space)"}
       >
-        {playbackState === "playing" ? "⏸" : "▶"}
+        {playing ? "⏸" : "▶"}
       </button>
 
-      {/* Stop */}
+      {/* ── Stop ─────────────────────────────────────────────── */}
       <button
         onClick={handleStop}
-        className="w-10 h-10 rounded-lg bg-surface-2 hover:bg-surface-3 text-foreground flex items-center justify-center transition-colors font-mono text-lg"
-        title="Stop"
+        className="w-[34px] h-[34px] rounded-lg bg-surface-3 hover:bg-surface-raised border border-border text-muted hover:text-foreground flex items-center justify-center transition-colors font-mono text-sm"
+        title="Stop (.)"
       >
         ⏹
       </button>
 
-      {/* BPM */}
-      <div className="flex items-center gap-2">
-        <label className="text-xs text-muted uppercase tracking-wider">BPM</label>
+      {/* ── BPM cluster ──────────────────────────────────────── */}
+      <div
+        className="flex items-center gap-1.5 px-2.5 h-[34px] border border-border rounded-[7px]"
+        style={{ background: "var(--surface-deep)", boxShadow: "0 2px 0 rgba(255,255,255,.02) inset" }}
+      >
+        <span className="text-[8.5px] font-bold font-mono tracking-[0.18em] text-muted">BPM</span>
         <input
           type="number"
           min={30}
           max={300}
           value={bpm}
           onChange={(e) => setBpm(Number(e.target.value))}
-          className="w-16 bg-surface-2 border border-border rounded px-2 py-1 text-center text-sm font-mono text-foreground focus:outline-none focus:border-accent"
+          className="tempo-input"
+          title="Beats per minute"
         />
         <button
           onClick={handleTap}
-          className="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-2 hover:bg-surface-3 text-muted hover:text-foreground transition-colors min-w-[3rem]"
-          title="Tap to set BPM — tap repeatedly at the desired tempo"
+          className="text-[9px] font-bold font-mono tracking-wider text-muted hover:text-foreground transition-colors min-w-[2.5rem]"
+          title="Tap to set BPM"
         >
           {tapHint}
         </button>
       </div>
 
-      {/* Swing */}
-      <div className="flex items-center gap-2">
-        <label className="text-xs text-muted uppercase tracking-wider">Swing</label>
+      {/* ── Beat counter ─────────────────────────────────────── */}
+      <div
+        className="flex items-center gap-2 px-3 h-[34px] border border-border rounded-[7px]"
+        style={{ background: "var(--surface-deep)" }}
+      >
+        <div className="text-[16px] font-bold font-mono leading-none" style={{ letterSpacing: "0.02em" }}>
+          <span style={{ color: playing ? "var(--foreground)" : "var(--muted)" }}>{bar}</span>
+          <span style={{ color: "var(--muted)", fontWeight: 400, margin: "0 1px" }}>.</span>
+          <span style={{
+            color: playing ? "var(--cyan)" : "var(--muted)",
+            textShadow: playing ? "0 0 10px var(--cyan-glow)" : "none",
+          }}>
+            {beat}
+          </span>
+        </div>
+        <span className="text-[8px] font-bold font-mono tracking-[0.18em] text-muted leading-none">BAR<br/>BEAT</span>
+      </div>
+
+      {/* ── Swing ────────────────────────────────────────────── */}
+      <div
+        className="flex items-center gap-2 px-2.5 h-[34px] border border-border rounded-[7px]"
+        style={{ background: "var(--surface-deep)" }}
+      >
+        <span className="text-[8.5px] font-bold font-mono tracking-[0.18em] text-muted">SWING</span>
         <input
           type="range"
           min={0}
@@ -203,20 +258,23 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
           step={0.01}
           value={swing}
           onChange={(e) => setSwing(Number(e.target.value))}
-          className="w-20"
+          className="w-16"
         />
-        <span className="text-xs font-mono text-muted w-8">
+        <span className="text-[10px] font-mono text-muted w-7 text-right">
           {Math.round(swing * 100)}%
         </span>
       </div>
 
-      {/* Steps */}
-      <div className="flex items-center gap-2">
-        <label className="text-xs text-muted uppercase tracking-wider">Steps</label>
+      {/* ── Steps ────────────────────────────────────────────── */}
+      <div
+        className="flex items-center gap-2 px-2.5 h-[34px] border border-border rounded-[7px]"
+        style={{ background: "var(--surface-deep)" }}
+      >
+        <span className="text-[8.5px] font-bold font-mono tracking-[0.18em] text-muted">STEPS</span>
         <select
           value={totalSteps}
           onChange={(e) => setTotalSteps(Number(e.target.value))}
-          className="bg-surface-2 border border-border rounded px-2 py-1 text-sm font-mono text-foreground focus:outline-none focus:border-accent"
+          className="bg-transparent border-none outline-none text-[12px] font-mono font-semibold text-foreground cursor-pointer"
         >
           <option value={8}>8</option>
           <option value={16}>16</option>
@@ -225,24 +283,30 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
         </select>
       </div>
 
-      {/* Separator */}
-      <div className="w-px h-6 bg-border mx-1" />
+      {/* ── Divider ──────────────────────────────────────────── */}
+      <div className="w-px h-5 bg-border mx-0.5" />
 
-      {/* Pattern Selector */}
+      {/* ── Pattern Selector ─────────────────────────────────── */}
       <div className="flex items-center gap-1.5">
-        <span className="text-xs text-muted uppercase tracking-wider">Pattern</span>
+        <span className="text-[8.5px] font-bold font-mono tracking-[0.18em] text-muted">PATTERN</span>
         <div className="flex gap-0.5">
           {PATTERN_LABELS.map((label, i) => (
             <button
               key={label}
               onClick={() => handlePatternClick(i)}
-              className={`w-7 h-7 rounded text-xs font-bold transition-all ${
+              className={`w-7 h-7 rounded text-[11px] font-bold font-mono transition-all grid place-items-center border ${
                 i === currentPattern
-                  ? "bg-accent text-white shadow-sm shadow-accent/30"
+                  ? "text-white border-accent"
                   : copySource === i
-                    ? "bg-warning text-black animate-pulse"
-                    : "bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground"
+                    ? "border-warning text-warning animate-blink"
+                    : "bg-surface-3 border-border text-muted hover:text-foreground hover:border-border/80"
               }`}
+              style={i === currentPattern ? {
+                background: "linear-gradient(180deg, var(--accent-hover), var(--accent-dim))",
+                boxShadow: "0 0 0 1px rgba(255,255,255,.15) inset, 0 4px 14px -6px var(--accent-glow)",
+              } : copySource === i ? {
+                background: "rgba(245,158,11,0.12)",
+              } : undefined}
               title={
                 copySource !== null
                   ? `Paste pattern ${PATTERN_LABELS[copySource]} here`
@@ -257,10 +321,10 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
         {/* Copy button */}
         <button
           onClick={handleCopy}
-          className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${
+          className={`px-2 py-1 rounded text-[10px] font-bold font-mono uppercase tracking-wider transition-colors border ${
             copySource !== null
-              ? "bg-warning text-black"
-              : "bg-surface-2 text-muted hover:bg-surface-3"
+              ? "bg-warning/20 border-warning text-warning"
+              : "bg-surface-3 border-border text-muted hover:text-foreground"
           }`}
           title={copySource !== null ? "Cancel copy" : "Copy current pattern"}
         >
@@ -298,42 +362,39 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
         )}
       </div>
 
-      {/* Separator */}
-      <div className="w-px h-6 bg-border mx-1" />
+      {/* ── Divider ──────────────────────────────────────────── */}
+      <div className="w-px h-5 bg-border mx-0.5" />
 
-      {/* Preset Loader */}
-      <div className="flex items-center gap-2">
-        <label className="text-xs text-muted uppercase tracking-wider">Preset</label>
+      {/* ── Preset Loader ────────────────────────────────────── */}
+      <div
+        className="flex items-center gap-2 px-2.5 h-[34px] border border-border rounded-[7px]"
+        style={{ background: "var(--surface-deep)" }}
+      >
+        <span className="text-[8.5px] font-bold font-mono tracking-[0.18em] text-muted">PRESET</span>
         <select
           value=""
           onChange={(e) => {
             const idx = Number(e.target.value);
-            if (!isNaN(idx) && PRESETS[idx]) {
-              loadPreset(PRESETS[idx]);
-            }
+            if (!isNaN(idx) && PRESETS[idx]) loadPreset(PRESETS[idx]);
           }}
-          className="bg-surface-2 border border-border rounded px-2 py-1 text-sm font-mono text-foreground focus:outline-none focus:border-accent"
+          className="bg-transparent border-none outline-none text-[11px] font-mono text-foreground cursor-pointer"
         >
-          <option value="" disabled>
-            Load...
-          </option>
+          <option value="" disabled>Load…</option>
           {PRESETS.map((p, i) => (
-            <option key={p.name} value={i}>
-              {p.name}
-            </option>
+            <option key={p.name} value={i}>{p.name}</option>
           ))}
         </select>
       </div>
 
-      {/* Spacer */}
+      {/* ── Spacer ───────────────────────────────────────────── */}
       <div className="flex-1" />
 
-      {/* Undo / Redo */}
+      {/* ── Undo / Redo ──────────────────────────────────────── */}
       <div className="flex gap-0.5">
         <button
           onClick={undo}
           disabled={!canUndo}
-          className="w-8 h-8 rounded text-sm transition-colors disabled:opacity-25 bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground"
+          className="w-8 h-8 rounded text-sm transition-colors disabled:opacity-25 bg-surface-2 border border-border text-muted hover:bg-surface-3 hover:text-foreground"
           title="Undo (Ctrl+Z)"
         >
           ↶
@@ -341,14 +402,14 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
         <button
           onClick={redo}
           disabled={!canRedo}
-          className="w-8 h-8 rounded text-sm transition-colors disabled:opacity-25 bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground"
+          className="w-8 h-8 rounded text-sm transition-colors disabled:opacity-25 bg-surface-2 border border-border text-muted hover:bg-surface-3 hover:text-foreground"
           title="Redo (Ctrl+Shift+Z)"
         >
           ↷
         </button>
       </div>
 
-      {/* Export */}
+      {/* ── Export ───────────────────────────────────────────── */}
       <div className="flex items-center gap-1">
         <select
           value={exportFormat}
@@ -375,63 +436,71 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
         )}
         <button
           onClick={() => {
-            if (exportFormat === "midi") {
-              exportMidi();
-            } else if (exportFormat === "stems") {
-              exportStems(exportLoops);
-            } else {
-              exportWAV(exportLoops);
-            }
+            if (exportFormat === "midi") exportMidi();
+            else if (exportFormat === "stems") exportStems(exportLoops);
+            else exportWAV(exportLoops);
           }}
           disabled={exporting || exportingMidi}
-          className={`px-3 py-1.5 rounded text-xs uppercase tracking-wider transition-colors font-bold ${
+          className={`px-3 py-1.5 rounded text-xs uppercase tracking-wider transition-colors font-bold border ${
             exporting || exportingMidi
-              ? "bg-accent/50 text-white/50 cursor-wait"
-              : "bg-accent hover:bg-accent-hover text-white"
+              ? "bg-accent/30 border-accent/30 text-white/50 cursor-wait"
+              : "bg-accent hover:bg-accent-hover border-accent text-white"
           }`}
           title={
             exportFormat === "midi"
-              ? "Export pattern as a Standard MIDI File (.mid) — drag into any DAW"
+              ? "Export pattern as a Standard MIDI File (.mid)"
               : exportFormat === "stems"
-                ? "Export each track as a separate WAV file — for collaboration or DAW import"
+                ? "Export each track as a separate WAV file"
                 : "Export pattern as 16-bit PCM WAV"
           }
         >
-          {exporting ? "Bouncing..." : exportingMidi ? "Writing..." : "Export"}
+          {exporting ? "Bouncing…" : exportingMidi ? "Writing…" : "Export"}
         </button>
       </div>
 
-      {/* Sessions */}
+      {/* ── Sessions ─────────────────────────────────────────── */}
       <SessionManager />
 
-      {/* Humanize */}
+      {/* ── Humanize ─────────────────────────────────────────── */}
       <button
         onClick={() => humanize(null, 0.15)}
-        className="px-3 py-1.5 rounded bg-surface-2 hover:bg-accent-dim/30 text-muted hover:text-accent text-xs uppercase tracking-wider transition-colors"
-        title="Humanize all tracks — randomize velocities slightly for a more natural feel (H)"
+        className="px-2.5 py-1.5 rounded bg-surface-2 border border-border hover:border-accent/40 text-muted hover:text-accent text-[10px] font-bold uppercase tracking-wider transition-colors"
+        title="Humanize all tracks (H)"
       >
         Humanize
       </button>
 
-      {/* Clear */}
+      {/* ── Clear ────────────────────────────────────────────── */}
       <button
         onClick={clearAll}
-        className="px-3 py-1.5 rounded bg-surface-2 hover:bg-danger/20 text-muted hover:text-danger text-xs uppercase tracking-wider transition-colors"
+        className="px-2.5 py-1.5 rounded bg-surface-2 border border-border hover:border-danger/40 text-muted hover:text-danger text-[10px] font-bold uppercase tracking-wider transition-colors"
       >
-        Clear All
+        Clear
       </button>
 
-      {/* Help */}
+      {/* ── Theme Switcher ───────────────────────────────────── */}
+      <select
+        value={accentTheme}
+        onChange={(e) => setAccentTheme(e.target.value as AccentTheme)}
+        className="bg-surface-2 border border-border rounded px-1.5 py-1 text-[10px] font-mono text-muted focus:outline-none focus:border-accent"
+        title="Accent theme"
+      >
+        {(Object.keys(THEME_LABELS) as AccentTheme[]).map((t) => (
+          <option key={t} value={t}>{THEME_LABELS[t]}</option>
+        ))}
+      </select>
+
+      {/* ── Help ─────────────────────────────────────────────── */}
       <button
         onClick={() => useUiStore.getState().toggleHelp()}
-        className="w-8 h-8 rounded-full bg-surface-2 hover:bg-surface-3 text-muted hover:text-foreground text-sm transition-colors"
+        className="w-8 h-8 rounded-full bg-surface-2 border border-border hover:bg-surface-3 text-muted hover:text-foreground text-sm transition-colors"
         title="Keyboard shortcuts (?)"
       >
         ?
       </button>
 
       {lastSaved && (
-        <span className="text-[10px] text-muted/60 font-mono" title="Auto-saved">
+        <span className="text-[9px] text-muted/50 font-mono" title="Auto-saved">
           saved {lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </span>
       )}

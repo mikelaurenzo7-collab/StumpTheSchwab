@@ -54,7 +54,7 @@ export const SpectrumAnalyzer = memo(function SpectrumAnalyzer({
       const h = rect.height;
 
       // Translucent fill = nice motion-trail / glow look without GPU shaders.
-      ctx.fillStyle = "rgba(15, 14, 23, 0.45)";
+      ctx.fillStyle = "rgba(10, 10, 18, 0.55)";
       ctx.fillRect(0, 0, w, h);
 
       const spectrum = getSpectrum();
@@ -138,7 +138,7 @@ export const SpectrumAnalyzer = memo(function SpectrumAnalyzer({
     <canvas
       ref={canvasRef}
       style={{ height: `${height}px` }}
-      className="w-full block bg-surface-2 rounded"
+      className="w-full block bg-surface-deep rounded-md border border-border/25"
     />
   );
 });

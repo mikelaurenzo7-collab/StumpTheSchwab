@@ -82,14 +82,17 @@ export function SessionManager() {
 
       {/* Flash notification */}
       {flash && (
-        <div className="absolute top-full mt-1 right-0 px-2 py-1 bg-accent text-white text-xs rounded whitespace-nowrap z-50">
+        <div
+          className="absolute top-full mt-2 right-0 px-3 py-1.5 text-white text-xs rounded-lg whitespace-nowrap z-50 font-medium"
+          style={{ backgroundColor: "var(--accent)", boxShadow: "0 0 16px var(--accent-glow)", animation: "fade-in-up 0.15s ease-out both" }}
+        >
           {flash}
         </div>
       )}
 
       {/* Panel */}
       {showPanel && (
-        <div className="absolute top-full mt-1 right-0 w-64 bg-surface border border-border rounded-lg shadow-xl z-50 p-3 flex flex-col gap-3">
+        <div className="absolute top-full mt-2 right-0 w-64 bg-surface border border-border/70 rounded-xl shadow-2xl z-50 p-3 flex flex-col gap-3" style={{ animation: "fade-in-up 0.18s ease-out both" }}>
           {/* Save */}
           <div className="flex gap-1">
             <input
@@ -115,7 +118,7 @@ export function SessionManager() {
               {sessions.map((name) => (
                 <div
                   key={name}
-                  className="flex items-center justify-between gap-1 px-2 py-1.5 bg-surface-2 rounded hover:bg-surface-3 group"
+                  className="flex items-center justify-between gap-1 px-2.5 py-1.5 bg-surface-2 rounded-lg hover:bg-surface-3 group border border-transparent hover:border-border/40 transition-all"
                 >
                   <button
                     onClick={() => handleLoad(name)}

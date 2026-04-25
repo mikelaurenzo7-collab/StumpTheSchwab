@@ -39,6 +39,7 @@ const NoteCell = memo(function NoteCell({
           style={{
             backgroundColor: color,
             opacity: isCurrent ? 1 : velocity * 0.7 + 0.2,
+            boxShadow: isCurrent ? `0 0 10px ${color}88` : `0 0 4px ${color}44`,
           }}
         />
       )}
@@ -98,16 +99,16 @@ export function PianoRoll() {
 
   return (
     <div
-      className="border-t border-border bg-background"
+      className="border-t border-border bg-surface-deep"
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-surface border-b border-border">
+      <div className="flex items-center justify-between px-4 py-2 bg-surface border-b border-border/60">
         <div className="flex items-center gap-2">
           <div
-            className="w-2.5 h-2.5 rounded-full"
-            style={{ backgroundColor: track.sound.color }}
+            className="w-2.5 h-2.5 rounded-sm"
+            style={{ backgroundColor: track.sound.color, boxShadow: `0 0 8px ${track.sound.color}66` }}
           />
           <span className="text-sm font-medium text-foreground">
             {track.sound.name} — Piano Roll
@@ -154,7 +155,7 @@ export function PianoRoll() {
                 {/* Note label */}
                 <div
                   className={`w-14 shrink-0 flex items-center justify-end pr-2 h-5 ${
-                    black ? "bg-surface" : ""
+                    black ? "bg-surface-2" : ""
                   } ${isC ? "border-t border-border/30" : ""}`}
                 >
                   <span
@@ -169,7 +170,7 @@ export function PianoRoll() {
                 {/* Step cells for this note */}
                 <div
                   className={`flex items-center gap-0 ${
-                    black ? "bg-surface/50" : "bg-background"
+                    black ? "bg-surface/50" : "bg-surface-deep/70"
                   } ${isC ? "border-t border-border/20" : ""}`}
                 >
                   {track.steps.map((velocity, stepIdx) => {

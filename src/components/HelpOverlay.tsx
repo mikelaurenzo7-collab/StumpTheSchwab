@@ -73,7 +73,7 @@ function Key({ children }: { children: React.ReactNode }) {
     return <span className="text-muted/60 mx-0.5">{children}</span>;
   }
   return (
-    <kbd className="inline-block px-1.5 py-0.5 rounded bg-surface-3 border border-border text-[10px] font-mono text-foreground shadow-[0_1px_0_0_rgba(0,0,0,0.4)]">
+    <kbd className="inline-block px-1.5 py-0.5 rounded-sm bg-surface-3 border border-border text-[10px] font-mono text-foreground shadow-[inset_0_-2px_0_rgba(0,0,0,0.4),_0_1px_0_rgba(255,255,255,0.05)]">
       {children}
     </kbd>
   );
@@ -103,12 +103,13 @@ export function HelpOverlay() {
       onClick={() => setOpen(false)}
     >
       <div
-        className="bg-surface border border-border rounded-xl shadow-2xl p-6 max-w-3xl w-[90%] max-h-[85vh] overflow-y-auto"
+        className="bg-surface border border-border/60 rounded-2xl shadow-2xl p-6 max-w-3xl w-[90%] max-h-[85vh] overflow-y-auto"
+        style={{ animation: "fade-in-up 0.22s cubic-bezier(0.22,1,0.36,1) both" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-base font-bold text-foreground">Keyboard Shortcuts</h2>
+            <h2 className="text-base font-bold text-foreground flex items-center gap-2"><span className="text-accent">⌨</span> Keyboard Shortcuts</h2>
             <p className="text-xs text-muted mt-0.5">
               Make better music, faster.
             </p>

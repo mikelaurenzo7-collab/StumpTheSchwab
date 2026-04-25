@@ -84,13 +84,17 @@ const StepCell = memo(function StepCell({
         ${
           active
             ? "shadow-sm"
-            : "border border-border/40 bg-surface-2 hover:bg-surface-3 hover:border-border/70"
+            : `border border-border/40 bg-surface-2 hover:bg-surface-3 hover:border-border/70 ${isCurrent ? "bg-[var(--cyan)]/5" : ""}`
         }
-        ${isCurrent && !active ? "ring-1 ring-accent/60 bg-accent/10" : ""}
-        ${isCurrent && active ? "ring-1 ring-white/40 scale-[1.08] z-10" : ""}
-        ${hasProb ? "ring-1 ring-white/20" : ""}
+        ${isCurrent ? "z-10" : ""}
+        ${hasProb && !isCurrent ? "ring-1 ring-white/20" : ""}
       `}
-      style={isCurrent && active ? { boxShadow: `0 0 16px ${color}99, 0 0 6px ${color}55` } : undefined}
+      style={isCurrent ? {
+        boxShadow: `0 0 0 1.5px var(--cyan), 0 0 12px rgba(111,227,255,0.4)${active ? `, 0 0 14px ${color}88` : ""}`,
+        transform: isCurrent && active ? "scale(1.06)" : undefined,
+      } : active ? {
+        boxShadow: `0 0 8px ${color}44`,
+      } : undefined}
     >
       {active && (
         <>
