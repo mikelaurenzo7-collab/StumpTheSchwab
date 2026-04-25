@@ -77,7 +77,7 @@ export function SongChain() {
         </div>
         <button
           onClick={handleToggle}
-          className="mt-4 w-full rounded-2xl bg-white px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-background transition-all hover:scale-[1.01] hover:bg-accent-hover hover:text-white"
+          className="mt-4 w-full rounded-2xl bg-white px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-black transition-all hover:scale-[1.01] hover:bg-accent-hover hover:text-white"
           title="Enable Song Mode to chain patterns into an arrangement"
         >
           Enable Song Mode
@@ -152,6 +152,13 @@ export function SongChain() {
             </button>
           )}
         </div>
+        <div aria-live="polite" className="sr-only">
+          {dragFrom === null
+            ? ""
+            : dragOver === null
+              ? `Moving pattern at position ${dragFrom + 1}.`
+              : `Moving pattern from position ${dragFrom + 1} to position ${dragOver + 1}.`}
+        </div>
 
         {chain.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-white/10 p-4 text-center text-xs leading-relaxed text-muted">
@@ -200,10 +207,10 @@ export function SongChain() {
                       {isCurrent ? " · playing" : ""}
                     </span>
                   </span>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted group-hover:hidden">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted group-hover:hidden group-focus-visible:hidden">
                     Drag
                   </span>
-                  <span className="hidden text-[10px] font-bold uppercase tracking-[0.18em] text-danger group-hover:block">
+                  <span className="hidden text-[10px] font-bold uppercase tracking-[0.18em] text-danger group-hover:block group-focus-visible:block">
                     Remove
                   </span>
                 </button>
