@@ -1,7 +1,8 @@
 "use client";
 
 import { useEngineStore, nextVelocity, nextProbability } from "@/store/engine";
-import { useCallback, memo } from "react";
+import { useCallback, memo, useState } from "react";
+import { EuclideanPopover } from "@/components/EuclideanPopover";
 
 const velLabel = (v: number) =>
   v >= 1 ? "Full" : v >= 0.75 ? "High" : v >= 0.5 ? "Med" : "Soft";
@@ -96,6 +97,7 @@ const TrackRow = memo(function TrackRow({
   pianoRollOpen,
   currentStep,
   canPaste,
+  euclideanOpen,
   onToggleStep,
   onCycleVelocity,
   onCtrlClick,
@@ -104,6 +106,8 @@ const TrackRow = memo(function TrackRow({
   onCopyTrack,
   onPasteTrack,
   onHumanizeTrack,
+  onOpenEuclidean,
+  onCloseEuclidean,
 }: {
   trackId: number;
   name: string;
@@ -114,6 +118,7 @@ const TrackRow = memo(function TrackRow({
   pianoRollOpen: boolean;
   currentStep: number;
   canPaste: boolean;
+  euclideanOpen: boolean;
   onToggleStep: (trackId: number, step: number) => void;
   onCycleVelocity: (trackId: number, step: number) => void;
   onCtrlClick: (trackId: number, step: number) => void;
@@ -122,9 +127,11 @@ const TrackRow = memo(function TrackRow({
   onCopyTrack: (trackId: number) => void;
   onPasteTrack: (trackId: number) => void;
   onHumanizeTrack: (trackId: number) => void;
+  onOpenEuclidean: (trackId: number) => void;
+  onCloseEuclidean: () => void;
 }) {
   return (
-    <div className="flex items-center gap-0.5 group">
+    <div className="flex items-center gap-0.5 group relative">
       {/* Track label */}
       <div
         className={`w-20 shrink-0 flex items-center gap-1.5 pr-2 ${
@@ -162,8 +169,14 @@ const TrackRow = memo(function TrackRow({
         ))}
       </div>
 
-      {/* Track actions — visible on hover */}
-      <div className="ml-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Track actions — visible on hover (and while popover is open) */}
+      <div
+        className={`ml-2 flex items-center gap-0.5 transition-opacity relative ${
+          euclideanOpen
+            ? "opacity-100"
+            : "opacity-0 group-hover:opacity-100"
+        }`}
+      >
         <button
           onClick={() => onCopyTrack(trackId)}
           className="w-5 h-5 rounded text-[9px] font-bold bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground transition-colors"
@@ -187,12 +200,32 @@ const TrackRow = memo(function TrackRow({
           ~
         </button>
         <button
+          onClick={() => onOpenEuclidean(trackId)}
+          className={`w-5 h-5 rounded text-[9px] font-bold transition-colors ${
+            euclideanOpen
+              ? "bg-accent text-white"
+              : "bg-surface-2 text-muted hover:bg-accent-dim/30 hover:text-accent"
+          }`}
+          title={`Euclidean fill for ${name}`}
+        >
+          E
+        </button>
+        <button
           onClick={() => onClearTrack(trackId)}
           className="w-5 h-5 rounded text-[9px] font-bold bg-surface-2 text-muted hover:bg-danger/20 hover:text-danger transition-colors"
           title={`Clear ${name}`}
         >
           ✕
         </button>
+
+        {euclideanOpen && (
+          <EuclideanPopover
+            trackId={trackId}
+            trackName={name}
+            trackColor={color}
+            onClose={onCloseEuclidean}
+          />
+        )}
       </div>
     </div>
   );
@@ -212,6 +245,8 @@ export function StepSequencer() {
   const pasteTrackSteps = useEngineStore((s) => s.pasteTrackSteps);
   const humanize = useEngineStore((s) => s.humanize);
   const canPaste = useEngineStore((s) => s.trackClipboard !== null);
+
+  const [euclideanTrack, setEuclideanTrack] = useState<number | null>(null);
 
   const handleToggle = useCallback(
     (trackId: number, step: number) => toggleStep(trackId, step),
@@ -270,6 +305,13 @@ export function StepSequencer() {
     [humanize]
   );
 
+  const handleOpenEuclidean = useCallback(
+    (trackId: number) => setEuclideanTrack(trackId),
+    []
+  );
+
+  const handleCloseEuclidean = useCallback(() => setEuclideanTrack(null), []);
+
   return (
     <div className="flex-1 overflow-auto p-4">
       <div className="inline-flex flex-col gap-1">
@@ -303,6 +345,7 @@ export function StepSequencer() {
             pianoRollOpen={pianoRollTrack === track.id}
             currentStep={currentStep}
             canPaste={canPaste}
+            euclideanOpen={euclideanTrack === track.id}
             onToggleStep={handleToggle}
             onCycleVelocity={handleCycleVelocity}
             onCtrlClick={handleCtrlClick}
@@ -311,6 +354,8 @@ export function StepSequencer() {
             onCopyTrack={handleCopyTrack}
             onPasteTrack={handlePasteTrack}
             onHumanizeTrack={handleHumanizeTrack}
+            onOpenEuclidean={handleOpenEuclidean}
+            onCloseEuclidean={handleCloseEuclidean}
           />
         ))}
       </div>

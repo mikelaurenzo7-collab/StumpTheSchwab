@@ -5,6 +5,7 @@ import { StepSequencer } from "@/components/StepSequencer";
 import { PianoRoll } from "@/components/PianoRoll";
 import { Mixer } from "@/components/Mixer";
 import { SongChain } from "@/components/SongChain";
+import { HelpOverlay } from "@/components/HelpOverlay";
 import { useAudioEngine } from "@/lib/useAudioEngine";
 import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
 import "@/store/history";
@@ -20,6 +21,7 @@ export default function DAW() {
       <StepSequencer />
       <PianoRoll />
       <Mixer getTrackMeter={getTrackMeter} getMasterMeter={getMasterMeter} />
+      <HelpOverlay />
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useEngineStore, MAX_PATTERNS } from "@/store/engine";
 import { useHistoryStore } from "@/store/history";
+import { useUiStore } from "@/store/ui";
 
 export function useKeyboardShortcuts(onInit: () => Promise<void>) {
   useEffect(() => {
@@ -10,6 +11,14 @@ export function useKeyboardShortcuts(onInit: () => Promise<void>) {
       // Don't capture shortcuts when typing in inputs
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      // Help overlay: ? toggles. Match by key not code so it works on
+      // any layout (US: shift+/, intl layouts vary).
+      if (e.key === "?" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        useUiStore.getState().toggleHelp();
+        return;
+      }
 
       // Undo: Cmd/Ctrl+Z
       if ((e.metaKey || e.ctrlKey) && e.code === "KeyZ" && !e.shiftKey) {
@@ -39,9 +48,19 @@ export function useKeyboardShortcuts(onInit: () => Promise<void>) {
           break;
         }
 
-        // Escape: Close piano roll first, then stop
+        // H: Humanize all tracks (skip if a modifier is held)
+        case "KeyH": {
+          if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) break;
+          e.preventDefault();
+          state.humanize(null, 0.15);
+          break;
+        }
+
+        // Escape: Close help → close piano roll → stop
         case "Escape": {
-          if (state.pianoRollTrack !== null) {
+          if (useUiStore.getState().helpOpen) {
+            useUiStore.getState().setHelpOpen(false);
+          } else if (state.pianoRollTrack !== null) {
             state.setPianoRollTrack(null);
           } else {
             state.stop();

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEngineStore, PATTERN_LABELS } from "@/store/engine";
-import { useCallback } from "react";
+import { useCallback, useState, type DragEvent } from "react";
 
 export function SongChain() {
   const songMode = useEngineStore((s) => s.songMode);
@@ -9,16 +9,52 @@ export function SongChain() {
   const chainPosition = useEngineStore((s) => s.chainPosition);
   const playbackState = useEngineStore((s) => s.playbackState);
   const currentPattern = useEngineStore((s) => s.currentPattern);
+  const patterns = useEngineStore((s) => s.patterns);
   const addToChain = useEngineStore((s) => s.addToChain);
   const removeFromChain = useEngineStore((s) => s.removeFromChain);
   const clearChain = useEngineStore((s) => s.clearChain);
   const setSongMode = useEngineStore((s) => s.setSongMode);
+  const moveChainItem = useEngineStore((s) => s.moveChainItem);
+
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
 
   const handleToggle = useCallback(() => setSongMode(!songMode), [songMode, setSongMode]);
 
   const handleAddCurrent = useCallback(() => {
     addToChain(currentPattern);
   }, [addToChain, currentPattern]);
+
+  const handleDragStart = useCallback((e: DragEvent<HTMLButtonElement>, position: number) => {
+    setDragFrom(position);
+    e.dataTransfer.effectAllowed = "move";
+    // Required for Firefox to actually start the drag
+    e.dataTransfer.setData("text/plain", String(position));
+  }, []);
+
+  const handleDragOver = useCallback((e: DragEvent<HTMLButtonElement>, position: number) => {
+    if (dragFrom === null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOver !== position) setDragOver(position);
+  }, [dragFrom, dragOver]);
+
+  const handleDrop = useCallback(
+    (e: DragEvent<HTMLButtonElement>, position: number) => {
+      e.preventDefault();
+      if (dragFrom !== null && dragFrom !== position) {
+        moveChainItem(dragFrom, position);
+      }
+      setDragFrom(null);
+      setDragOver(null);
+    },
+    [dragFrom, moveChainItem]
+  );
+
+  const handleDragEnd = useCallback(() => {
+    setDragFrom(null);
+    setDragOver(null);
+  }, []);
 
   if (!songMode) {
     return (
@@ -65,7 +101,7 @@ export function SongChain() {
             key={label}
             onClick={() => addToChain(i)}
             className="w-5 h-5 rounded text-[9px] font-bold bg-surface-2 text-muted/70 hover:bg-surface-3 hover:text-foreground transition-colors"
-            title={`Append pattern ${label}`}
+            title={`Append ${patterns[i]?.name ?? label}`}
           >
             {label}
           </button>
@@ -80,22 +116,44 @@ export function SongChain() {
           Empty — add patterns to build an arrangement
         </span>
       ) : (
-        <div className="flex items-center gap-0.5 flex-wrap">
+        <div className="flex items-center gap-0.5 flex-wrap" onDragLeave={() => setDragOver(null)}>
           {chain.map((patternIdx, position) => {
             const isCurrent = isPlaying && position === chainPosition;
+            const isDragging = dragFrom === position;
+            const isDropTarget = dragOver === position && dragFrom !== position;
+            const patternName = patterns[patternIdx]?.name ?? PATTERN_LABELS[patternIdx];
+            const customName = patternName !== PATTERN_LABELS[patternIdx];
+
             return (
               <button
                 key={position}
+                draggable
+                onDragStart={(e) => handleDragStart(e, position)}
+                onDragOver={(e) => handleDragOver(e, position)}
+                onDrop={(e) => handleDrop(e, position)}
+                onDragEnd={handleDragEnd}
                 onClick={() => removeFromChain(position)}
-                className={`group relative w-7 h-6 rounded text-[10px] font-bold transition-all ${
+                className={`group relative h-6 rounded text-[10px] font-bold transition-all ${
+                  customName ? "px-1.5 min-w-[1.75rem]" : "w-7"
+                } ${
                   isCurrent
                     ? "bg-accent text-white shadow-sm shadow-accent/40 scale-110"
-                    : "bg-surface-2 text-foreground hover:bg-danger/30 hover:text-danger"
+                    : isDropTarget
+                      ? "bg-accent/40 text-white ring-2 ring-accent"
+                      : isDragging
+                        ? "bg-surface-3 text-muted opacity-40"
+                        : "bg-surface-2 text-foreground hover:bg-danger/30 hover:text-danger cursor-grab"
                 }`}
-                title={`Position ${position + 1}: Pattern ${PATTERN_LABELS[patternIdx]} — click to remove`}
+                title={`${position + 1}. ${patternName}${customName ? ` (${PATTERN_LABELS[patternIdx]})` : ""} — drag to reorder · click to remove`}
               >
-                {PATTERN_LABELS[patternIdx]}
-                <span className="absolute -top-1 -right-1 text-[7px] opacity-0 group-hover:opacity-100 text-danger">
+                {customName ? (
+                  <span className="text-[9px] truncate max-w-[5rem] block">
+                    {patternName}
+                  </span>
+                ) : (
+                  PATTERN_LABELS[patternIdx]
+                )}
+                <span className="absolute -top-1 -right-1 text-[7px] opacity-0 group-hover:opacity-100 text-danger pointer-events-none">
                   ✕
                 </span>
               </button>

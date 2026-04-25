@@ -115,6 +115,9 @@ export interface EngineState {
   clearChain: () => void;
   setChainPosition: (pos: number) => void;
   switchPatternSilent: (index: number) => void;
+  moveChainItem: (from: number, to: number) => void;
+  renamePattern: (index: number, name: string) => void;
+  euclideanFill: (trackId: number, hits: number, rotation: number) => void;
 
   copyTrackSteps: (trackId: number) => void;
   pasteTrackSteps: (trackId: number) => void;
@@ -129,6 +132,38 @@ export interface EngineState {
 
 // ── Helpers ────────────────────────────────────────────────────
 const INITIAL_STEPS = 16;
+
+/**
+ * Generate an evenly-distributed (euclidean) rhythm.
+ * Uses Bresenham-style accumulation primed so step 0 always lands on a hit
+ * (when hits > 0) — this matches the canonical Bjorklund patterns producers
+ * recognize: tresillo E(3,8), cinquillo E(5,8), 4-on-floor E(4,16), etc.
+ * Rotation shifts the result to the right.
+ */
+export function euclideanPattern(
+  hits: number,
+  steps: number,
+  rotation: number = 0
+): boolean[] {
+  if (steps <= 0) return [];
+  const h = Math.max(0, Math.min(steps, Math.floor(hits)));
+  if (h === 0) return Array(steps).fill(false);
+  if (h === steps) return Array(steps).fill(true);
+
+  const pattern: boolean[] = Array(steps).fill(false);
+  // Prime accumulator so the first overflow lands on step 0
+  let acc = steps - h;
+  for (let i = 0; i < steps; i++) {
+    acc += h;
+    if (acc >= steps) {
+      acc -= steps;
+      pattern[i] = true;
+    }
+  }
+  if (rotation === 0) return pattern;
+  const r = ((rotation % steps) + steps) % steps;
+  return [...pattern.slice(steps - r), ...pattern.slice(0, steps - r)];
+}
 
 export const DEFAULT_EFFECTS: TrackEffects = {
   filterOn: false,
@@ -611,6 +646,56 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
   },
 
   setChainPosition: (pos) => set({ chainPosition: pos }),
+
+  moveChainItem: (from, to) => {
+    pushHistory();
+    set((state) => {
+      if (
+        from === to ||
+        from < 0 ||
+        to < 0 ||
+        from >= state.chain.length ||
+        to >= state.chain.length
+      ) {
+        return state;
+      }
+      const next = [...state.chain];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return { chain: next };
+    });
+  },
+
+  renamePattern: (index, name) => {
+    if (index < 0 || index >= MAX_PATTERNS) return;
+    pushHistory();
+    set((state) => ({
+      patterns: state.patterns.map((p, i) =>
+        i === index ? { ...p, name: name.slice(0, 16) } : p
+      ),
+    }));
+  },
+
+  euclideanFill: (trackId, hits, rotation) => {
+    pushHistory();
+    set((state) => {
+      const total = state.totalSteps;
+      const pattern = euclideanPattern(hits, total, rotation);
+      return {
+        tracks: state.tracks.map((t) => {
+          if (t.id !== trackId) return t;
+          return {
+            ...t,
+            steps: t.steps.map((existing, i) =>
+              pattern[i] ? (existing > 0 ? existing : 1.0) : 0
+            ),
+            notes: t.notes.map((n, i) => (pattern[i] ? n : "")),
+            probabilities: t.probabilities.map((p, i) => (pattern[i] ? p : 1.0)),
+          };
+        }),
+      };
+    });
+  },
 
   switchPatternSilent: (index) => {
     set((state) => {
