@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from "react";
 import * as Tone from "tone";
 import { useEngineStore, type Track, type TrackEffects, type MasterBus } from "@/store/engine";
 import type { TrackSound } from "@/lib/sounds";
+import { getStepDurationSeconds, getStepSubdivision } from "@/lib/stepTiming";
 
 export type SynthNode =
   | Tone.MembraneSynth
@@ -448,7 +449,7 @@ export function useAudioEngine() {
 
             // Step duration in seconds; multiplied by per-track noteLength so
             // each track can be staccato or held independent of the grid.
-            const stepDurationSeconds = (60 / currentState.bpm) * (4 / totalSteps);
+            const stepDurationSeconds = getStepDurationSeconds(currentState.bpm, totalSteps);
 
             currentTracks.forEach((track: Track, trackIndex: number) => {
               const velocity = track.steps[stepIndex];
@@ -492,7 +493,7 @@ export function useAudioEngine() {
             }
           },
           stepIndices,
-          "16n"
+          getStepSubdivision(totalSteps)
         );
 
         sequenceRef.current.start(0);

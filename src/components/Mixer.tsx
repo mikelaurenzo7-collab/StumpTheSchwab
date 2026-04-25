@@ -380,10 +380,10 @@ function LevelMeter({ getLevel, color }: { getLevel: () => number; color: string
   }, [getLevel, color]);
 
   return (
-    <div className="relative w-2 h-20 bg-surface-2 rounded-sm overflow-hidden">
+    <div className="relative h-24 w-2.5 overflow-hidden rounded-full border border-white/[0.06] bg-surface-2/80">
       <div
         ref={barRef}
-        className="absolute bottom-0 left-0 w-full rounded-sm transition-[height] duration-75"
+        className="absolute bottom-0 left-0 w-full rounded-full transition-[height] duration-75"
         style={{ height: "0%", backgroundColor: color }}
       />
       <div
@@ -480,27 +480,29 @@ const ChannelStrip = memo(function ChannelStrip({
   }, [trackId]);
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      <div className="panel-soft flex w-16 flex-col items-center gap-2 rounded-[1.2rem] px-2 py-3">
+    <div className="flex snap-start flex-col items-center gap-1.5">
+      <div className="panel-soft flex w-[4.9rem] flex-col items-center gap-2.5 rounded-[1.35rem] px-2.5 py-3">
         {/* Track color dot + name */}
-        <div
-          className="rounded-full transition-all duration-100"
-          style={{
-            width: flashing ? "10px" : "8px",
-            height: flashing ? "10px" : "8px",
-            backgroundColor: color,
-            boxShadow: flashing ? `0 0 12px 2px ${color}` : "none",
-          }}
-        />
-        <span className="text-[10px] text-muted truncate w-full text-center">
-          {hasSample ? sampleName ?? "Sample" : name}
-        </span>
+        <div className="flex w-full flex-col items-center gap-1 rounded-[1rem] border border-white/[0.06] bg-black/15 px-2 py-2">
+          <div
+            className="rounded-full transition-all duration-100"
+            style={{
+              width: flashing ? "10px" : "8px",
+              height: flashing ? "10px" : "8px",
+              backgroundColor: color,
+              boxShadow: flashing ? `0 0 12px 2px ${color}` : "none",
+            }}
+          />
+          <span className="w-full truncate text-center text-[10px] font-semibold text-foreground/82">
+            {hasSample ? sampleName ?? "Sample" : name}
+          </span>
+        </div>
 
         {/* Sample load / clear */}
-        <div className="flex gap-0.5 w-full justify-center">
+        <div className="flex w-full gap-0.5 justify-center">
           <button
             onClick={() => onLoadSample(trackId)}
-            className={`flex-1 h-4 rounded text-[8px] font-bold transition-colors ${
+            className={`flex-1 h-5 rounded-lg text-[8px] font-bold transition-colors ${
               hasSample
                 ? "bg-success/30 text-success"
                 : "button-secondary"
@@ -512,7 +514,7 @@ const ChannelStrip = memo(function ChannelStrip({
           {hasSample && (
             <button
               onClick={() => onClearSample(trackId)}
-              className="button-secondary h-4 w-4 rounded text-[8px] font-bold hover:bg-danger/20 hover:text-danger"
+              className="button-secondary h-5 w-5 rounded-lg text-[8px] font-bold hover:bg-danger/20 hover:text-danger"
               title="Clear sample — revert to built-in synth"
             >
               ✕
@@ -521,14 +523,14 @@ const ChannelStrip = memo(function ChannelStrip({
         </div>
 
         {/* Note length — staccato / half / legato. Cycles with one click. */}
-        <div className="flex gap-0.5 w-full justify-center" title={`Note length: ${noteLength.toFixed(2)}× step`}>
+        <div className="flex w-full gap-0.5 justify-center" title={`Note length: ${noteLength.toFixed(2)}× step`}>
           {NOTE_LENGTH_PRESETS.map((p) => {
             const active = Math.abs(noteLength - p.value) < 0.05;
             return (
               <button
                 key={p.value}
                 onClick={() => onNoteLength(trackId, p.value)}
-                className={`flex-1 h-3.5 rounded text-[10px] leading-none font-bold transition-colors ${
+                className={`flex-1 h-4 rounded-lg text-[10px] leading-none font-bold transition-colors ${
                   active
                     ? "bg-accent text-white"
                     : "button-secondary"
@@ -542,7 +544,7 @@ const ChannelStrip = memo(function ChannelStrip({
         </div>
 
         {/* Pan knob */}
-        <div className="flex flex-col items-center gap-0.5 w-full">
+        <div className="flex w-full flex-col items-center gap-0.5 rounded-[0.95rem] border border-white/[0.06] bg-black/10 px-1.5 py-2">
           <input
             type="range"
             min={-1}
@@ -560,7 +562,7 @@ const ChannelStrip = memo(function ChannelStrip({
         </div>
 
         {/* Fader + Meter */}
-        <div className="h-24 flex items-center gap-1">
+        <div className="flex h-28 items-center gap-1 rounded-[1rem] border border-white/[0.06] bg-black/10 px-1.5 py-2">
           <input
             type="range"
             min={0}
@@ -568,8 +570,8 @@ const ChannelStrip = memo(function ChannelStrip({
             step={0.01}
             value={volume}
             onChange={(e) => onVolume(trackId, Number(e.target.value))}
-            className="h-20 -rotate-90 origin-center"
-            style={{ width: "80px" }}
+            className="h-24 -rotate-90 origin-center"
+            style={{ width: "92px" }}
           />
           <LevelMeter getLevel={getLevel} color={color} />
         </div>
@@ -583,7 +585,7 @@ const ChannelStrip = memo(function ChannelStrip({
         <div className="flex gap-1">
           <button
             onClick={() => onMute(trackId)}
-            className={`w-6 h-5 rounded text-[10px] font-bold transition-colors ${
+            className={`h-6 w-7 rounded-lg text-[10px] font-bold transition-colors ${
               muted
                 ? "bg-danger text-white"
                 : "button-secondary"
@@ -593,7 +595,7 @@ const ChannelStrip = memo(function ChannelStrip({
           </button>
           <button
             onClick={() => onSolo(trackId)}
-            className={`w-6 h-5 rounded text-[10px] font-bold transition-colors ${
+            className={`h-6 w-7 rounded-lg text-[10px] font-bold transition-colors ${
               solo
                 ? "bg-warning text-black"
                 : "button-secondary"
@@ -606,7 +608,7 @@ const ChannelStrip = memo(function ChannelStrip({
         {/* FX toggle button */}
         <button
           onClick={() => onToggleFX(trackId)}
-          className={`w-full h-5 rounded text-[9px] font-bold transition-colors ${
+          className={`h-6 w-full rounded-lg text-[9px] font-bold transition-colors ${
             fxOpen
               ? "bg-accent text-white"
               : hasFX
@@ -639,19 +641,21 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="ml-1 flex flex-col items-center gap-1 border-l border-white/[0.06] pl-3">
-      <div className="panel-soft flex w-16 flex-col items-center gap-2 rounded-[1.2rem] px-2 py-3">
+    <div className="ml-1 flex flex-col items-center gap-1.5 border-l border-white/[0.06] pl-3">
+      <div className="panel-soft flex w-[5rem] flex-col items-center gap-2.5 rounded-[1.35rem] px-2.5 py-3">
         {/* Master label */}
-        <div className="w-2 h-2 rounded-full bg-accent" />
-        <span className="text-[10px] text-accent font-bold truncate w-full text-center">
-          MASTER
-        </span>
+        <div className="flex w-full flex-col items-center gap-1 rounded-[1rem] border border-white/[0.06] bg-black/15 px-2 py-2">
+          <div className="h-2 w-2 rounded-full bg-accent" />
+          <span className="w-full truncate text-center text-[10px] font-bold text-accent">
+            MASTER
+          </span>
+        </div>
 
         {/* Spacer to align with pan knob area */}
-        <div className="h-5" />
+        <div className="h-6" />
 
         {/* Master fader + Meter */}
-        <div className="h-24 flex items-center gap-1">
+        <div className="flex h-28 items-center gap-1 rounded-[1rem] border border-white/[0.06] bg-black/10 px-1.5 py-2">
           <input
             type="range"
             min={0}
@@ -659,8 +663,8 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
             step={0.01}
             value={master.volume}
             onChange={(e) => setMaster("volume", Number(e.target.value))}
-            className="h-20 -rotate-90 origin-center"
-            style={{ width: "80px" }}
+            className="h-24 -rotate-90 origin-center"
+            style={{ width: "92px" }}
           />
           <LevelMeter getLevel={getLevel} color="var(--accent)" />
         </div>
@@ -676,7 +680,7 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
         <div className="flex gap-1">
           <button
             onClick={() => setMaster("eqOn", !master.eqOn)}
-            className={`w-5 h-5 rounded text-[9px] font-bold transition-colors ${
+            className={`h-6 w-6 rounded-lg text-[9px] font-bold transition-colors ${
               master.eqOn
                 ? "bg-accent text-white"
                 : "button-secondary"
@@ -687,7 +691,7 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
           </button>
           <button
             onClick={() => setMaster("compressorOn", !master.compressorOn)}
-            className={`w-5 h-5 rounded text-[9px] font-bold transition-colors ${
+            className={`h-6 w-6 rounded-lg text-[9px] font-bold transition-colors ${
               master.compressorOn
                 ? "bg-accent text-white"
                 : "button-secondary"
@@ -698,7 +702,7 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
           </button>
           <button
             onClick={() => setMaster("limiterOn", !master.limiterOn)}
-            className={`w-5 h-5 rounded text-[9px] font-bold transition-colors ${
+            className={`h-6 w-6 rounded-lg text-[9px] font-bold transition-colors ${
               master.limiterOn
                 ? "bg-accent text-white"
                 : "button-secondary"
@@ -712,7 +716,7 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
         {/* Expand controls */}
         <button
           onClick={() => setExpanded(!expanded)}
-          className={`w-full h-5 rounded text-[9px] font-bold transition-colors ${
+          className={`h-6 w-full rounded-lg text-[9px] font-bold transition-colors ${
             expanded
               ? "bg-accent text-white"
               : "button-secondary"
@@ -943,7 +947,7 @@ export function Mixer({
   return (
     <div className="px-4 py-3">
       {/* Master visualizer — spectrum bars + oscilloscope overlay. */}
-      <div className="mb-3 flex items-center justify-between gap-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-4 rounded-[1.25rem] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015)),rgba(8,12,18,0.68)] px-4 py-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.28em] text-cyan">
             Perform / Mix
@@ -951,6 +955,10 @@ export function Mixer({
           <h2 className="text-lg font-black tracking-tight text-white">
             Color, motion, level
           </h2>
+        </div>
+        <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-foreground/72">
+          <span className="pill-badge rounded-full px-2.5 py-1">{tracks.length} channels</span>
+          <span className="pill-badge rounded-full px-2.5 py-1">{openFX.size} FX open</span>
         </div>
         <div className="min-w-0 flex-1">
         <SpectrumAnalyzer
@@ -961,7 +969,7 @@ export function Mixer({
       </div>
 
       <div className="panel-soft rounded-[1.5rem] p-3">
-        <div className="flex items-start gap-2 overflow-x-auto">
+        <div className="flex items-start gap-3 overflow-x-auto pb-1 [scroll-snap-type:x_mandatory]">
         {tracks.map((track, i) => (
           <ChannelStrip
             key={track.id}

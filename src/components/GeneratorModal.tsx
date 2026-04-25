@@ -529,41 +529,54 @@ export function GeneratorModal() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(3,6,12,0.84)] p-4 backdrop-blur-md"
       onClick={() => !loading && setOpen(false)}
     >
       <div
-        className="panel relative max-h-[85vh] w-full max-w-4xl overflow-y-auto rounded-[2rem] p-6"
+        className="panel relative max-h-[88vh] w-full max-w-6xl overflow-y-auto rounded-[2rem] p-0"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-[radial-gradient(circle_at_10%_0%,rgba(155,92,255,0.18),transparent_18rem)]" />
-        <div className="relative">
-          <div className="mb-4 flex items-start justify-between">
-            <div>
-              <p className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-cyan">
-                Creative instrument
-              </p>
-              <h2 className="flex items-center gap-2 text-2xl font-black tracking-[-0.04em] text-white">
-                <span className="text-accent">✦</span>
-                {mode === "create" ? "Generate a groove" : "Mutate the current groove"}
-              </h2>
-              <p className="mt-1 text-xs text-muted">
-                {mode === "create"
-                  ? "Turn prompts into grooves, keep versions, and compare bold directions without losing the pocket."
-                  : "Refine the live pattern with scoped moves, next-step suggestions, and A/B auditioning."}
-              </p>
+        <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-[radial-gradient(circle_at_12%_0%,rgba(139,92,246,0.2),transparent_18rem),radial-gradient(circle_at_88%_8%,rgba(94,234,212,0.12),transparent_20rem)]" />
+        <div className="relative p-5">
+          <div className="mb-5 rounded-[1.6rem] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.015)),rgba(8,12,18,0.72)] p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-cyan">
+                  Creative instrument
+                </p>
+                <h2 className="flex items-center gap-2 text-3xl font-black tracking-[-0.04em] text-white">
+                  <span className="text-accent">✦</span>
+                  {mode === "create" ? "Generate a groove" : "Mutate the current groove"}
+                </h2>
+                <p className="mt-2 max-w-3xl text-sm text-muted">
+                  {mode === "create"
+                    ? "Turn prompts into grooves, keep versions, and compare bold directions without losing the pocket."
+                    : "Refine the live pattern with scoped moves, next-step suggestions, and A/B auditioning."}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="pill-badge rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em]">
+                  Target {targetLabel(target)}
+                </span>
+                <button
+                  onClick={() => !loading && setOpen(false)}
+                  disabled={loading}
+                  className="button-secondary rounded-full px-3 py-1 text-2xl leading-none disabled:opacity-30"
+                  title="Close (Esc)"
+                >
+                  ×
+                </button>
+              </div>
             </div>
-            <button
-              onClick={() => !loading && setOpen(false)}
-              disabled={loading}
-              className="rounded-full px-3 py-1 text-2xl leading-none text-muted hover:bg-white/[0.08] hover:text-foreground disabled:opacity-30"
-              title="Close (Esc)"
-            >
-              ×
-            </button>
+
+            <div className="mt-4 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-foreground/74">
+              <span className="pill-badge rounded-full px-3 py-1.5">History {history.length}</span>
+              <span className="pill-badge rounded-full px-3 py-1.5">Profiles {profiles.length}</span>
+              <span className="pill-badge rounded-full px-3 py-1.5">A/B ready</span>
+            </div>
           </div>
 
-          <div className="mb-5 flex gap-2 rounded-2xl bg-white/[0.05] p-1">
+          <div className="mb-5 flex gap-2 rounded-2xl border border-white/[0.06] bg-white/[0.05] p-1">
             <button
               onClick={() => !loading && setMode("create")}
               className={`flex-1 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${
@@ -588,7 +601,7 @@ export function GeneratorModal() {
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(20rem,0.95fr)]">
             <div className="space-y-4">
-              <div className="panel-soft rounded-2xl p-3">
+              <div className="panel-soft rounded-2xl p-4">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div className="text-[9px] font-black uppercase tracking-[0.22em] text-muted">
                     Target the move
@@ -607,9 +620,9 @@ export function GeneratorModal() {
                       key={option.value}
                       onClick={() => setTarget(option.value)}
                       disabled={loading}
-                        className={`rounded-2xl border px-3 py-2 text-left transition-colors ${
+                        className={`rounded-2xl border px-3 py-3 text-left transition-colors ${
                           target === option.value
-                            ? "border-accent/60 bg-accent/15 text-white"
+                            ? "border-accent/60 bg-[linear-gradient(180deg,rgba(139,92,246,0.18),rgba(139,92,246,0.05)),rgba(12,16,24,0.82)] text-white"
                             : "border-white/[0.08] bg-black/20 text-muted hover:border-white/15 hover:text-foreground"
                         }`}
                     >
@@ -634,7 +647,7 @@ export function GeneratorModal() {
                 </div>
               </div>
 
-              <div className="panel-soft rounded-2xl p-3">
+              <div className="panel-soft rounded-2xl p-4">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div className="text-[9px] font-black uppercase tracking-[0.22em] text-muted">
                     Creative profiles
@@ -683,7 +696,7 @@ export function GeneratorModal() {
 
               {mode === "create" ? (
                 <>
-                  <div className="mb-3">
+                  <div className="panel-soft rounded-2xl p-4">
                     <div className="mb-2 text-[9px] font-black uppercase tracking-[0.22em] text-muted">
                       Starting points
                     </div>
@@ -699,34 +712,33 @@ export function GeneratorModal() {
                         </button>
                       ))}
                     </div>
-                  </div>
-
-                  <textarea
-                    ref={inputRef}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    aria-describedby="generator-create-help"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                        e.preventDefault();
-                        handleGenerate({ prompt: description, refine: false, target });
-                      }
-                    }}
-                    maxLength={500}
-                    rows={4}
-                    placeholder="e.g. dusty boom-bap at 92 with ghost-note snare and a deep bass walking through Dm..."
-                    disabled={loading}
-                     className="control-textarea w-full resize-none rounded-2xl px-4 py-3 text-sm disabled:opacity-50"
-                   />
-                  <div className="mt-1 mb-3 flex justify-between">
-                    <span id="generator-create-help" className="text-[10px] text-muted/70">
-                      {description.length}/500 · Cmd/Ctrl+Enter to generate · target {targetLabel(target).toLowerCase()}
-                    </span>
+                    <textarea
+                      ref={inputRef}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      aria-describedby="generator-create-help"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                          e.preventDefault();
+                          handleGenerate({ prompt: description, refine: false, target });
+                        }
+                      }}
+                      maxLength={500}
+                      rows={5}
+                      placeholder="e.g. dusty boom-bap at 92 with ghost-note snare and a deep bass walking through Dm..."
+                      disabled={loading}
+                       className="control-textarea mt-3 w-full resize-none rounded-2xl px-4 py-3 text-sm disabled:opacity-50"
+                     />
+                    <div className="mb-1 mt-3 flex justify-between">
+                      <span id="generator-create-help" className="text-[10px] text-muted/70">
+                        {description.length}/500 · Cmd/Ctrl+Enter to generate · target {targetLabel(target).toLowerCase()}
+                      </span>
+                    </div>
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="mb-3">
+                  <div className="panel-soft rounded-2xl p-4">
                     <div className="mb-2 text-[9px] font-black uppercase tracking-[0.22em] text-muted">
                       Creative moves
                     </div>
@@ -742,29 +754,28 @@ export function GeneratorModal() {
                         </button>
                       ))}
                     </div>
-                  </div>
-
-                  <textarea
-                    ref={refineInputRef}
-                    value={refineDraft}
-                    onChange={(e) => setRefineDraft(e.target.value)}
-                    aria-describedby="generator-refine-help"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                        e.preventDefault();
-                        handleGenerate({ prompt: refineDraft, refine: true, target });
-                      }
-                    }}
-                    maxLength={500}
-                    rows={3}
-                    placeholder="e.g. drop the open hat, add a tom fill on steps 13-16, raise kick velocity"
-                    disabled={loading}
-                     className="control-textarea w-full resize-none rounded-2xl px-4 py-3 text-sm disabled:opacity-50"
-                   />
-                  <div className="mt-1 mb-3 flex justify-between">
-                    <span id="generator-refine-help" className="text-[10px] text-muted/70">
-                      {refineDraft.length}/500 · Cmd/Ctrl+Enter to mutate · target {targetLabel(target).toLowerCase()}
-                    </span>
+                    <textarea
+                      ref={refineInputRef}
+                      value={refineDraft}
+                      onChange={(e) => setRefineDraft(e.target.value)}
+                      aria-describedby="generator-refine-help"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                          e.preventDefault();
+                          handleGenerate({ prompt: refineDraft, refine: true, target });
+                        }
+                      }}
+                      maxLength={500}
+                      rows={4}
+                      placeholder="e.g. drop the open hat, add a tom fill on steps 13-16, raise kick velocity"
+                      disabled={loading}
+                       className="control-textarea mt-3 w-full resize-none rounded-2xl px-4 py-3 text-sm disabled:opacity-50"
+                     />
+                    <div className="mb-1 mt-3 flex justify-between">
+                      <span id="generator-refine-help" className="text-[10px] text-muted/70">
+                        {refineDraft.length}/500 · Cmd/Ctrl+Enter to mutate · target {targetLabel(target).toLowerCase()}
+                      </span>
+                    </div>
                   </div>
                 </>
               )}
@@ -790,7 +801,7 @@ export function GeneratorModal() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-2">
+              <div className="panel-soft flex items-center justify-between gap-2 rounded-2xl p-4">
                 <div className="text-[10px] text-muted/60">
                   {loading
                     ? "Shaping the groove…"
@@ -832,13 +843,13 @@ export function GeneratorModal() {
               </div>
 
               {error && (
-                <div className="mt-4 rounded-2xl border border-danger/30 bg-danger/10 p-3 text-xs whitespace-pre-wrap text-danger">
+                <div className="rounded-2xl border border-danger/30 bg-danger/10 p-3 text-xs whitespace-pre-wrap text-danger">
                   {error}
                 </div>
               )}
 
               {lastResult && !error && (
-                 <div className="shadow-accent-soft mt-4 rounded-2xl border border-accent/30 bg-accent/10 p-3">
+                 <div className="shadow-accent-soft rounded-2xl border border-accent/30 bg-[linear-gradient(180deg,rgba(139,92,246,0.16),rgba(139,92,246,0.06)),rgba(11,16,24,0.8)] p-4">
                   <div className="mb-1.5 flex items-center justify-between gap-3">
                     <span className="text-xs font-bold text-accent">
                       {lastResult.refined ? "✦ Mutated:" : "✓ Applied:"} v{lastResult.version} · {lastResult.beat.name}
@@ -874,7 +885,7 @@ export function GeneratorModal() {
 
             <div className="space-y-4">
               {(compareSlots.A || compareSlots.B) && (
-                 <div className="panel-soft rounded-2xl p-3">
+                 <div className="panel-soft rounded-2xl p-4">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <div className="text-[9px] font-black uppercase tracking-[0.22em] text-muted">
                       A/B compare
@@ -891,7 +902,7 @@ export function GeneratorModal() {
                       return (
                         <div
                           key={slot}
-                           className="rounded-2xl border border-white/[0.08] bg-black/20 p-3"
+                          className="rounded-2xl border border-white/[0.08] bg-black/20 p-3"
                         >
                           <div className="mb-2 flex items-center justify-between gap-2">
                             <span className="text-[10px] font-black uppercase tracking-[0.18em] text-accent">
@@ -939,7 +950,7 @@ export function GeneratorModal() {
               )}
 
               {history.length > 0 && (
-                 <div className="panel-soft rounded-2xl p-3">
+                 <div className="panel-soft rounded-2xl p-4">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <div className="text-[9px] font-black uppercase tracking-[0.22em] text-muted">
                       Prompt history

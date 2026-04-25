@@ -46,9 +46,9 @@ const StepCell = memo(function StepCell({
   const active = velocity > 0;
   const hasProb = active && probability < 1;
   const hasNudge = active && nudge !== 0;
-  let activeStateClass = "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]";
+  let activeStateClass = "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.015)),rgba(6,10,16,0.92)] hover:border-accent/35 hover:bg-white/[0.08]";
   if (active) {
-    activeStateClass = "border-white/10 shadow-sm shadow-black/30";
+    activeStateClass = "border-white/14 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02)),rgba(10,15,23,0.94)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_26px_rgba(0,0,0,0.26)]";
   }
 
   return (
@@ -94,20 +94,20 @@ const StepCell = memo(function StepCell({
           : "Click or drag to paint · double-click: shape step"
       }
       className={`
-        relative w-9 h-9 rounded-xl transition-all duration-75 border overflow-hidden select-none
+        relative h-10 w-10 rounded-[0.95rem] border overflow-hidden select-none transition-all duration-75
         ${beatStart ? "ml-1" : ""}
         ${activeStateClass}
-        ${isCurrent && !active ? "ring-2 ring-accent/70 bg-accent/10" : ""}
-        ${isCurrent && active ? "ring-2 ring-white/70 scale-105" : ""}
+        ${isCurrent && !active ? "ring-2 ring-accent/70 border-accent/40 bg-accent/10" : ""}
+        ${isCurrent && active ? "ring-2 ring-white/70 scale-[1.02]" : ""}
         ${hasProb ? "ring-1 ring-cyan/40" : ""}
       `}
     >
       {active && (
         <div
-          className="absolute bottom-0 left-0 right-0 rounded-lg transition-all duration-75"
+          className="absolute inset-x-1 bottom-1 rounded-[0.7rem] transition-all duration-75"
           style={{
             background: `linear-gradient(180deg, ${color}, ${color}cc)`,
-            height: `${velocity * 100}%`,
+            height: `${Math.max(velocity * 100, 18)}%`,
             opacity: isCurrent ? 1 : 0.8,
             boxShadow: `0 0 18px ${color}55`,
           }}
@@ -185,10 +185,10 @@ const TrackRow = memo(function TrackRow({
   onCloseEuclidean: () => void;
 }) {
   return (
-    <div className="relative flex items-center gap-2 rounded-[1.35rem] border border-white/[0.07] bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.015)),rgba(0,0,0,0.18)] px-2.5 py-2 shadow-[0_14px_32px_rgba(0,0,0,0.18)]">
+    <div className="relative min-w-max rounded-[1.45rem] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015)),rgba(8,12,18,0.62)] p-2.5 shadow-[0_14px_32px_rgba(0,0,0,0.18)]">
       {/* Track label */}
       <div
-        className={`w-28 shrink-0 flex items-center gap-2 pr-2 ${
+        className={`sticky left-0 z-20 flex w-40 shrink-0 items-center gap-2 rounded-[1rem] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02)),rgba(11,16,24,0.92)] px-3 py-2 pr-2 backdrop-blur-md ${
           melodic ? "cursor-pointer hover:opacity-80" : ""
         }`}
         onClick={() => melodic && onTogglePianoRoll(trackId)}
@@ -196,19 +196,24 @@ const TrackRow = memo(function TrackRow({
       >
         {/* Track color rail anchors the row and separates instruments at scan speed. */}
         <div
-          className={`h-8 w-1.5 shrink-0 rounded-full ${
+          className={`h-10 w-2 shrink-0 rounded-full ${
              pianoRollOpen ? "ring-2 ring-accent ring-offset-1 ring-offset-background" : ""
            }`}
           style={{ backgroundColor: color }}
         />
-        <span className={`truncate text-sm font-bold ${pianoRollOpen ? "text-accent" : "text-foreground"}`}>
-          {name}
-          {melodic && <span className="text-[10px] ml-1 opacity-60">♪</span>}
-        </span>
+        <div className="min-w-0">
+          <span className={`block truncate text-sm font-black tracking-[-0.02em] ${pianoRollOpen ? "text-accent" : "text-foreground"}`}>
+            {name}
+            {melodic && <span className="ml-1 text-[10px] opacity-60">♪</span>}
+          </span>
+          <span className="block text-[9px] font-bold uppercase tracking-[0.18em] text-muted/80">
+            {melodic ? "Piano lane" : "Rhythm lane"}
+          </span>
+        </div>
       </div>
 
       {/* Steps */}
-      <div className="flex items-center gap-0.5">
+      <div className="mx-3 flex items-center gap-0.5">
         {steps.map((velocity, stepIdx) => (
           <StepCell
             key={stepIdx}
@@ -229,7 +234,7 @@ const TrackRow = memo(function TrackRow({
 
       {/* Core groove actions stay visible so editing is discoverable without hover. */}
       <div
-        className="relative ml-2 flex items-center gap-1"
+        className="sticky right-0 z-20 ml-2 flex items-center gap-1 rounded-[1rem] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02)),rgba(11,16,24,0.92)] px-2 py-1.5 backdrop-blur-md"
       >
         <button
           onClick={() => onCopyTrack(trackId)}
@@ -320,6 +325,11 @@ export function StepSequencer() {
     step: number;
     rect: DOMRect;
   } | null>(null);
+  const totalSteps = tracks[0]?.steps.length ?? 0;
+  const activeTrackCount = tracks.reduce(
+    (count, track) => count + (track.steps.some((step) => step > 0) ? 1 : 0),
+    0
+  );
 
   const handlePaintStep = useCallback(
     (trackId: number, step: number) => {
@@ -403,7 +413,7 @@ export function StepSequencer() {
   const handleCloseEuclidean = useCallback(() => setEuclideanTrack(null), []);
 
   return (
-    <div className="relative flex-1 overflow-auto p-5">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       {detailStep && (
         <StepDetailPopover
           trackId={detailStep.trackId}
@@ -412,83 +422,94 @@ export function StepSequencer() {
           onClose={() => setDetailStep(null)}
         />
       )}
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
+      <div className="border-b border-white/[0.06] px-4 py-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
           <p className="text-[10px] font-black uppercase tracking-[0.28em] text-accent-hover">
             Compose
           </p>
           <h2 className="text-2xl font-black tracking-[-0.04em] text-white">
             Step canvas
           </h2>
-        </div>
-        <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
-          <span className="pill-badge rounded-full px-3 py-1.5">Drag to paint</span>
-          <span className="pill-badge rounded-full px-3 py-1.5">Double-click shape</span>
-          <span className="pill-badge rounded-full px-3 py-1.5">Ctrl-click chance</span>
+            <p className="mt-1 text-sm text-foreground/70">
+              Clear lanes, anchored controls, and a stickier ruler so the groove stays readable while you work.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
+            <span className="pill-badge rounded-full px-3 py-1.5">{tracks.length} lanes</span>
+            <span className="pill-badge rounded-full px-3 py-1.5">{totalSteps} steps</span>
+            <span className="pill-badge rounded-full px-3 py-1.5">{activeTrackCount} active</span>
+            <span className="pill-badge rounded-full px-3 py-1.5">Playhead {currentStep + 1}</span>
+          </div>
         </div>
       </div>
 
-      <section aria-label="Sequencer workflow tips" className="mb-4 grid gap-2 sm:grid-cols-3">
-        <div className="panel-soft rounded-[1.25rem] px-4 py-3">
-          <div className="text-[9px] font-black uppercase tracking-[0.22em] text-muted">Flow</div>
-          <div className="mt-1 text-sm font-semibold text-white">Sketch fast, then sculpt details.</div>
-        </div>
-        <div className="panel-soft rounded-[1.25rem] px-4 py-3">
-          <div className="text-[9px] font-black uppercase tracking-[0.22em] text-muted">Dynamics</div>
-          <div className="mt-1 text-sm font-semibold text-white">Probability and nudge keep loops alive.</div>
-        </div>
-        <div className="panel-soft rounded-[1.25rem] px-4 py-3">
-          <div className="text-[9px] font-black uppercase tracking-[0.22em] text-muted">Performance</div>
-          <div className="mt-1 text-sm font-semibold text-white">Hotkeys keep the pocket moving.</div>
+      <section aria-label="Sequencer workflow tips" className="border-b border-white/[0.05] px-4 py-3">
+        <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-foreground/72">
+          <span className="pill-badge rounded-full px-3 py-1.5">Drag to paint</span>
+          <span className="pill-badge rounded-full px-3 py-1.5">Double-click to shape</span>
+          <span className="pill-badge rounded-full px-3 py-1.5">Ctrl-click for chance</span>
+          <span className="pill-badge rounded-full px-3 py-1.5">Fill lanes with Euclid</span>
         </div>
       </section>
 
-      <div className="panel-soft inline-flex flex-col gap-2 rounded-[1.5rem] p-3">
-        {/* Step numbers */}
-        <div className="flex items-center gap-2">
-          <div className="w-28 shrink-0" />
-          <div className="flex items-center gap-0.5">
-            {tracks[0]?.steps.map((_, i) => (
-              <div
-                key={i}
-                className={`w-9 text-center text-[10px] font-mono ${
-                  currentStep === i ? "text-accent font-black" : "text-muted/50"
-                } ${i > 0 && i % 4 === 0 ? "ml-1" : ""}`}
-              >
-                {i + 1}
+      <div className="min-h-0 flex-1 px-4 pb-4 pt-3">
+        <div className="h-full overflow-auto rounded-[1.5rem] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015)),rgba(6,10,16,0.7)]">
+          <div className="min-w-max p-3">
+            <div className="sticky top-0 z-30 mb-3 rounded-[1.1rem] border border-white/[0.08] bg-[rgba(8,13,20,0.9)] px-3 py-2 backdrop-blur-xl">
+              <div className="flex items-center gap-2">
+                <div className="w-40 shrink-0 text-[10px] font-black uppercase tracking-[0.22em] text-muted/90">
+                  Track / controls
+                </div>
+                <div className="flex items-center gap-0.5">
+                  {tracks[0]?.steps.map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-10 text-center text-[10px] font-mono ${
+                        currentStep === i ? "font-black text-accent" : "text-muted/60"
+                      } ${i > 0 && i % 4 === 0 ? "ml-1" : ""}`}
+                    >
+                      {i + 1}
+                    </div>
+                  ))}
+                </div>
+                <div className="ml-3 text-[10px] font-black uppercase tracking-[0.22em] text-muted/90">
+                  Edit tools
+                </div>
               </div>
-            ))}
+            </div>
+
+            <div className="flex flex-col gap-2.5 pb-1">
+              {tracks.map((track) => (
+                <TrackRow
+                  key={track.id}
+                  trackId={track.id}
+                  name={track.sound.name}
+                  color={track.sound.color}
+                  steps={track.steps}
+                  probabilities={track.probabilities}
+                  nudgeArr={track.nudge}
+                  melodic={track.sound.melodic}
+                  pianoRollOpen={pianoRollTrack === track.id}
+                  currentStep={currentStep}
+                  canPaste={canPaste}
+                  euclideanOpen={euclideanTrack === track.id}
+                  onPaintStep={handlePaintStep}
+                  onEraseStep={handleEraseStep}
+                  onRightClickStep={handleRightClickStep}
+                  onCtrlClick={handleCtrlClick}
+                  onClearTrack={handleClear}
+                  onTogglePianoRoll={handleTogglePianoRoll}
+                  onCopyTrack={handleCopyTrack}
+                  onPasteTrack={handlePasteTrack}
+                  onHumanizeTrack={handleHumanizeTrack}
+                  onOpenEuclidean={handleOpenEuclidean}
+                  onCloseEuclidean={handleCloseEuclidean}
+                />
+              ))}
+            </div>
           </div>
         </div>
-
-        {/* Track rows */}
-        {tracks.map((track) => (
-          <TrackRow
-            key={track.id}
-            trackId={track.id}
-            name={track.sound.name}
-            color={track.sound.color}
-            steps={track.steps}
-            probabilities={track.probabilities}
-            nudgeArr={track.nudge}
-            melodic={track.sound.melodic}
-            pianoRollOpen={pianoRollTrack === track.id}
-            currentStep={currentStep}
-            canPaste={canPaste}
-            euclideanOpen={euclideanTrack === track.id}
-            onPaintStep={handlePaintStep}
-            onEraseStep={handleEraseStep}
-            onRightClickStep={handleRightClickStep}
-            onCtrlClick={handleCtrlClick}
-            onClearTrack={handleClear}
-            onTogglePianoRoll={handleTogglePianoRoll}
-            onCopyTrack={handleCopyTrack}
-            onPasteTrack={handlePasteTrack}
-            onHumanizeTrack={handleHumanizeTrack}
-            onOpenEuclidean={handleOpenEuclidean}
-            onCloseEuclidean={handleCloseEuclidean}
-          />
-        ))}
       </div>
     </div>
   );

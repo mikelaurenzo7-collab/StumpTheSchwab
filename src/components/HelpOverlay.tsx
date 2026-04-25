@@ -73,7 +73,7 @@ function Key({ children }: { children: React.ReactNode }) {
     return <span className="text-muted/60 mx-0.5">{children}</span>;
   }
   return (
-    <kbd className="inline-block px-1.5 py-0.5 rounded bg-surface-3 border border-border text-[10px] font-mono text-foreground shadow-[0_1px_0_0_rgba(0,0,0,0.4)]">
+    <kbd className="inline-block rounded-[0.7rem] border border-white/[0.1] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02)),rgba(17,23,34,0.92)] px-2 py-1 text-[10px] font-mono text-foreground shadow-[0_1px_0_0_rgba(255,255,255,0.08),0_8px_16px_rgba(0,0,0,0.18)]">
       {children}
     </kbd>
   );
@@ -99,63 +99,89 @@ export function HelpOverlay() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(3,6,12,0.82)] p-4 backdrop-blur-md"
       onClick={() => setOpen(false)}
     >
       <div
-        className="panel max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-[1.8rem] p-6"
+        className="panel max-h-[88vh] w-full max-w-5xl overflow-y-auto rounded-[2rem] p-0"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-4">
-          <div>
+        <div className="grid gap-0 lg:grid-cols-[18rem_minmax(0,1fr)]">
+          <aside className="border-b border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015)),rgba(8,12,18,0.82)] p-5 lg:border-b-0 lg:border-r">
             <p className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-accent-hover">Shortcut map</p>
-            <h2 className="text-xl font-black tracking-[-0.03em] text-foreground">Keyboard Shortcuts</h2>
-            <p className="mt-0.5 text-xs text-muted">
-              Make better music, faster.
+            <h2 className="text-2xl font-black tracking-[-0.03em] text-foreground">Control room</h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              Keep the groove moving without leaving the keyboard.
             </p>
-          </div>
-          <button
-            onClick={() => setOpen(false)}
-            className="button-secondary rounded-full px-3 py-1 text-xl leading-none"
-            title="Close (Esc)"
-          >
-            ×
-          </button>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-          {SHORTCUTS.map((group) => (
-            <div key={group.title}>
-                <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-accent">
-                  {group.title}
-                </h3>
-                <ul className="flex flex-col gap-1.5 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3">
-                  {group.items.map((item, i) => (
-                  <li
-                    key={i}
-                    className="flex items-center justify-between gap-3 text-xs"
-                  >
-                    <span className="text-muted">{item.label}</span>
-                    <span className="flex items-center gap-1 shrink-0">
-                      {item.keys.map((k, ki) => (
-                        <Key key={ki}>{k}</Key>
-                      ))}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+            <div className="mt-5 space-y-3">
+              <div className="panel-soft rounded-[1.2rem] p-3">
+                <div className="text-[9px] font-black uppercase tracking-[0.22em] text-cyan">Fast start</div>
+                <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-foreground/80">
+                  <span className="pill-badge rounded-full px-2.5 py-1">Space to play</span>
+                  <span className="pill-badge rounded-full px-2.5 py-1">G to generate</span>
+                  <span className="pill-badge rounded-full px-2.5 py-1">? for help</span>
+                </div>
+              </div>
+
+              <div className="panel-soft rounded-[1.2rem] p-3 text-[11px] leading-relaxed text-muted">
+                Right-click a step for micro edits. Ctrl or Cmd click cycles chance. Drag across the grid to paint rhythm quickly.
+              </div>
             </div>
-          ))}
-        </div>
+          </aside>
 
-        <div className="mt-6 flex items-center justify-between border-t border-white/[0.06] pt-4 text-[10px] text-muted">
-          <span>
-            Tip: right-click a step to cycle velocity, ctrl-click to set
-            probability.
-          </span>
-          <span>
-            <Key>?</Key> to toggle · <Key>Esc</Key> to close
-          </span>
+          <section className="p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-black tracking-tight text-white">Keyboard shortcuts</h3>
+                <p className="mt-1 text-xs text-muted">Playback, arrangement, editing, and performance in one view.</p>
+              </div>
+              <button
+                onClick={() => setOpen(false)}
+                className="button-secondary rounded-full px-3 py-1 text-xl leading-none"
+                title="Close (Esc)"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {SHORTCUTS.map((group) => (
+                <div key={group.title} className="panel-soft rounded-[1.35rem] p-4">
+                  <h3 className="mb-3 text-[10px] font-black uppercase tracking-[0.24em] text-accent">
+                    {group.title}
+                  </h3>
+                  <ul className="flex flex-col gap-2">
+                    {group.items.map((item, i) => (
+                      <li
+                        key={i}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-black/15 px-3 py-2 text-xs"
+                      >
+                        <span className="text-foreground/82">{item.label}</span>
+                        <span className="flex shrink-0 items-center gap-1">
+                          {item.keys.map((k, ki) => (
+                            <Key key={ki}>{k}</Key>
+                          ))}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-4 text-[10px] text-muted">
+              <span>
+                Tip: use pattern switching and track triggers together to improvise structure live.
+              </span>
+              <span className="flex items-center gap-2">
+                <Key>?</Key>
+                <span>toggle</span>
+                <Key>Esc</Key>
+                <span>close</span>
+              </span>
+            </div>
+          </section>
         </div>
       </div>
     </div>

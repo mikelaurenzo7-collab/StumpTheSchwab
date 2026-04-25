@@ -1,27 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  --background: #05040a;
-  --foreground: #f4f1ff;
-  --surface: #11101a;
-  --surface-2: #1a1827;
-  --surface-3: #2b2640;
-  --border: #353047;
-  --accent: #9b5cff;
-  --accent-hover: #c084fc;
-  --accent-dim: #6d28d9;
+  --background: #070b12;
+  --foreground: #f6f7fb;
+  --surface: #101722;
+  --surface-2: #172131;
+  --surface-3: #223247;
+  --border: #33465d;
+  --accent: #8b5cf6;
+  --accent-hover: #ddd6fe;
+  --accent-dim: #5b3ab4;
   --success: #22c55e;
   --warning: #f59e0b;
   --danger: #ef4444;
-  --muted: #8d85a6;
-  --glow: rgba(155, 92, 255, 0.35);
-  --cyan: #22d3ee;
-  --shadow-soft: 0 18px 48px rgba(0, 0, 0, 0.26);
-  --shadow-panel: 0 28px 90px rgba(0, 0, 0, 0.34);
-  --shadow-pop: 0 32px 120px rgba(0, 0, 0, 0.44);
-  --shadow-cyan-soft: 0 18px 36px rgba(34, 211, 238, 0.08);
-  --shadow-accent-soft: 0 20px 44px rgba(155, 92, 255, 0.12);
-  --ring-strong: rgba(192, 132, 252, 0.42);
+  --muted: #93a2b8;
+  --glow: rgba(139, 92, 246, 0.28);
+  --cyan: #5eead4;
+  --shadow-soft: 0 18px 48px rgba(0, 0, 0, 0.3);
+  --shadow-panel: 0 32px 90px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 36px 120px rgba(0, 0, 0, 0.5);
+  --shadow-cyan-soft: 0 18px 36px rgba(94, 234, 212, 0.1);
+  --shadow-accent-soft: 0 20px 44px rgba(139, 92, 246, 0.14);
+  --ring-strong: rgba(139, 92, 246, 0.42);
 }
 
 @theme inline {
@@ -40,23 +40,24 @@
   --color-muted: var(--muted);
   --color-glow: var(--glow);
   --color-cyan: var(--cyan);
-  --font-sans: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "SF Mono", "Cascadia Code", "Fira Code", "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: "Avenir Next", "IBM Plex Sans", "SF Pro Display", "Segoe UI Variable", "Helvetica Neue", sans-serif;
+  --font-mono: "IBM Plex Mono", "SF Mono", "Cascadia Code", "JetBrains Mono", ui-monospace, monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), sans-serif;
   min-height: 100dvh;
   color-scheme: dark;
   background-image:
-    radial-gradient(circle at 16% 10%, rgba(155, 92, 255, 0.22), transparent 30rem),
-    radial-gradient(circle at 82% 8%, rgba(34, 211, 238, 0.12), transparent 24rem),
-    radial-gradient(circle at 50% 110%, rgba(76, 29, 149, 0.28), transparent 28rem),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 20rem),
-    linear-gradient(135deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 100%);
-  background-size: auto, auto, auto, auto, 38px 38px;
+    radial-gradient(circle at 12% 0%, rgba(94, 234, 212, 0.14), transparent 24rem),
+    radial-gradient(circle at 88% 8%, rgba(139, 92, 246, 0.2), transparent 28rem),
+    radial-gradient(circle at 52% 110%, rgba(249, 115, 22, 0.14), transparent 24rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 18rem),
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: auto, auto, auto, auto, 44px 44px, 44px 44px;
   background-attachment: fixed;
 }
 
@@ -102,11 +103,11 @@ button:disabled {
 
 .panel {
   position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
-    linear-gradient(135deg, rgba(155, 92, 255, 0.08), transparent 42%),
-    rgba(17, 16, 26, 0.84);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.018)),
+    linear-gradient(135deg, rgba(94, 234, 212, 0.05), transparent 44%),
+    rgba(16, 23, 34, 0.84);
   box-shadow: var(--shadow-panel), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
@@ -124,10 +125,10 @@ button:disabled {
 
 .panel-soft {
   position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)),
-    rgba(17, 16, 26, 0.68);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015)),
+    rgba(16, 23, 34, 0.72);
   box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
@@ -135,8 +136,8 @@ button:disabled {
   position: relative;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
-    rgba(9, 8, 15, 0.56);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.02)),
+    rgba(9, 15, 24, 0.62);
   box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
@@ -163,9 +164,9 @@ button:disabled {
 
 .button-secondary {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
-    rgba(255, 255, 255, 0.04);
-  color: var(--muted);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.045);
+  color: rgba(246, 247, 251, 0.78);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
@@ -179,7 +180,7 @@ button:disabled {
 
 .button-ghost {
   background: rgba(255, 255, 255, 0.02);
-  color: var(--muted);
+  color: rgba(246, 247, 251, 0.72);
 }
 
 .button-ghost:hover:not(:disabled) {
@@ -191,8 +192,8 @@ button:disabled {
 .control-select,
 .control-textarea {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
-    rgba(0, 0, 0, 0.24);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.028)),
+    rgba(4, 8, 14, 0.34);
   color: var(--foreground);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
@@ -203,9 +204,9 @@ button:disabled {
 }
 
 .pill-badge {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--muted);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(246, 247, 251, 0.72);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
@@ -235,18 +236,18 @@ textarea:focus-visible {
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--surface);
+  background: rgba(16, 23, 34, 0.8);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--surface-3);
-  border-radius: 3px;
+  background: rgba(147, 162, 184, 0.38);
+  border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--muted);
+  background: rgba(147, 162, 184, 0.6);
 }
 
 /* Range input styling */

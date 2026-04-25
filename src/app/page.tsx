@@ -25,6 +25,7 @@ export default function DAW() {
   useKeyboardShortcuts(initAudio, triggerTrack);
 
   const { lastSaved, recoverAutosave, clearAutosave } = useAutoSave();
+  const [mixerOpen, setMixerOpen] = useState(false);
   const [recoveryBanner, setRecoveryBanner] = useState(() => {
     if (typeof window === "undefined") return false;
     try { return localStorage.getItem("sts_session___autosave") !== null; } catch { return false; }
@@ -42,7 +43,7 @@ export default function DAW() {
 
   return (
     <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(155,92,255,0.08),transparent_28rem),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.05),transparent_24rem)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.1),transparent_30rem),radial-gradient(circle_at_bottom_right,rgba(251,146,60,0.08),transparent_24rem)]" />
       {recoveryBanner && (
         <div className="relative mx-4 mt-3 flex items-center justify-between rounded-[1.6rem] border border-accent/30 bg-accent/15 px-4 py-3 text-sm shadow-lg shadow-accent/10 backdrop-blur">
           <span className="text-foreground/90">
@@ -64,54 +65,29 @@ export default function DAW() {
           </div>
         </div>
       )}
-      <header className="relative px-5 pb-3 pt-4">
-        <div className="panel relative overflow-hidden rounded-[2rem] px-5 py-5">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_0%,rgba(155,92,255,0.24),transparent_22rem),radial-gradient(circle_at_80%_20%,rgba(34,211,238,0.12),transparent_18rem)]" />
-          <div className="relative flex flex-col gap-5">
-            <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-              <div className="max-w-3xl">
-                <div className="mb-2 flex items-center gap-2">
+      <header className="relative px-4 pb-2 pt-3 md:px-5">
+        <div className="panel relative overflow-hidden rounded-[1.6rem] px-4 py-4">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_0%,rgba(20,184,166,0.2),transparent_20rem),radial-gradient(circle_at_86%_18%,rgba(251,146,60,0.14),transparent_18rem)]" />
+          <div className="relative flex flex-col gap-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="min-w-0">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
                   <span className="pill-badge rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.28em] text-accent-hover">
                     StumpTheSchwab
                   </span>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.28em] text-cyan/80">
-                    Idea-to-groove workstation
+                  <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan/80">
+                    Composer-first workflow
                   </span>
                 </div>
-                <h1 className="max-w-3xl text-2xl font-black tracking-[-0.04em] text-white sm:text-4xl">
-                  Capture, mutate, arrange, and bounce polished grooves in real time.
+                <h1 className="max-w-4xl text-xl font-black tracking-[-0.03em] text-white sm:text-2xl">
+                  Build, shape, arrange, and export grooves with a clear full-width composition canvas.
                 </h1>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <span className="pill-badge rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em]">
-                    Responsive step editing
-                  </span>
-                  <span className="pill-badge rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em]">
-                    AI groove direction
-                  </span>
-                  <span className="pill-badge rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em]">
-                    Offline bounce + MIDI
-                  </span>
-                </div>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2 xl:w-[24rem] xl:grid-cols-1">
-                <div className="panel-soft rounded-[1.4rem] px-4 py-3 text-right sm:block">
-                  <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted">
-                    Workflow
-                  </div>
-                  <div className="mt-1 text-sm font-semibold text-foreground">
-                    Generate → Sequence → Arrange → Mix
-                  </div>
-                </div>
-                <div className="panel-soft rounded-[1.4rem] px-4 py-3">
-                  <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted">
-                    Mood board
-                  </div>
-                  <div aria-hidden="true" className="mt-2 grid grid-cols-3 gap-2 text-[11px] font-semibold text-foreground/85">
-                    <div className="rounded-2xl bg-white/[0.05] px-3 py-2 text-center">Neon</div>
-                    <div className="rounded-2xl bg-white/[0.05] px-3 py-2 text-center">Punch</div>
-                    <div className="rounded-2xl bg-white/[0.05] px-3 py-2 text-center">Depth</div>
-                  </div>
-                </div>
+              <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.16em]">
+                <span className="pill-badge rounded-full px-3 py-1.5">Generate</span>
+                <span className="pill-badge rounded-full px-3 py-1.5">Sequence</span>
+                <span className="pill-badge rounded-full px-3 py-1.5">Arrange</span>
+                <span className="pill-badge rounded-full px-3 py-1.5">Mix</span>
               </div>
             </div>
             <Transport onInit={initAudio} lastSaved={lastSaved} />
@@ -119,20 +95,20 @@ export default function DAW() {
         </div>
       </header>
 
-      <main className="relative grid min-h-0 flex-1 grid-cols-1 gap-4 px-5 pb-4 xl:grid-cols-[minmax(0,1fr)_23rem]">
-        <section className="panel flex min-h-0 flex-col overflow-hidden rounded-[1.75rem]">
+      <main className="relative grid min-h-0 flex-1 grid-cols-1 gap-3 px-4 pb-3 md:px-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <section className="panel flex min-h-0 flex-col overflow-hidden rounded-[1.35rem]">
           <StepSequencer />
           <PianoRoll />
         </section>
 
-        <aside className="flex min-h-0 flex-col gap-4 overflow-y-auto">
-          <div className="panel rounded-[1.75rem] p-4">
-            <div className="mb-3 flex items-center justify-between">
+        <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto">
+          <div className="panel rounded-[1.35rem] p-4">
+            <div className="mb-2 flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.28em] text-accent-hover">
                   Arrange
                 </p>
-                <h2 className="text-lg font-black tracking-tight text-white">
+                <h2 className="text-base font-black tracking-tight text-white">
                   Song chain
                 </h2>
               </div>
@@ -143,18 +119,18 @@ export default function DAW() {
             <SongChain />
           </div>
 
-          <div className="panel-soft rounded-[1.5rem] p-4">
+          <div className="panel-soft rounded-[1.2rem] p-3.5">
             <p className="text-[10px] font-black uppercase tracking-[0.28em] text-muted">
               Fast moves
             </p>
-            <div className="mt-3 grid gap-2 text-sm text-foreground/80">
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.04] p-3">
+            <div className="mt-2.5 grid gap-2 text-sm text-foreground/80">
+              <div className="rounded-xl border border-white/[0.06] bg-white/[0.04] p-2.5">
                 <span className="font-bold text-white">Paint</span> steps by dragging across the grid.
               </div>
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.04] p-3">
+              <div className="rounded-xl border border-white/[0.06] bg-white/[0.04] p-2.5">
                 <span className="font-bold text-white">Shape</span> a hit by double-clicking a lit step.
               </div>
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.04] p-3">
+              <div className="rounded-xl border border-white/[0.06] bg-white/[0.04] p-2.5">
                 <span className="font-bold text-white">Mutate</span> patterns from the Generate button.
               </div>
             </div>
@@ -162,14 +138,45 @@ export default function DAW() {
         </aside>
       </main>
 
-      <footer className="relative px-5 pb-5">
-        <div className="panel overflow-hidden rounded-[1.75rem]">
-          <Mixer
-            getTrackMeter={getTrackMeter}
-            getMasterMeter={getMasterMeter}
-            getMasterSpectrum={getMasterSpectrum}
-            getMasterWaveform={getMasterWaveform}
-          />
+      <footer className="relative px-4 pb-4 md:px-5 md:pb-5">
+        <div className="panel overflow-hidden rounded-[1.35rem]">
+          <button
+            onClick={() => setMixerOpen((open) => !open)}
+            className="flex w-full items-center justify-between gap-4 border-b border-white/[0.06] px-4 py-3 text-left"
+            aria-expanded={mixerOpen}
+            aria-controls="studio-mixer"
+          >
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-cyan">
+                Mix Dock
+              </p>
+              <h2 className="text-sm font-black tracking-tight text-white">
+                {mixerOpen ? "Mixer and master view" : "Keep the composition canvas dominant until you need mix controls"}
+              </h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="pill-badge rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/80">
+                {mixerOpen ? "Expanded" : "Collapsed"}
+              </span>
+              <span className="button-secondary rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-foreground">
+                {mixerOpen ? "Hide" : "Open"}
+              </span>
+            </div>
+          </button>
+          {mixerOpen ? (
+            <div id="studio-mixer">
+              <Mixer
+                getTrackMeter={getTrackMeter}
+                getMasterMeter={getMasterMeter}
+                getMasterSpectrum={getMasterSpectrum}
+                getMasterWaveform={getMasterWaveform}
+              />
+            </div>
+          ) : (
+            <div className="px-4 py-3 text-sm text-foreground/72">
+              Open the dock for metering, master visualization, sample loading, channel FX, and export context while keeping the sequencer front and center.
+            </div>
+          )}
         </div>
       </footer>
       <HelpOverlay />

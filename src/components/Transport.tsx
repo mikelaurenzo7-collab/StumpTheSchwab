@@ -6,7 +6,7 @@ import { useUiStore } from "@/store/ui";
 import { PRESETS } from "@/lib/presets";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SessionManager } from "@/components/SessionManager";
-import { useExport } from "@/lib/useExport";
+import { STEM_RENDER_MODE_OPTIONS, useExport, type StemRenderMode } from "@/lib/useExport";
 import { useMidiExport } from "@/lib/useMidiExport";
 
 export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; lastSaved?: Date | null }) {
@@ -41,10 +41,12 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
   const renameInputRef = useRef<HTMLInputElement>(null);
   const [tapTimes, setTapTimes] = useState<number[]>([]);
   const tapResetRef = useRef<number | null>(null);
-  const [exportFormat, setExportFormat] = useState<"wav" | "midi">("wav");
+  const [exportFormat, setExportFormat] = useState<"wav" | "stems" | "midi">("wav");
+  const [stemRenderMode, setStemRenderMode] = useState<StemRenderMode>("fx-post-fader");
+  const [includeMasterPrint, setIncludeMasterPrint] = useState(true);
   const { exportMidi, exporting: exportingMidi } = useMidiExport();
   const [exportLoops, setExportLoops] = useState(2);
-  const { exportWAV, exporting } = useExport();
+  const { exportWAV, exportStems, exporting, exportMode } = useExport();
   const canUndo = useHistoryStore((s) => s.past.length > 0);
   const canRedo = useHistoryStore((s) => s.future.length > 0);
   const undo = useHistoryStore((s) => s.undo);
@@ -132,11 +134,11 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       : `${tapTimes.length}/6`;
 
   return (
-    <div className="glass-control relative flex flex-wrap items-center gap-3 rounded-[1.8rem] px-3 py-3">
+    <div className="glass-control relative flex flex-wrap items-center gap-2.5 rounded-[1.45rem] px-2.5 py-2.5">
       {/* AI Generate */}
       <button
         onClick={() => useUiStore.getState().setGeneratorOpen(true)}
-        className="button-primary group flex items-center gap-2 rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-[0.2em]"
+        className="button-primary group flex items-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-[10px] font-black uppercase tracking-[0.18em]"
         title="Generate or mutate a groove (G)"
       >
         <span className="text-base leading-none transition-transform group-hover:rotate-12">✦</span>
@@ -146,7 +148,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Play/Pause */}
       <button
         onClick={handlePlay}
-        className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/20 bg-white text-lg font-mono text-background shadow-lg shadow-white/10 hover:scale-105"
+        className="flex h-11 w-11 items-center justify-center rounded-[1rem] border border-white/20 bg-white text-lg font-mono text-background shadow-lg shadow-white/10 hover:scale-105"
         title={playbackState === "playing" ? "Pause (Space)" : "Play (Space)"}
       >
         {playbackState === "playing" ? "⏸" : "▶"}
@@ -155,14 +157,14 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Stop */}
       <button
         onClick={handleStop}
-        className="button-secondary flex h-12 w-12 items-center justify-center rounded-2xl font-mono text-lg text-foreground"
+        className="button-secondary flex h-11 w-11 items-center justify-center rounded-[1rem] font-mono text-lg text-foreground"
         title="Stop"
       >
         ⏹
       </button>
 
       {/* BPM */}
-      <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
+      <div className="rounded-[1rem] border border-white/[0.08] bg-black/20 px-2.5 py-2">
         <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">BPM</div>
         <div className="flex items-center gap-2">
         <input
@@ -184,7 +186,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       </div>
 
       {/* Swing */}
-      <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
+      <div className="rounded-[1rem] border border-white/[0.08] bg-black/20 px-2.5 py-2">
         <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Swing</div>
         <div className="flex items-center gap-2">
         <input
@@ -203,7 +205,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       </div>
 
       {/* Steps */}
-      <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
+      <div className="rounded-[1rem] border border-white/[0.08] bg-black/20 px-2.5 py-2">
         <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Steps</div>
         <div className="flex items-center gap-2">
         <select
@@ -220,10 +222,10 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       </div>
 
       {/* Separator */}
-      <div className="w-px h-8 bg-white/10 mx-1" />
+      <div className="mx-1 h-7 w-px bg-white/10" />
 
       {/* Pattern Selector */}
-      <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
+      <div className="rounded-[1rem] border border-white/[0.08] bg-black/20 px-2.5 py-2">
         <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Pattern bank</div>
         <div className="flex items-center gap-1.5">
         <div className="flex gap-0.5">
@@ -295,10 +297,10 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       </div>
 
       {/* Separator */}
-      <div className="w-px h-8 bg-white/10 mx-1" />
+      <div className="mx-1 h-7 w-px bg-white/10" />
 
       {/* Preset Loader */}
-      <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
+      <div className="rounded-[1rem] border border-white/[0.08] bg-black/20 px-2.5 py-2">
         <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Preset</div>
         <div className="flex items-center gap-2">
         <select
@@ -324,7 +326,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       </div>
 
       {/* Spacer */}
-      <div className="flex-1" />
+      <div className="hidden min-w-4 flex-1 xl:block" />
 
       {/* Undo / Redo */}
       <div className="flex gap-0.5">
@@ -350,19 +352,20 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       <div className="flex items-center gap-1">
         <select
           value={exportFormat}
-          onChange={(e) => setExportFormat(e.target.value as "wav" | "midi")}
+          onChange={(e) => setExportFormat(e.target.value as "wav" | "stems" | "midi")}
           className="control-select rounded-xl px-2 py-1.5 text-[10px] font-mono text-muted"
           title="Export format"
         >
-          <option value="wav">WAV</option>
+          <option value="wav">WAV Mix</option>
+          <option value="stems">WAV Stems</option>
           <option value="midi">MIDI</option>
         </select>
-        {exportFormat === "wav" && (
+        {exportFormat !== "midi" && (
           <select
             value={exportLoops}
             onChange={(e) => setExportLoops(Number(e.target.value))}
               className="control-select w-14 rounded-xl px-2 py-1.5 text-[10px] font-mono text-muted"
-            title="Number of loops to export (WAV only)"
+            title="Number of loops to export"
           >
             <option value={1}>1x</option>
             <option value={2}>2x</option>
@@ -370,16 +373,54 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
             <option value={8}>8x</option>
           </select>
         )}
+        {exportFormat === "stems" && (
+          <>
+            <select
+              value={stemRenderMode}
+              onChange={(e) => setStemRenderMode(e.target.value as StemRenderMode)}
+              className="control-select rounded-xl px-2 py-1.5 text-[10px] font-mono text-muted"
+              title={
+                STEM_RENDER_MODE_OPTIONS.find((option) => option.value === stemRenderMode)?.hint ??
+                "Choose how stems are rendered"
+              }
+            >
+              {STEM_RENDER_MODE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setIncludeMasterPrint((value) => !value)}
+              aria-pressed={includeMasterPrint}
+              className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                includeMasterPrint
+                  ? "bg-accent text-white shadow-sm shadow-accent/30"
+                  : "button-secondary"
+              }`}
+              title="Include a mastered full-mix print alongside the premaster reference and stems"
+            >
+              Master Print
+            </button>
+          </>
+        )}
         <button
           onClick={() => {
             if (exportFormat === "midi") {
               exportMidi();
+            } else if (exportFormat === "stems") {
+              exportStems({
+                loops: exportLoops,
+                renderMode: stemRenderMode,
+                includeMasterPrint,
+              });
             } else {
               exportWAV(exportLoops);
             }
           }}
           disabled={exporting || exportingMidi}
-            className={`rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors ${
+            className={`rounded-xl px-3.5 py-2 text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${
              exporting || exportingMidi
                ? "bg-accent/50 text-white/50 cursor-wait"
                : "button-secondary bg-white text-background hover:bg-accent-hover hover:text-white"
@@ -387,10 +428,20 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
           title={
             exportFormat === "midi"
               ? "Export pattern as a Standard MIDI File (.mid) — drag into any DAW"
-              : "Export pattern as 16-bit PCM WAV"
+              : exportFormat === "stems"
+                ? `${STEM_RENDER_MODE_OPTIONS.find((option) => option.value === stemRenderMode)?.hint ?? "Export stems"}${includeMasterPrint ? " Includes a mastered print." : " Includes only the premaster reference."}`
+                : "Export pattern as a 16-bit PCM WAV mixdown"
           }
         >
-          {exporting ? "Bouncing..." : exportingMidi ? "Writing..." : "Export"}
+          {exporting
+            ? exportMode === "stems"
+              ? "Packing..."
+              : "Bouncing..."
+            : exportingMidi
+              ? "Writing..."
+              : exportFormat === "stems"
+                ? "Stems"
+                : "Export"}
         </button>
       </div>
 
@@ -400,7 +451,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Humanize */}
       <button
         onClick={() => humanize(null, 0.15)}
-        className="button-secondary rounded-xl px-3 py-2 text-xs uppercase tracking-wider hover:text-accent"
+        className="button-secondary rounded-xl px-3 py-2 text-[10px] uppercase tracking-[0.18em] hover:text-accent"
         title="Humanize all tracks — randomize velocities slightly for a more natural feel (H)"
       >
         Humanize
@@ -409,7 +460,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Clear */}
       <button
         onClick={clearAll}
-        className="button-secondary rounded-xl px-3 py-2 text-xs uppercase tracking-wider hover:bg-danger/20 hover:text-danger"
+        className="button-secondary rounded-xl px-3 py-2 text-[10px] uppercase tracking-[0.18em] hover:bg-danger/20 hover:text-danger"
       >
         Clear All
       </button>

@@ -75,23 +75,40 @@ export function SessionManager() {
           setShowPanel(!showPanel);
           if (!showPanel) refreshSessions();
         }}
-        className="button-secondary rounded-xl px-3 py-1.5 text-xs uppercase tracking-wider"
+        className="button-secondary inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs uppercase tracking-wider"
       >
+        <span className="h-2 w-2 rounded-full bg-cyan shadow-[0_0_12px_rgba(94,234,212,0.8)]" />
         Sessions
       </button>
 
       {/* Flash notification */}
       {flash && (
-        <div className="button-primary absolute right-0 top-full z-50 mt-1 whitespace-nowrap rounded-xl px-2 py-1 text-xs">
+        <div className="button-primary absolute right-0 top-full z-50 mt-1 whitespace-nowrap rounded-xl px-2 py-1 text-xs shadow-accent-soft">
           {flash}
         </div>
       )}
 
       {/* Panel */}
       {showPanel && (
-        <div className="panel absolute right-0 top-full z-50 mt-2 flex w-72 flex-col gap-3 rounded-[1.35rem] p-3">
+        <div className="panel absolute right-0 top-full z-50 mt-2 flex w-80 flex-col gap-3 rounded-[1.45rem] p-3">
+          <div className="rounded-[1.1rem] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02)),rgba(10,16,24,0.72)] p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-cyan">
+                  Session vault
+                </p>
+                <h3 className="mt-1 text-sm font-black tracking-tight text-white">
+                  Save takes, recover ideas fast
+                </h3>
+              </div>
+              <span className="pill-badge rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em]">
+                {sessions.length} saved
+              </span>
+            </div>
+          </div>
+
           {/* Save */}
-          <div className="flex gap-1">
+          <div className="flex gap-1.5">
             <input
               type="text"
               value={saveName}
@@ -111,35 +128,41 @@ export function SessionManager() {
 
           {/* Saved sessions list */}
           {sessions.length > 0 ? (
-            <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
+            <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-[1.1rem] border border-white/[0.06] bg-black/15 p-1.5">
               {sessions.map((name) => (
                 <div
                   key={name}
-                  className="group flex items-center justify-between gap-1 rounded-xl border border-white/[0.06] bg-white/[0.04] px-2 py-1.5 hover:bg-white/[0.08]"
+                  className="group flex items-center justify-between gap-2 rounded-xl border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.015)),rgba(8,12,18,0.65)] px-2.5 py-2 hover:border-cyan/20 hover:bg-white/[0.08]"
                 >
                   <button
                     onClick={() => handleLoad(name)}
-                    className="flex-1 truncate text-left text-xs text-foreground"
+                    className="flex-1 truncate text-left"
                   >
-                    {name}
+                    <span className="block truncate text-xs font-semibold text-foreground">
+                      {name}
+                    </span>
+                    <span className="block text-[9px] uppercase tracking-[0.16em] text-muted/70">
+                      Click to load
+                    </span>
                   </button>
                   <button
                     onClick={() => handleDelete(name)}
-                    className="text-muted/0 group-hover:text-muted hover:text-danger text-xs transition-colors"
+                    className="rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-muted/0 transition-colors group-hover:text-muted hover:bg-danger/15 hover:text-danger"
                   >
-                    ✕
+                    Del
                   </button>
                 </div>
               ))}
             </div>
           ) : (
-            <span className="text-xs text-muted text-center py-2">
+            <div className="rounded-[1.1rem] border border-dashed border-white/10 bg-black/10 px-4 py-5 text-center text-xs text-muted">
               No saved sessions yet
-            </span>
+            </div>
           )}
 
-          <div className="text-[9px] text-muted/50 text-center">
-            Autosaving every 10s
+          <div className="flex items-center justify-between text-[9px] uppercase tracking-[0.16em] text-muted/60">
+            <span>Autosaving every 10s</span>
+            <span>Local only</span>
           </div>
         </div>
       )}
