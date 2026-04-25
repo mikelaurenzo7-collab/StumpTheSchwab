@@ -85,6 +85,43 @@ function encodeWAV(buffer: AudioBuffer): Blob {
   return new Blob([arrayBuffer], { type: "audio/wav" });
 }
 
+type PatternRenderData = {
+  steps: number[][];
+  notes?: string[][];
+  probabilities?: number[][];
+  nudge?: number[][];
+};
+
+/**
+ * Concatenates one per-track pattern field across the song chain.
+ * Uses live track values for the current pattern, stored pattern values for
+ * other chain entries, and the provided fill value for older saved sessions.
+ */
+function flattenPatternArray<T>(
+  tracks: Track[],
+  patterns: PatternRenderData[],
+  inSongMode: boolean,
+  chain: number[],
+  currentPattern: number,
+  totalSteps: number,
+  getLiveValues: (track: Track) => T[],
+  getPatternValues: (pattern: PatternRenderData | undefined, trackIndex: number) => T[] | undefined,
+  fill: T,
+): T[][] {
+  return tracks.map((track, trackIdx) => {
+    if (!inSongMode) return [...getLiveValues(track)];
+    const out: T[] = [];
+    for (const patternIdx of chain) {
+      const src =
+        patternIdx === currentPattern
+          ? getLiveValues(track)
+          : getPatternValues(patterns[patternIdx], trackIdx) ?? Array(totalSteps).fill(fill);
+      for (let step = 0; step < totalSteps; step++) out.push(src[step] ?? fill);
+    }
+    return out;
+  });
+}
+
 export function useExport() {
   const [exporting, setExporting] = useState(false);
 
@@ -101,31 +138,50 @@ export function useExport() {
       const inSongMode = songMode && chain.length > 0;
       const sequenceLength = inSongMode ? totalSteps * chain.length : totalSteps;
 
-      const flatSteps: number[][] = tracks.map((t, i) => {
-        if (!inSongMode) return [...t.steps];
-        const out: number[] = [];
-        for (const patternIdx of chain) {
-          const src =
-            patternIdx === currentPattern
-              ? t.steps
-              : patterns[patternIdx]?.steps[i] ?? Array(totalSteps).fill(0);
-          for (let s = 0; s < totalSteps; s++) out.push(src[s] ?? 0);
-        }
-        return out;
-      });
-
-      const flatProbs: number[][] = tracks.map((t, i) => {
-        if (!inSongMode) return [...t.probabilities];
-        const out: number[] = [];
-        for (const patternIdx of chain) {
-          const src =
-            patternIdx === currentPattern
-              ? t.probabilities
-              : patterns[patternIdx]?.probabilities[i] ?? Array(totalSteps).fill(1);
-          for (let s = 0; s < totalSteps; s++) out.push(src[s] ?? 1);
-        }
-        return out;
-      });
+      const flatSteps = flattenPatternArray(
+        tracks,
+        patterns,
+        inSongMode,
+        chain,
+        currentPattern,
+        totalSteps,
+        (track) => track.steps,
+        (pattern, trackIdx) => pattern?.steps[trackIdx],
+        0,
+      );
+      const flatProbs = flattenPatternArray(
+        tracks,
+        patterns,
+        inSongMode,
+        chain,
+        currentPattern,
+        totalSteps,
+        (track) => track.probabilities,
+        (pattern, trackIdx) => pattern?.probabilities?.[trackIdx],
+        1,
+      );
+      const flatNotes = flattenPatternArray(
+        tracks,
+        patterns,
+        inSongMode,
+        chain,
+        currentPattern,
+        totalSteps,
+        (track) => track.notes,
+        (pattern, trackIdx) => pattern?.notes?.[trackIdx],
+        "",
+      );
+      const flatNudge = flattenPatternArray(
+        tracks,
+        patterns,
+        inSongMode,
+        chain,
+        currentPattern,
+        totalSteps,
+        (track) => track.nudge,
+        (pattern, trackIdx) => pattern?.nudge?.[trackIdx],
+        0,
+      );
 
       const beatsPerStep = 4 / totalSteps;
       const secondsPerBeat = 60 / bpm;
@@ -230,6 +286,8 @@ export function useExport() {
 
           const trackSteps = flatSteps[trackIdx];
           const trackProbs = flatProbs[trackIdx];
+          const trackNotes = flatNotes[trackIdx];
+          const trackNudge = flatNudge[trackIdx];
           const stepIndices = Array.from({ length: sequenceLength }, (_, i) => i);
 
           const noteDur = stepDurationSeconds * (track.noteLength ?? 1.0);
@@ -240,8 +298,8 @@ export function useExport() {
               if (!velocity) return;
               const probability = trackProbs[stepIndex] ?? 1.0;
               if (probability < 1.0 && Math.random() > probability) return;
-              const noteOverride = track.notes[stepIndex % totalSteps] || undefined;
-              const nudgeOffset = (track.nudge[stepIndex % totalSteps] ?? 0) * stepDurationSeconds;
+              const noteOverride = trackNotes[stepIndex] || undefined;
+              const nudgeOffset = (trackNudge[stepIndex] ?? 0) * stepDurationSeconds;
               const trigTime = time + nudgeOffset;
               if (synth instanceof Tone.NoiseSynth) {
                 synth.triggerAttackRelease(noteDur, trigTime, velocity);
