@@ -93,6 +93,12 @@ export interface Pattern {
 }
 
 type PatternSnapshot = Pick<Pattern, "steps" | "notes" | "probabilities" | "nudge">;
+type StoredPatternData = {
+  steps: number[][];
+  notes?: string[][];
+  probabilities: number[][];
+  nudge?: number[][];
+};
 
 export const PATTERN_LABELS = ["A", "B", "C", "D", "E", "F", "G", "H"] as const;
 export const MAX_PATTERNS = PATTERN_LABELS.length;
@@ -401,7 +407,7 @@ function snapshotPattern(tracks: Track[]): PatternSnapshot {
 
 function applyPatternToTracks(
   tracks: Track[],
-  pattern: PatternSnapshot | { steps: number[][]; notes?: string[][]; probabilities: number[][]; nudge?: number[][] },
+  pattern: PatternSnapshot | StoredPatternData,
   totalSteps: number
 ): Track[] {
   return tracks.map((t, i) => {

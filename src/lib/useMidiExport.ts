@@ -148,8 +148,8 @@ export function buildMidiFile(state: ReturnType<typeof useEngineStore.getState>)
   const sequenceLength = inSongMode ? totalSteps * chain.length : totalSteps;
   const ticksPerStep = (PPQ * 4) / totalSteps; // 16 steps → 120, 32 steps → 60
 
-  // Pull effective per-track arrays. In song mode we concatenate each
-  // pattern's data; otherwise we use the live track state.
+  // Pull effective per-track step, note, and nudge arrays. In song mode we
+  // concatenate each pattern's data; otherwise we use the live track state.
   const effectiveStepsByTrack: number[][] = tracks.map((t, i) => {
     if (!inSongMode) return [...t.steps];
     const out: number[] = [];
