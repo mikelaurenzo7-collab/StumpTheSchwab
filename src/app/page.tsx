@@ -8,6 +8,10 @@ import { Mixer } from "@/components/Mixer";
 import { SongChain } from "@/components/SongChain";
 import { HelpOverlay } from "@/components/HelpOverlay";
 import { GeneratorModal } from "@/components/GeneratorModal";
+import { GroovePanel } from "@/components/GroovePanel";
+import { AutomationEditor } from "@/components/AutomationEditor";
+import { PerformanceMode } from "@/components/PerformanceMode";
+import { SampleBrowser } from "@/components/SampleBrowser";
 import { useAudioEngine } from "@/lib/useAudioEngine";
 import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
 import { useAutoSave } from "@/lib/useAutoSave";
@@ -26,6 +30,7 @@ export default function DAW() {
 
   const { lastSaved, recoverAutosave, clearAutosave } = useAutoSave();
   const [mixerOpen, setMixerOpen] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<"arrange" | "groove" | "automation" | "performance" | "samples">("arrange");
   const [recoveryBanner, setRecoveryBanner] = useState(() => {
     if (typeof window === "undefined") return false;
     try { return localStorage.getItem("sts_session___autosave") !== null; } catch { return false; }
@@ -102,39 +107,73 @@ export default function DAW() {
         </section>
 
         <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto">
-          <div className="panel rounded-[1.35rem] p-4">
-            <div className="mb-2 flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.28em] text-accent-hover">
-                  Arrange
-                </p>
-                <h2 className="text-base font-black tracking-tight text-white">
-                  Song chain
-                </h2>
-              </div>
-              <span className="pill-badge rounded-full bg-cyan/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan">
-                Visible
-              </span>
-            </div>
-            <SongChain />
+          {/* Tab Navigation */}
+          <div className="panel-soft flex gap-1 rounded-[1.2rem] p-1.5">
+            {[
+              { id: "arrange", label: "Arrange", icon: "🎵" },
+              { id: "groove", label: "Groove", icon: "🎛️" },
+              { id: "automation", label: "Auto", icon: "📊" },
+              { id: "performance", label: "Perf", icon: "🎭" },
+              { id: "samples", label: "Samples", icon: "📦" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setSidebarTab(tab.id as typeof sidebarTab)}
+                className={`flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-bold uppercase tracking-[0.14em] transition-colors ${
+                  sidebarTab === tab.id
+                    ? "bg-teal-500/20 text-teal-400"
+                    : "text-white/60 hover:bg-white/5 hover:text-white/80"
+                }`}
+              >
+                <span>{tab.icon}</span>
+                <span className="hidden sm:inline">{tab.label}</span>
+              </button>
+            ))}
           </div>
 
-          <div className="panel-soft rounded-[1.2rem] p-3.5">
-            <p className="text-[10px] font-black uppercase tracking-[0.28em] text-muted">
-              Fast moves
-            </p>
-            <div className="mt-2.5 grid gap-2 text-sm text-foreground/80">
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.04] p-2.5">
-                <span className="font-bold text-white">Paint</span> steps by dragging across the grid.
+          {/* Tab Content */}
+          {sidebarTab === "arrange" && (
+            <>
+              <div className="panel rounded-[1.35rem] p-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.28em] text-accent-hover">
+                      Arrange
+                    </p>
+                    <h2 className="text-base font-black tracking-tight text-white">
+                      Song chain
+                    </h2>
+                  </div>
+                  <span className="pill-badge rounded-full bg-cyan/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan">
+                    Visible
+                  </span>
+                </div>
+                <SongChain />
               </div>
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.04] p-2.5">
-                <span className="font-bold text-white">Shape</span> a hit by double-clicking a lit step.
+
+              <div className="panel-soft rounded-[1.2rem] p-3.5">
+                <p className="text-[10px] font-black uppercase tracking-[0.28em] text-muted">
+                  Fast moves
+                </p>
+                <div className="mt-2.5 grid gap-2 text-sm text-foreground/80">
+                  <div className="rounded-xl border border-white/[0.06] bg-white/[0.04] p-2.5">
+                    <span className="font-bold text-white">Paint</span> steps by dragging across the grid.
+                  </div>
+                  <div className="rounded-xl border border-white/[0.06] bg-white/[0.04] p-2.5">
+                    <span className="font-bold text-white">Shape</span> a hit by double-clicking a lit step.
+                  </div>
+                  <div className="rounded-xl border border-white/[0.06] bg-white/[0.04] p-2.5">
+                    <span className="font-bold text-white">Mutate</span> patterns from the Generate button.
+                  </div>
+                </div>
               </div>
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.04] p-2.5">
-                <span className="font-bold text-white">Mutate</span> patterns from the Generate button.
-              </div>
-            </div>
-          </div>
+            </>
+          )}
+
+          {sidebarTab === "groove" && <GroovePanel />}
+          {sidebarTab === "automation" && <AutomationEditor />}
+          {sidebarTab === "performance" && <PerformanceMode />}
+          {sidebarTab === "samples" && <SampleBrowser />}
         </aside>
       </main>
 

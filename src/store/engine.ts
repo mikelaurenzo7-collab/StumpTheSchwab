@@ -84,12 +84,66 @@ export interface Track {
   nudge: number[];
 }
 
+// ── Automation types ─────────────────────────────────────────
+export interface AutomationPoint {
+  position: number;  // 0..1 (normalized time within pattern/scene duration)
+  value: number;     // parameter value (range depends on target)
+}
+
+export type AutomationTarget =
+  | "bpm"
+  | "master.volume"
+  | `track.${number}.volume`
+  | `track.${number}.pan`
+  | `track.${number}.effects.filterFreq`
+  | `track.${number}.effects.delayWet`
+  | `track.${number}.effects.reverbWet`;
+
+export interface AutomationLane {
+  id: string;
+  target: AutomationTarget;
+  points: AutomationPoint[];
+  enabled: boolean;
+  min: number;
+  max: number;
+}
+
+// ── Groove templates ─────────────────────────────────────────
+export interface GrooveTemplate {
+  id: string;
+  name: string;
+  swing: number;           // 0..1 (shuffle amount)
+  velocityVariation: number;  // 0..1 (random velocity humanization)
+  timingVariation: number;    // 0..1 (random micro-timing jitter)
+  accentPattern: number[];    // [1, 0, 0.5, 0, 1, ...] velocity multipliers per step
+}
+
+// ── Performance / Scene mode ─────────────────────────────────
+export interface Scene {
+  id: string;
+  name: string;
+  patternSlots: (number | null)[];  // Index into patterns array, null = empty slot
+  duration: number;  // Bars to play before auto-advancing
+}
+
 export interface Pattern {
   name: string;
   steps: number[][];
   notes: string[][];
   probabilities: number[][];
   nudge: number[][];
+  automation: AutomationLane[];
+}
+
+// ── Sample browser ───────────────────────────────────────────
+export interface Sample {
+  id: string;
+  name: string;
+  url: string;
+  category: string;
+  tags: string[];
+  bpm?: number;
+  key?: string;
 }
 
 type PatternSnapshot = Pick<Pattern, "steps" | "notes" | "probabilities" | "nudge">;
@@ -98,6 +152,7 @@ type StoredPatternData = {
   notes?: string[][];
   probabilities: number[][];
   nudge?: number[][];
+  automation?: AutomationLane[];
 };
 
 export const PATTERN_LABELS = ["A", "B", "C", "D", "E", "F", "G", "H"] as const;
@@ -157,6 +212,22 @@ export interface EngineState {
   chainPosition: number;
   trackClipboard: { steps: number[]; notes: string[]; probabilities: number[]; nudge: number[] } | null;
 
+  // ── New features ────────────────────────────────────────────
+  grooveTemplates: GrooveTemplate[];
+  activeGroove: string | null;
+  globalVelocityHumanize: number;  // 0..1
+  globalTimingHumanize: number;    // 0..1
+
+  scenes: Scene[];
+  performanceMode: boolean;
+  activeScenes: Set<string>;  // Currently playing scenes
+
+  sampleLibrary: Sample[];
+  sampleCategories: string[];
+
+  automationRecording: boolean;
+  selectedAutomationLane: string | null;
+
   setBpm: (bpm: number) => void;
   setSwing: (swing: number) => void;
   play: () => void;
@@ -214,6 +285,37 @@ export interface EngineState {
   loadSession: (name: string) => boolean;
   deleteSession: (name: string) => void;
   getSavedSessions: () => string[];
+
+  // ── Automation actions ────────────────────────────────────
+  addAutomationLane: (patternIndex: number, target: AutomationTarget, min: number, max: number) => void;
+  removeAutomationLane: (patternIndex: number, laneId: string) => void;
+  toggleAutomationLane: (patternIndex: number, laneId: string) => void;
+  addAutomationPoint: (patternIndex: number, laneId: string, position: number, value: number) => void;
+  updateAutomationPoint: (patternIndex: number, laneId: string, pointIndex: number, position: number, value: number) => void;
+  removeAutomationPoint: (patternIndex: number, laneId: string, pointIndex: number) => void;
+  setAutomationRecording: (recording: boolean) => void;
+  selectAutomationLane: (laneId: string | null) => void;
+
+  // ── Groove actions ────────────────────────────────────────
+  setActiveGroove: (grooveId: string | null) => void;
+  applyGrooveToPattern: (patternIndex: number, grooveId: string) => void;
+  setGlobalHumanization: (velocity: number, timing: number) => void;
+  createCustomGroove: (name: string, swing: number, velocityVar: number, timingVar: number, accent: number[]) => void;
+
+  // ── Performance mode actions ──────────────────────────────
+  setPerformanceMode: (on: boolean) => void;
+  createScene: (name: string, patternSlots: (number | null)[], duration: number) => void;
+  deleteScene: (sceneId: string) => void;
+  triggerScene: (sceneId: string) => void;
+  stopScene: (sceneId: string) => void;
+  updateScene: (sceneId: string, updates: Partial<Omit<Scene, "id">>) => void;
+
+  // ── Sample library actions ────────────────────────────────
+  addSampleToLibrary: (sample: Sample) => void;
+  removeSampleFromLibrary: (sampleId: string) => void;
+  loadSampleFromLibrary: (trackId: number, sampleId: string) => void;
+  filterSamplesByCategory: (category: string) => Sample[];
+  searchSamples: (query: string) => Sample[];
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -344,11 +446,22 @@ interface SessionData {
     noteLength?: number;
     nudge?: number[];
   }[];
-  patterns?: { name: string; steps: number[][]; notes?: string[][]; probabilities?: number[][]; nudge?: number[][] }[];
+  patterns?: {
+    name: string;
+    steps: number[][];
+    notes?: string[][];
+    probabilities?: number[][];
+    nudge?: number[][];
+    automation?: AutomationLane[];
+  }[];
   currentPattern?: number;
   chain?: number[];
   songMode?: boolean;
   master: MasterBus;
+  grooveTemplates?: GrooveTemplate[];
+  activeGroove?: string | null;
+  scenes?: Scene[];
+  sampleLibrary?: Sample[];
 }
 
 function serializeSession(state: EngineState): SessionData {
@@ -378,14 +491,70 @@ function serializeSession(state: EngineState): SessionData {
       notes: i === state.currentPattern ? currentSnapshot.notes : p.notes,
       probabilities: i === state.currentPattern ? currentSnapshot.probabilities : p.probabilities,
       nudge: i === state.currentPattern ? currentSnapshot.nudge : p.nudge,
+      automation: p.automation,
     })),
     chain: state.chain,
     songMode: state.songMode,
     master: state.master,
+    grooveTemplates: state.grooveTemplates,
+    activeGroove: state.activeGroove,
+    scenes: state.scenes,
+    sampleLibrary: state.sampleLibrary,
   };
 }
 
 // ── Pattern helpers ───────────────────────────────────────────
+export const DEFAULT_GROOVE_TEMPLATES: GrooveTemplate[] = [
+  {
+    id: "none",
+    name: "None (Quantized)",
+    swing: 0,
+    velocityVariation: 0,
+    timingVariation: 0,
+    accentPattern: [],
+  },
+  {
+    id: "dilla",
+    name: "J Dilla",
+    swing: 0.62,
+    velocityVariation: 0.15,
+    timingVariation: 0.08,
+    accentPattern: [1, 0.7, 0.85, 0.65, 1, 0.7, 0.9, 0.6],
+  },
+  {
+    id: "trap",
+    name: "Trap",
+    swing: 0.18,
+    velocityVariation: 0.12,
+    timingVariation: 0.05,
+    accentPattern: [1, 0.6, 0.8, 0.5, 1, 0.6, 0.85, 0.55],
+  },
+  {
+    id: "house",
+    name: "House (4-on-floor)",
+    swing: 0.05,
+    velocityVariation: 0.08,
+    timingVariation: 0.03,
+    accentPattern: [1, 0.7, 0.8, 0.7],
+  },
+  {
+    id: "dnb",
+    name: "Drum & Bass",
+    swing: 0,
+    velocityVariation: 0.2,
+    timingVariation: 0.1,
+    accentPattern: [1, 0.5, 0.9, 0.5, 0.85, 0.5, 0.92, 0.5],
+  },
+  {
+    id: "jazz",
+    name: "Jazz Swing",
+    swing: 0.66,
+    velocityVariation: 0.25,
+    timingVariation: 0.15,
+    accentPattern: [1, 0.6, 0.9, 0.65, 0.95, 0.6, 0.85, 0.65],
+  },
+];
+
 function createEmptyPattern(name: string, trackCount: number, totalSteps: number): Pattern {
   return {
     name,
@@ -393,6 +562,7 @@ function createEmptyPattern(name: string, trackCount: number, totalSteps: number
     notes: Array.from({ length: trackCount }, () => Array(totalSteps).fill("")),
     probabilities: Array.from({ length: trackCount }, () => Array(totalSteps).fill(1.0)),
     nudge: Array.from({ length: trackCount }, () => Array(totalSteps).fill(0)),
+    automation: [],
   };
 }
 
@@ -445,6 +615,22 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
   songMode: false,
   chainPosition: 0,
   trackClipboard: null,
+
+  // ── New feature state ──────────────────────────────────────
+  grooveTemplates: DEFAULT_GROOVE_TEMPLATES,
+  activeGroove: null,
+  globalVelocityHumanize: 0,
+  globalTimingHumanize: 0,
+
+  scenes: [],
+  performanceMode: false,
+  activeScenes: new Set(),
+
+  sampleLibrary: [],
+  sampleCategories: ["Drums", "Bass", "Melodic", "FX", "Vocals", "Loops"],
+
+  automationRecording: false,
+  selectedAutomationLane: null,
 
   setBpm: (bpm) => set({ bpm: Math.max(30, Math.min(300, bpm)) }),
   setSwing: (swing) => set({ swing: Math.max(0, Math.min(1, swing)) }),
@@ -1100,6 +1286,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
               nudge: Array.from({ length: state.tracks.length }, (_, trackIdx) =>
                 Array(data.totalSteps).fill(0).map((_, stepIdx) => p.nudge?.[trackIdx]?.[stepIdx] ?? 0)
               ),
+              automation: p.automation ?? [],
             }))
           : state.patterns,
         chain: data.chain ?? [],
@@ -1108,6 +1295,10 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         // Merge default master onto the saved bus so older sessions pick up
         // EQ fields without crashing.
         master: { ...DEFAULT_MASTER, ...data.master },
+        grooveTemplates: data.grooveTemplates ?? DEFAULT_GROOVE_TEMPLATES,
+        activeGroove: data.activeGroove ?? null,
+        scenes: data.scenes ?? [],
+        sampleLibrary: data.sampleLibrary ?? [],
       }));
       return true;
     } catch {
@@ -1134,5 +1325,308 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
     } catch {
       return [];
     }
+  },
+
+  // ── Automation actions ────────────────────────────────────────
+  addAutomationLane: (patternIndex, target, min, max) => {
+    pushHistory();
+    set((state) => ({
+      patterns: state.patterns.map((p, i) =>
+        i === patternIndex
+          ? {
+              ...p,
+              automation: [
+                ...p.automation,
+                {
+                  id: `${target}-${Date.now()}`,
+                  target,
+                  points: [
+                    { position: 0, value: (min + max) / 2 },
+                    { position: 1, value: (min + max) / 2 },
+                  ],
+                  enabled: true,
+                  min,
+                  max,
+                },
+              ],
+            }
+          : p
+      ),
+    }));
+  },
+
+  removeAutomationLane: (patternIndex, laneId) => {
+    pushHistory();
+    set((state) => ({
+      patterns: state.patterns.map((p, i) =>
+        i === patternIndex
+          ? {
+              ...p,
+              automation: p.automation.filter((lane) => lane.id !== laneId),
+            }
+          : p
+      ),
+      selectedAutomationLane: state.selectedAutomationLane === laneId ? null : state.selectedAutomationLane,
+    }));
+  },
+
+  toggleAutomationLane: (patternIndex, laneId) => {
+    set((state) => ({
+      patterns: state.patterns.map((p, i) =>
+        i === patternIndex
+          ? {
+              ...p,
+              automation: p.automation.map((lane) =>
+                lane.id === laneId ? { ...lane, enabled: !lane.enabled } : lane
+              ),
+            }
+          : p
+      ),
+    }));
+  },
+
+  addAutomationPoint: (patternIndex, laneId, position, value) => {
+    pushHistory();
+    set((state) => ({
+      patterns: state.patterns.map((p, i) =>
+        i === patternIndex
+          ? {
+              ...p,
+              automation: p.automation.map((lane) =>
+                lane.id === laneId
+                  ? {
+                      ...lane,
+                      points: [...lane.points, { position, value }].sort(
+                        (a, b) => a.position - b.position
+                      ),
+                    }
+                  : lane
+              ),
+            }
+          : p
+      ),
+    }));
+  },
+
+  updateAutomationPoint: (patternIndex, laneId, pointIndex, position, value) => {
+    set((state) => ({
+      patterns: state.patterns.map((p, i) =>
+        i === patternIndex
+          ? {
+              ...p,
+              automation: p.automation.map((lane) =>
+                lane.id === laneId
+                  ? {
+                      ...lane,
+                      points: lane.points
+                        .map((pt, j) =>
+                          j === pointIndex ? { position, value } : pt
+                        )
+                        .sort((a, b) => a.position - b.position),
+                    }
+                  : lane
+              ),
+            }
+          : p
+      ),
+    }));
+  },
+
+  removeAutomationPoint: (patternIndex, laneId, pointIndex) => {
+    pushHistory();
+    set((state) => ({
+      patterns: state.patterns.map((p, i) =>
+        i === patternIndex
+          ? {
+              ...p,
+              automation: p.automation.map((lane) =>
+                lane.id === laneId
+                  ? {
+                      ...lane,
+                      points: lane.points.filter((_, j) => j !== pointIndex),
+                    }
+                  : lane
+              ),
+            }
+          : p
+      ),
+    }));
+  },
+
+  setAutomationRecording: (recording) => set({ automationRecording: recording }),
+
+  selectAutomationLane: (laneId) => set({ selectedAutomationLane: laneId }),
+
+  // ── Groove actions ────────────────────────────────────────────
+  setActiveGroove: (grooveId) => {
+    pushHistory();
+    set({ activeGroove: grooveId });
+  },
+
+  applyGrooveToPattern: (patternIndex, grooveId) => {
+    pushHistory();
+    set((state) => {
+      const groove = state.grooveTemplates.find((g) => g.id === grooveId);
+      if (!groove) return state;
+
+      const currentPattern = state.patterns[patternIndex];
+      const updatedSteps = currentPattern.steps.map((trackSteps) =>
+        trackSteps.map((velocity, stepIdx) => {
+          if (velocity === 0) return 0;
+          // Apply accent pattern
+          const accentIdx = stepIdx % (groove.accentPattern.length || 1);
+          const accent = groove.accentPattern[accentIdx] ?? 1.0;
+          // Apply velocity humanization
+          const velVar = groove.velocityVariation * (Math.random() * 2 - 1) * 0.15;
+          return Math.max(0.1, Math.min(1.0, velocity * accent * (1 + velVar)));
+        })
+      );
+
+      const updatedNudge = currentPattern.nudge.map((trackNudge) =>
+        trackNudge.map((nudge) => {
+          // Apply timing humanization
+          const timingVar = groove.timingVariation * (Math.random() * 2 - 1) * 0.1;
+          return Math.max(-0.5, Math.min(0.5, nudge + timingVar));
+        })
+      );
+
+      return {
+        patterns: state.patterns.map((p, i) =>
+          i === patternIndex
+            ? { ...p, steps: updatedSteps, nudge: updatedNudge }
+            : p
+        ),
+        swing: groove.swing,
+      };
+    });
+  },
+
+  setGlobalHumanization: (velocity, timing) => {
+    set({
+      globalVelocityHumanize: Math.max(0, Math.min(1, velocity)),
+      globalTimingHumanize: Math.max(0, Math.min(1, timing)),
+    });
+  },
+
+  createCustomGroove: (name, swing, velocityVar, timingVar, accent) => {
+    pushHistory();
+    set((state) => ({
+      grooveTemplates: [
+        ...state.grooveTemplates,
+        {
+          id: `custom-${Date.now()}`,
+          name,
+          swing,
+          velocityVariation: velocityVar,
+          timingVariation: timingVar,
+          accentPattern: accent,
+        },
+      ],
+    }));
+  },
+
+  // ── Performance mode actions ──────────────────────────────────
+  setPerformanceMode: (on) => {
+    set({ performanceMode: on });
+    if (!on) {
+      // Stop all active scenes when exiting performance mode
+      set({ activeScenes: new Set() });
+    }
+  },
+
+  createScene: (name, patternSlots, duration) => {
+    pushHistory();
+    set((state) => ({
+      scenes: [
+        ...state.scenes,
+        {
+          id: `scene-${Date.now()}`,
+          name,
+          patternSlots,
+          duration,
+        },
+      ],
+    }));
+  },
+
+  deleteScene: (sceneId) => {
+    pushHistory();
+    set((state) => ({
+      scenes: state.scenes.filter((s) => s.id !== sceneId),
+      activeScenes: new Set(
+        [...state.activeScenes].filter((id) => id !== sceneId)
+      ),
+    }));
+  },
+
+  triggerScene: (sceneId) => {
+    set((state) => {
+      const newActive = new Set(state.activeScenes);
+      newActive.add(sceneId);
+      return { activeScenes: newActive };
+    });
+  },
+
+  stopScene: (sceneId) => {
+    set((state) => {
+      const newActive = new Set(state.activeScenes);
+      newActive.delete(sceneId);
+      return { activeScenes: newActive };
+    });
+  },
+
+  updateScene: (sceneId, updates) => {
+    pushHistory();
+    set((state) => ({
+      scenes: state.scenes.map((s) =>
+        s.id === sceneId ? { ...s, ...updates } : s
+      ),
+    }));
+  },
+
+  // ── Sample library actions ────────────────────────────────────
+  addSampleToLibrary: (sample) => {
+    set((state) => ({
+      sampleLibrary: [...state.sampleLibrary, sample],
+    }));
+  },
+
+  removeSampleFromLibrary: (sampleId) => {
+    set((state) => ({
+      sampleLibrary: state.sampleLibrary.filter((s) => s.id !== sampleId),
+    }));
+  },
+
+  loadSampleFromLibrary: (trackId, sampleId) => {
+    set((state) => {
+      const sample = state.sampleLibrary.find((s) => s.id === sampleId);
+      if (!sample) return state;
+
+      return {
+        tracks: state.tracks.map((t) =>
+          t.id === trackId
+            ? {
+                ...t,
+                customSampleUrl: sample.url,
+                customSampleName: sample.name,
+              }
+            : t
+        ),
+      };
+    });
+  },
+
+  filterSamplesByCategory: (category) => {
+    return get().sampleLibrary.filter((s) => s.category === category);
+  },
+
+  searchSamples: (query) => {
+    const lower = query.toLowerCase();
+    return get().sampleLibrary.filter(
+      (s) =>
+        s.name.toLowerCase().includes(lower) ||
+        s.tags.some((tag) => tag.toLowerCase().includes(lower)) ||
+        s.category.toLowerCase().includes(lower)
+    );
   },
 }));
