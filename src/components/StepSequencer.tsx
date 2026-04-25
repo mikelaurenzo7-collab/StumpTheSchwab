@@ -185,7 +185,7 @@ const TrackRow = memo(function TrackRow({
   onCloseEuclidean: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-2xl border border-white/[0.05] bg-black/10 px-2 py-1.5 relative">
+    <div className="relative flex items-center gap-2 rounded-[1.35rem] border border-white/[0.07] bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.015)),rgba(0,0,0,0.18)] px-2.5 py-2 shadow-[0_14px_32px_rgba(0,0,0,0.18)]">
       {/* Track label */}
       <div
         className={`w-28 shrink-0 flex items-center gap-2 pr-2 ${
@@ -196,12 +196,12 @@ const TrackRow = memo(function TrackRow({
       >
         {/* Track color rail anchors the row and separates instruments at scan speed. */}
         <div
-          className={`w-1.5 h-8 rounded-full shrink-0 ${
-            pianoRollOpen ? "ring-2 ring-accent ring-offset-1 ring-offset-background" : ""
-          }`}
+          className={`h-8 w-1.5 shrink-0 rounded-full ${
+             pianoRollOpen ? "ring-2 ring-accent ring-offset-1 ring-offset-background" : ""
+           }`}
           style={{ backgroundColor: color }}
         />
-        <span className={`text-sm font-bold truncate ${pianoRollOpen ? "text-accent" : "text-foreground"}`}>
+        <span className={`truncate text-sm font-bold ${pianoRollOpen ? "text-accent" : "text-foreground"}`}>
           {name}
           {melodic && <span className="text-[10px] ml-1 opacity-60">♪</span>}
         </span>
@@ -229,11 +229,11 @@ const TrackRow = memo(function TrackRow({
 
       {/* Core groove actions stay visible so editing is discoverable without hover. */}
       <div
-        className="ml-2 flex items-center gap-1 relative"
+        className="relative ml-2 flex items-center gap-1"
       >
         <button
           onClick={() => onCopyTrack(trackId)}
-          className="h-7 rounded-full bg-white/[0.06] px-2 text-[9px] font-bold text-muted transition-colors hover:bg-white/[0.12] hover:text-foreground"
+          className="button-secondary h-7 rounded-full px-2 text-[9px] font-bold"
           title={`Copy ${name} pattern`}
         >
           Copy
@@ -241,14 +241,14 @@ const TrackRow = memo(function TrackRow({
         <button
           onClick={() => onPasteTrack(trackId)}
           disabled={!canPaste}
-          className="h-7 rounded-full bg-white/[0.06] px-2 text-[9px] font-bold text-muted transition-colors hover:bg-accent-dim/30 hover:text-accent disabled:opacity-25 disabled:hover:bg-white/[0.06] disabled:hover:text-muted"
+          className="button-secondary h-7 rounded-full px-2 text-[9px] font-bold hover:bg-accent-dim/30 hover:text-accent disabled:hover:text-muted"
           title={canPaste ? `Paste into ${name}` : "Copy a track first"}
         >
           Paste
         </button>
         <button
           onClick={() => onHumanizeTrack(trackId)}
-          className="h-7 rounded-full bg-white/[0.06] px-2 text-[9px] font-bold text-muted transition-colors hover:bg-accent-dim/30 hover:text-accent"
+          className="button-secondary h-7 rounded-full px-2 text-[9px] font-bold hover:bg-accent-dim/30 hover:text-accent"
           title={`Humanize ${name} — slight velocity randomization`}
         >
           Feel
@@ -258,15 +258,15 @@ const TrackRow = memo(function TrackRow({
           className={`h-7 rounded-full px-2 text-[9px] font-bold transition-colors ${
             euclideanOpen
               ? "bg-accent text-white"
-              : "bg-white/[0.06] text-muted hover:bg-accent-dim/30 hover:text-accent"
-          }`}
+              : "button-secondary hover:bg-accent-dim/30 hover:text-accent"
+           }`}
           title={`Euclidean fill for ${name}`}
         >
           Fill
         </button>
         <button
           onClick={() => onClearTrack(trackId)}
-          className="h-7 rounded-full bg-white/[0.06] px-2 text-[9px] font-bold text-muted transition-colors hover:bg-danger/20 hover:text-danger"
+          className="button-secondary h-7 rounded-full px-2 text-[9px] font-bold hover:bg-danger/20 hover:text-danger"
           title={`Clear ${name}`}
         >
           Clear
@@ -403,7 +403,7 @@ export function StepSequencer() {
   const handleCloseEuclidean = useCallback(() => setEuclideanTrack(null), []);
 
   return (
-    <div className="flex-1 overflow-auto p-5 relative">
+    <div className="relative flex-1 overflow-auto p-5">
       {detailStep && (
         <StepDetailPopover
           trackId={detailStep.trackId}
@@ -422,13 +422,28 @@ export function StepSequencer() {
           </h2>
         </div>
         <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
-          <span className="rounded-full bg-white/[0.06] px-3 py-1.5">Drag to paint</span>
-          <span className="rounded-full bg-white/[0.06] px-3 py-1.5">Double-click shape</span>
-          <span className="rounded-full bg-white/[0.06] px-3 py-1.5">Ctrl-click chance</span>
+          <span className="pill-badge rounded-full px-3 py-1.5">Drag to paint</span>
+          <span className="pill-badge rounded-full px-3 py-1.5">Double-click shape</span>
+          <span className="pill-badge rounded-full px-3 py-1.5">Ctrl-click chance</span>
         </div>
       </div>
 
-      <div className="inline-flex flex-col gap-2">
+      <div className="mb-4 grid gap-2 sm:grid-cols-3">
+        <div className="panel-soft rounded-[1.25rem] px-4 py-3">
+          <div className="text-[9px] font-black uppercase tracking-[0.22em] text-muted">Flow</div>
+          <div className="mt-1 text-sm font-semibold text-white">Sketch fast, then sculpt details.</div>
+        </div>
+        <div className="panel-soft rounded-[1.25rem] px-4 py-3">
+          <div className="text-[9px] font-black uppercase tracking-[0.22em] text-muted">Dynamics</div>
+          <div className="mt-1 text-sm font-semibold text-white">Probability and nudge keep loops alive.</div>
+        </div>
+        <div className="panel-soft rounded-[1.25rem] px-4 py-3">
+          <div className="text-[9px] font-black uppercase tracking-[0.22em] text-muted">Performance</div>
+          <div className="mt-1 text-sm font-semibold text-white">Hotkeys keep the pocket moving.</div>
+        </div>
+      </div>
+
+      <div className="inline-flex flex-col gap-2 rounded-[1.5rem] border border-white/[0.05] bg-black/10 p-3">
         {/* Step numbers */}
         <div className="flex items-center gap-2">
           <div className="w-28 shrink-0" />

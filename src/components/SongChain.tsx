@@ -86,14 +86,14 @@ export function SongChain() {
           </div>
           <span
             aria-label="Song Mode is currently disabled"
-            className="rounded-full bg-white/[0.06] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-muted"
+            className="pill-badge rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.18em]"
           >
             Off
           </span>
         </div>
         <button
           onClick={handleToggle}
-          className="mt-4 w-full rounded-2xl bg-white px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-black transition-all hover:scale-[1.01] hover:bg-accent-hover hover:text-white"
+          className="button-primary mt-4 w-full rounded-2xl px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em]"
           title="Enable Song Mode to chain patterns into an arrangement"
         >
           Enable Song Mode
@@ -110,7 +110,7 @@ export function SongChain() {
         <div className="flex items-center justify-between gap-3">
           <button
             onClick={handleToggle}
-            className="rounded-full bg-accent px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-white transition-colors hover:bg-accent-hover"
+            className="button-primary rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em]"
             title="Disable Song Mode"
           >
             Song Mode On
@@ -122,7 +122,7 @@ export function SongChain() {
 
         <button
           onClick={handleAddCurrent}
-          className="mt-3 w-full rounded-2xl bg-white/[0.08] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-foreground transition-colors hover:bg-white/[0.14]"
+          className="button-secondary mt-3 w-full rounded-2xl px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-foreground"
           title={`Append pattern ${PATTERN_LABELS[currentPattern]} to the chain`}
         >
           Add current pattern {PATTERN_LABELS[currentPattern]}
@@ -142,8 +142,8 @@ export function SongChain() {
               className={`rounded-xl px-2 py-2 text-[10px] font-black transition-colors ${
                 i === currentPattern
                   ? "bg-accent text-white shadow-sm shadow-accent/40"
-                  : "bg-white/[0.08] text-muted/80 hover:bg-white/[0.14] hover:text-foreground"
-              }`}
+                  : "button-secondary text-muted/80"
+               }`}
               title={`Append ${patterns[i]?.name ?? label}`}
             >
               {label}
@@ -161,7 +161,7 @@ export function SongChain() {
           {chain.length > 0 && (
             <button
               onClick={clearChain}
-              className="rounded-full bg-white/[0.08] px-3 py-1 text-[9px] font-bold uppercase tracking-wider text-muted transition-colors hover:bg-danger/20 hover:text-danger"
+              className="button-secondary rounded-full px-3 py-1 text-[9px] font-bold uppercase tracking-wider hover:bg-danger/20 hover:text-danger"
               title="Clear the chain"
             >
               Clear

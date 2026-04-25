@@ -568,8 +568,8 @@ export function GeneratorModal() {
               onClick={() => !loading && setMode("create")}
               className={`flex-1 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${
                 mode === "create"
-                  ? "bg-accent text-white"
-                  : "text-muted hover:bg-white/[0.06] hover:text-foreground"
+                  ? "button-primary"
+                  : "button-ghost"
               }`}
             >
               Generate
@@ -578,8 +578,8 @@ export function GeneratorModal() {
               onClick={() => !loading && setMode("refine")}
               className={`flex-1 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${
                 mode === "refine"
-                  ? "bg-accent text-white"
-                  : "text-muted hover:bg-white/[0.06] hover:text-foreground"
+                  ? "button-primary"
+                  : "button-ghost"
               }`}
             >
               Mutate
@@ -588,7 +588,7 @@ export function GeneratorModal() {
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(20rem,0.95fr)]">
             <div className="space-y-4">
-              <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+              <div className="panel-soft rounded-2xl p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div className="text-[9px] font-black uppercase tracking-[0.22em] text-muted">
                     Target the move
@@ -596,7 +596,7 @@ export function GeneratorModal() {
                   <button
                     onClick={() => handleSurprise()}
                     disabled={loading}
-                    className="rounded-full bg-accent/15 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-accent hover:bg-accent hover:text-white disabled:opacity-40"
+                    className="button-secondary rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-accent hover:bg-accent hover:text-white disabled:opacity-40"
                   >
                     Surprise me
                   </button>
@@ -607,11 +607,11 @@ export function GeneratorModal() {
                       key={option.value}
                       onClick={() => setTarget(option.value)}
                       disabled={loading}
-                      className={`rounded-2xl border px-3 py-2 text-left transition-colors ${
-                        target === option.value
-                          ? "border-accent/60 bg-accent/15 text-white"
-                          : "border-white/8 bg-black/20 text-muted hover:border-white/15 hover:text-foreground"
-                      }`}
+                        className={`rounded-2xl border px-3 py-2 text-left transition-colors ${
+                          target === option.value
+                            ? "border-accent/60 bg-accent/15 text-white"
+                            : "border-white/[0.08] bg-black/20 text-muted hover:border-white/15 hover:text-foreground"
+                        }`}
                     >
                       <div className="text-[10px] font-black uppercase tracking-[0.2em]">
                         {option.label}
@@ -626,7 +626,7 @@ export function GeneratorModal() {
                       key={pack.label}
                       onClick={() => handleSurprise(pack)}
                       disabled={loading}
-                      className="rounded-full bg-white/[0.06] px-3 py-1.5 text-[10px] text-muted transition-colors hover:bg-white/[0.13] hover:text-foreground disabled:opacity-30"
+                      className="button-secondary rounded-full px-3 py-1.5 text-[10px] disabled:opacity-30"
                     >
                       {pack.label}
                     </button>
@@ -634,7 +634,7 @@ export function GeneratorModal() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+              <div className="panel-soft rounded-2xl p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div className="text-[9px] font-black uppercase tracking-[0.22em] text-muted">
                     Creative profiles
@@ -642,33 +642,33 @@ export function GeneratorModal() {
                   <button
                     onClick={handleSaveProfile}
                     disabled={loading || currentPromptText.trim().length === 0}
-                    className="rounded-full bg-white/[0.06] px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-muted hover:bg-white/[0.12] hover:text-foreground disabled:opacity-30"
+                    className="button-secondary rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] disabled:opacity-30"
                   >
                     Save current
                   </button>
                 </div>
                 {profiles.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {profiles.map((profile) => (
-                      <div
-                        key={profile.id}
-                        className="flex items-center gap-1 rounded-full bg-white/[0.05] pr-1"
-                      >
-                        <button
-                          onClick={() => handleLoadProfile(profile)}
-                          className="rounded-full px-3 py-1.5 text-[10px] text-muted hover:text-foreground"
+                    <div className="flex flex-wrap gap-1.5">
+                      {profiles.map((profile) => (
+                        <div
+                          key={profile.id}
+                          className="flex items-center gap-1 rounded-full border border-white/[0.06] bg-white/[0.05] pr-1"
                         >
-                          {profile.name}
-                        </button>
+                          <button
+                            onClick={() => handleLoadProfile(profile)}
+                            className="button-ghost rounded-full px-3 py-1.5 text-[10px]"
+                          >
+                            {profile.name}
+                          </button>
                         <button
                           onClick={() =>
                             setProfiles((current) =>
                               current.filter((item) => item.id !== profile.id),
                             )
                           }
-                          className="rounded-full px-1.5 py-1 text-[10px] text-muted hover:text-danger"
-                          title={`Remove ${profile.name}`}
-                        >
+                           className="button-ghost rounded-full px-1.5 py-1 text-[10px] hover:text-danger"
+                           title={`Remove ${profile.name}`}
+                         >
                           ✕
                         </button>
                       </div>
@@ -693,8 +693,8 @@ export function GeneratorModal() {
                           key={suggestion}
                           onClick={() => handleSuggestion(suggestion)}
                           disabled={loading}
-                          className="rounded-full bg-white/[0.07] px-3 py-1.5 text-[10px] text-muted transition-colors hover:bg-white/[0.13] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
-                        >
+                           className="button-secondary rounded-full px-3 py-1.5 text-[10px] disabled:cursor-not-allowed disabled:opacity-30"
+                         >
                           {suggestion}
                         </button>
                       ))}
@@ -716,8 +716,8 @@ export function GeneratorModal() {
                     rows={4}
                     placeholder="e.g. dusty boom-bap at 92 with ghost-note snare and a deep bass walking through Dm..."
                     disabled={loading}
-                    className="w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-foreground placeholder:text-muted/50 focus:border-accent focus:outline-none disabled:opacity-50"
-                  />
+                     className="control-textarea w-full resize-none rounded-2xl px-4 py-3 text-sm disabled:opacity-50"
+                   />
                   <div className="mt-1 mb-3 flex justify-between">
                     <span id="generator-create-help" className="text-[10px] text-muted/70">
                       {description.length}/500 · Cmd/Ctrl+Enter to generate · target {targetLabel(target).toLowerCase()}
@@ -736,8 +736,8 @@ export function GeneratorModal() {
                           key={suggestion}
                           onClick={() => handleRefineChip(suggestion)}
                           disabled={loading}
-                          className="rounded-full bg-white/[0.07] px-3 py-1.5 text-[10px] text-muted transition-colors hover:bg-white/[0.13] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
-                        >
+                           className="button-secondary rounded-full px-3 py-1.5 text-[10px] disabled:cursor-not-allowed disabled:opacity-30"
+                         >
                           {suggestion}
                         </button>
                       ))}
@@ -759,8 +759,8 @@ export function GeneratorModal() {
                     rows={3}
                     placeholder="e.g. drop the open hat, add a tom fill on steps 13-16, raise kick velocity"
                     disabled={loading}
-                    className="w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-foreground placeholder:text-muted/50 focus:border-accent focus:outline-none disabled:opacity-50"
-                  />
+                     className="control-textarea w-full resize-none rounded-2xl px-4 py-3 text-sm disabled:opacity-50"
+                   />
                   <div className="mt-1 mb-3 flex justify-between">
                     <span id="generator-refine-help" className="text-[10px] text-muted/70">
                       {refineDraft.length}/500 · Cmd/Ctrl+Enter to mutate · target {targetLabel(target).toLowerCase()}
@@ -769,7 +769,7 @@ export function GeneratorModal() {
                 </>
               )}
 
-              <div className="rounded-2xl border border-cyan/15 bg-cyan/5 p-3">
+              <div className="rounded-2xl border border-cyan/15 bg-cyan/5 p-3 shadow-[0_18px_36px_rgba(34,211,238,0.08)]">
                 <div className="mb-2 text-[9px] font-black uppercase tracking-[0.22em] text-cyan">
                   Next moves from this groove
                 </div>
@@ -782,7 +782,7 @@ export function GeneratorModal() {
                         setTarget(move.target);
                         setRefineDraft(move.prompt);
                       }}
-                      className="rounded-full bg-white/[0.06] px-3 py-1.5 text-[10px] text-muted transition-colors hover:bg-white/[0.13] hover:text-foreground"
+                      className="button-secondary rounded-full px-3 py-1.5 text-[10px]"
                     >
                       {move.label}
                     </button>
@@ -800,7 +800,7 @@ export function GeneratorModal() {
                   {loading && (
                     <button
                       onClick={() => abortRef.current?.abort()}
-                      className="rounded-full bg-white/[0.08] px-4 py-2 text-xs uppercase tracking-wider text-muted transition-colors hover:bg-white/[0.14]"
+                      className="button-secondary rounded-full px-4 py-2 text-xs uppercase tracking-wider"
                     >
                       Cancel
                     </button>
@@ -817,7 +817,7 @@ export function GeneratorModal() {
                     className={`rounded-full px-5 py-2 text-xs font-black uppercase tracking-[0.18em] transition-colors ${
                       loading
                         ? "cursor-wait bg-accent/40 text-white/60"
-                        : "bg-accent text-white hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-white/[0.06] disabled:text-muted/50"
+                        : "button-primary disabled:cursor-not-allowed disabled:bg-white/[0.06] disabled:text-muted/50"
                     }`}
                   >
                     {loading
@@ -838,7 +838,7 @@ export function GeneratorModal() {
               )}
 
               {lastResult && !error && (
-                <div className="mt-4 rounded-2xl border border-accent/30 bg-accent/10 p-3">
+                 <div className="mt-4 rounded-2xl border border-accent/30 bg-accent/10 p-3 shadow-[0_20px_44px_rgba(155,92,255,0.12)]">
                   <div className="mb-1.5 flex items-center justify-between gap-3">
                     <span className="text-xs font-bold text-accent">
                       {lastResult.refined ? "✦ Mutated:" : "✓ Applied:"} v{lastResult.version} · {lastResult.beat.name}
@@ -861,8 +861,8 @@ export function GeneratorModal() {
                         <button
                           key={slot}
                           onClick={() => assignCompareSlot(slot, latestHistoryEntry)}
-                          className="rounded-full bg-white/[0.08] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-muted hover:bg-white/[0.14] hover:text-foreground"
-                        >
+                           className="button-secondary rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em]"
+                         >
                           Pin to {slot}
                         </button>
                       ))}
@@ -874,7 +874,7 @@ export function GeneratorModal() {
 
             <div className="space-y-4">
               {(compareSlots.A || compareSlots.B) && (
-                <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+                 <div className="panel-soft rounded-2xl p-3">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <div className="text-[9px] font-black uppercase tracking-[0.22em] text-muted">
                       A/B compare
@@ -891,7 +891,7 @@ export function GeneratorModal() {
                       return (
                         <div
                           key={slot}
-                          className="rounded-2xl border border-white/8 bg-black/20 p-3"
+                           className="rounded-2xl border border-white/[0.08] bg-black/20 p-3"
                         >
                           <div className="mb-2 flex items-center justify-between gap-2">
                             <span className="text-[10px] font-black uppercase tracking-[0.18em] text-accent">
@@ -902,8 +902,8 @@ export function GeneratorModal() {
                                 onClick={() =>
                                   setCompareSlots((current) => ({ ...current, [slot]: null }))
                                 }
-                                className="text-[10px] text-muted hover:text-danger"
-                              >
+                                 className="button-ghost rounded-full px-2 py-1 text-[10px] hover:text-danger"
+                               >
                                 Clear
                               </button>
                             )}
@@ -921,7 +921,7 @@ export function GeneratorModal() {
                               </p>
                               <button
                                 onClick={() => applyHistoryEntry(entry)}
-                                className="mt-3 rounded-full bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-black hover:bg-accent-hover hover:text-white"
+                                className="button-secondary mt-3 rounded-full bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-black hover:bg-accent-hover hover:text-white"
                               >
                                 Apply {slot}
                               </button>
@@ -939,7 +939,7 @@ export function GeneratorModal() {
               )}
 
               {history.length > 0 && (
-                <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+                 <div className="panel-soft rounded-2xl p-3">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <div className="text-[9px] font-black uppercase tracking-[0.22em] text-muted">
                       Prompt history
@@ -952,7 +952,7 @@ export function GeneratorModal() {
                     {history.map((entry) => (
                       <div
                         key={entry.id}
-                        className="rounded-2xl border border-white/8 bg-black/20 p-3"
+                         className="rounded-2xl border border-white/[0.08] bg-black/20 p-3"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
@@ -969,22 +969,22 @@ export function GeneratorModal() {
                           <div className="flex shrink-0 flex-wrap justify-end gap-1">
                             <button
                               onClick={() => applyHistoryEntry(entry)}
-                              className="rounded-full bg-white/[0.08] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-muted hover:bg-white/[0.14] hover:text-foreground"
-                            >
+                               className="button-secondary rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em]"
+                             >
                               Apply
                             </button>
                             <button
                               onClick={() => loadIntoComposer(entry)}
-                              className="rounded-full bg-white/[0.08] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-muted hover:bg-white/[0.14] hover:text-foreground"
-                            >
+                               className="button-secondary rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em]"
+                             >
                               Load
                             </button>
                             {(["A", "B"] as CompareSlot[]).map((slot) => (
                               <button
                                 key={slot}
                                 onClick={() => assignCompareSlot(slot, entry)}
-                                className="rounded-full bg-white/[0.08] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-muted hover:bg-white/[0.14] hover:text-foreground"
-                              >
+                                 className="button-secondary rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em]"
+                               >
                                 {slot}
                               </button>
                             ))}

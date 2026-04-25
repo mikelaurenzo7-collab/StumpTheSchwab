@@ -116,7 +116,7 @@ const TrackFXPanel = memo(function TrackFXPanel({
   );
 
   return (
-    <div className="flex flex-col gap-2 p-2 bg-surface rounded border border-border">
+    <div className="panel-soft flex flex-col gap-2 rounded-[1.1rem] p-2">
       {/* Color bar */}
       <div className="h-0.5 w-full rounded" style={{ backgroundColor: color }} />
 
@@ -143,7 +143,7 @@ const TrackFXPanel = memo(function TrackFXPanel({
           <select
             value={effects.filterType}
             onChange={(e) => set("filterType", e.target.value as FilterType)}
-            className="bg-surface-2 text-[9px] text-foreground rounded px-1 py-0.5 border-none outline-none"
+            className="control-select rounded px-1 py-0.5 text-[9px]"
           >
             <option value="lowpass">LP</option>
             <option value="highpass">HP</option>
@@ -243,7 +243,7 @@ const TrackFXPanel = memo(function TrackFXPanel({
             value={effects.panLfoShape}
             onChange={(e) => set("panLfoShape", e.target.value as LfoShape)}
             disabled={!effects.panLfoOn}
-            className="bg-surface-2 text-[9px] text-foreground rounded px-1 py-0.5 border-none outline-none disabled:opacity-40"
+            className="control-select rounded px-1 py-0.5 text-[9px] disabled:opacity-40"
           >
             {LFO_SHAPES.map((s) => (
               <option key={s} value={s}>{s.slice(0, 3)}</option>
@@ -253,7 +253,7 @@ const TrackFXPanel = memo(function TrackFXPanel({
             value={effects.panLfoRate}
             onChange={(e) => set("panLfoRate", e.target.value as LfoRate)}
             disabled={!effects.panLfoOn}
-            className="bg-surface-2 text-[9px] text-foreground rounded px-1 py-0.5 border-none outline-none disabled:opacity-40"
+            className="control-select rounded px-1 py-0.5 text-[9px] disabled:opacity-40"
           >
             {LFO_RATES.map((r) => (
               <option key={r} value={r}>{r}</option>
@@ -292,11 +292,11 @@ const TrackFXPanel = memo(function TrackFXPanel({
                     set("sidechainSource", active ? null : t.id)
                   }
                   disabled={!effects.sidechainOn}
-                  className={`px-1 py-0.5 rounded text-[8px] font-bold transition-colors ${
+                  className={`rounded px-1 py-0.5 text-[8px] font-bold transition-colors ${
                     active
                       ? "text-white"
-                      : "bg-surface-2 text-muted hover:bg-surface-3"
-                  } ${!effects.sidechainOn ? "opacity-30 cursor-not-allowed" : ""}`}
+                      : "button-secondary"
+                   } ${!effects.sidechainOn ? "opacity-30 cursor-not-allowed" : ""}`}
                   style={active ? { backgroundColor: t.color } : undefined}
                   title={`Duck when ${t.name} fires`}
                 >
@@ -481,7 +481,7 @@ const ChannelStrip = memo(function ChannelStrip({
 
   return (
     <div className="flex flex-col items-center gap-1">
-      <div className="flex flex-col items-center gap-2 w-16">
+      <div className="panel-soft flex w-16 flex-col items-center gap-2 rounded-[1.2rem] px-2 py-3">
         {/* Track color dot + name */}
         <div
           className="rounded-full transition-all duration-100"
@@ -503,8 +503,8 @@ const ChannelStrip = memo(function ChannelStrip({
             className={`flex-1 h-4 rounded text-[8px] font-bold transition-colors ${
               hasSample
                 ? "bg-success/30 text-success"
-                : "bg-surface-2 text-muted hover:bg-surface-3"
-            }`}
+                : "button-secondary"
+             }`}
             title={hasSample ? `Loaded: ${sampleName}` : "Load audio sample (.wav, .mp3, .ogg)"}
           >
             {hasSample ? "SMP" : "SMP"}
@@ -512,7 +512,7 @@ const ChannelStrip = memo(function ChannelStrip({
           {hasSample && (
             <button
               onClick={() => onClearSample(trackId)}
-              className="w-4 h-4 rounded text-[8px] font-bold bg-surface-2 text-muted hover:bg-danger/20 hover:text-danger transition-colors"
+              className="button-secondary h-4 w-4 rounded text-[8px] font-bold hover:bg-danger/20 hover:text-danger"
               title="Clear sample — revert to built-in synth"
             >
               ✕
@@ -531,8 +531,8 @@ const ChannelStrip = memo(function ChannelStrip({
                 className={`flex-1 h-3.5 rounded text-[10px] leading-none font-bold transition-colors ${
                   active
                     ? "bg-accent text-white"
-                    : "bg-surface-2 text-muted hover:bg-surface-3"
-                }`}
+                    : "button-secondary"
+                 }`}
                 title={p.title}
               >
                 {p.label}
@@ -586,8 +586,8 @@ const ChannelStrip = memo(function ChannelStrip({
             className={`w-6 h-5 rounded text-[10px] font-bold transition-colors ${
               muted
                 ? "bg-danger text-white"
-                : "bg-surface-2 text-muted hover:bg-surface-3"
-            }`}
+                : "button-secondary"
+             }`}
           >
             M
           </button>
@@ -596,8 +596,8 @@ const ChannelStrip = memo(function ChannelStrip({
             className={`w-6 h-5 rounded text-[10px] font-bold transition-colors ${
               solo
                 ? "bg-warning text-black"
-                : "bg-surface-2 text-muted hover:bg-surface-3"
-            }`}
+                : "button-secondary"
+             }`}
           >
             S
           </button>
@@ -611,8 +611,8 @@ const ChannelStrip = memo(function ChannelStrip({
               ? "bg-accent text-white"
               : hasFX
                 ? "bg-accent-dim text-white"
-                : "bg-surface-2 text-muted hover:bg-surface-3"
-          }`}
+                : "button-secondary"
+             }`}
         >
           FX{hasFX ? " \u2022" : ""}
         </button>
@@ -639,8 +639,8 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="flex flex-col items-center gap-1 border-l border-border pl-3 ml-1">
-      <div className="flex flex-col items-center gap-2 w-16">
+    <div className="ml-1 flex flex-col items-center gap-1 border-l border-white/[0.06] pl-3">
+      <div className="panel-soft flex w-16 flex-col items-center gap-2 rounded-[1.2rem] px-2 py-3">
         {/* Master label */}
         <div className="w-2 h-2 rounded-full bg-accent" />
         <span className="text-[10px] text-accent font-bold truncate w-full text-center">
@@ -679,8 +679,8 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
             className={`w-5 h-5 rounded text-[9px] font-bold transition-colors ${
               master.eqOn
                 ? "bg-accent text-white"
-                : "bg-surface-2 text-muted hover:bg-surface-3"
-            }`}
+                : "button-secondary"
+              }`}
             title="Master 3-band EQ"
           >
             EQ
@@ -690,8 +690,8 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
             className={`w-5 h-5 rounded text-[9px] font-bold transition-colors ${
               master.compressorOn
                 ? "bg-accent text-white"
-                : "bg-surface-2 text-muted hover:bg-surface-3"
-            }`}
+                : "button-secondary"
+              }`}
             title="Master compressor"
           >
             C
@@ -701,8 +701,8 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
             className={`w-5 h-5 rounded text-[9px] font-bold transition-colors ${
               master.limiterOn
                 ? "bg-accent text-white"
-                : "bg-surface-2 text-muted hover:bg-surface-3"
-            }`}
+                : "button-secondary"
+              }`}
             title="Brickwall limiter"
           >
             L
@@ -715,8 +715,8 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
           className={`w-full h-5 rounded text-[9px] font-bold transition-colors ${
             expanded
               ? "bg-accent text-white"
-              : "bg-surface-2 text-muted hover:bg-surface-3"
-          }`}
+              : "button-secondary"
+            }`}
         >
           {expanded ? "HIDE" : "CTRL"}
         </button>
@@ -724,7 +724,7 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
 
       {/* Expanded master controls */}
       {expanded && (
-        <div className="flex flex-col gap-2 p-2 bg-surface rounded border border-border">
+        <div className="panel-soft flex flex-col gap-2 rounded-[1.1rem] p-2">
           <div className="h-0.5 w-full rounded bg-accent" />
 
           {/* EQ */}
@@ -960,7 +960,8 @@ export function Mixer({
         </div>
       </div>
 
-      <div className="flex items-start gap-2 overflow-x-auto">
+      <div className="rounded-[1.5rem] border border-white/[0.06] bg-black/10 p-3">
+        <div className="flex items-start gap-2 overflow-x-auto">
         {tracks.map((track, i) => (
           <ChannelStrip
             key={track.id}
@@ -990,7 +991,8 @@ export function Mixer({
         ))}
 
         {/* Master bus */}
-        <MasterStrip getLevel={getMasterMeter} />
+          <MasterStrip getLevel={getMasterMeter} />
+        </div>
       </div>
 
       {/* Hidden file input for sample loading */}
