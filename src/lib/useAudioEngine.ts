@@ -26,6 +26,7 @@ interface TrackFXChain {
 
 interface MasterChain {
   gain: Tone.Gain;
+  eq: Tone.EQ3;
   compressor: Tone.Compressor;
   limiter: Tone.Limiter;
 }
@@ -144,12 +145,29 @@ function createMasterChain(): MasterChain {
     attack: master.compressorAttack,
     release: master.compressorRelease,
   }).connect(limiter);
-  const gain = new Tone.Gain(master.volume).connect(compressor);
-  return { gain, compressor, limiter };
+  // Tone.EQ3 is a 3-band shelf+peak. It's the standard "master tone" tool;
+  // bypass = all bands at 0 dB.
+  const eq = new Tone.EQ3({
+    low: master.eqOn ? master.eqLow : 0,
+    mid: master.eqOn ? master.eqMid : 0,
+    high: master.eqOn ? master.eqHigh : 0,
+  }).connect(compressor);
+  const gain = new Tone.Gain(master.volume).connect(eq);
+  return { gain, eq, compressor, limiter };
 }
 
 function applyMasterSettings(chain: MasterChain, master: MasterBus) {
   chain.gain.gain.value = master.volume;
+
+  if (master.eqOn) {
+    chain.eq.low.value = master.eqLow;
+    chain.eq.mid.value = master.eqMid;
+    chain.eq.high.value = master.eqHigh;
+  } else {
+    chain.eq.low.value = 0;
+    chain.eq.mid.value = 0;
+    chain.eq.high.value = 0;
+  }
 
   if (master.compressorOn) {
     chain.compressor.threshold.value = master.compressorThreshold;
@@ -482,6 +500,7 @@ export function useAudioEngine() {
       });
       if (masterChainRef.current) {
         masterChainRef.current.gain.dispose();
+        masterChainRef.current.eq.dispose();
         masterChainRef.current.compressor.dispose();
         masterChainRef.current.limiter.dispose();
       }

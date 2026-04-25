@@ -151,7 +151,12 @@ export function useExport() {
               }
             : { threshold: 0, ratio: 1 }
         ).connect(limiter);
-        const masterGain = new Tone.Gain(master.volume).connect(compressor);
+        const masterEq = new Tone.EQ3({
+          low: master.eqOn ? master.eqLow : 0,
+          mid: master.eqOn ? master.eqMid : 0,
+          high: master.eqOn ? master.eqHigh : 0,
+        }).connect(compressor);
+        const masterGain = new Tone.Gain(master.volume).connect(masterEq);
 
         const hasSolo = tracks.some((t: Track) => t.solo);
 

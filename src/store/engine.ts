@@ -43,6 +43,10 @@ export interface MasterBus {
   compressorRelease: number;
   limiterOn: boolean;
   limiterThreshold: number;
+  eqOn: boolean;
+  eqLow: number;   // dB, -24..+24
+  eqMid: number;   // dB
+  eqHigh: number;  // dB
 }
 
 export interface Track {
@@ -249,6 +253,10 @@ const DEFAULT_MASTER: MasterBus = {
   compressorRelease: 0.25,
   limiterOn: true,
   limiterThreshold: -3,
+  eqOn: false,
+  eqLow: 0,
+  eqMid: 0,
+  eqHigh: 0,
 };
 
 export const VELOCITY_LEVELS = [1.0, 0.75, 0.5, 0.25] as const;
@@ -975,7 +983,9 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         chain: data.chain ?? [],
         songMode: data.songMode ?? false,
         chainPosition: 0,
-        master: data.master,
+        // Merge default master onto the saved bus so older sessions pick up
+        // EQ fields without crashing.
+        master: { ...DEFAULT_MASTER, ...data.master },
       }));
       return true;
     } catch {

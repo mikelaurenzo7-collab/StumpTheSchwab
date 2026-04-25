@@ -623,25 +623,38 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
             : `${(20 * Math.log10(master.volume)).toFixed(1)}`}dB
         </span>
 
-        {/* Comp / Limiter toggles */}
+        {/* EQ / Comp / Limiter toggles */}
         <div className="flex gap-1">
           <button
+            onClick={() => setMaster("eqOn", !master.eqOn)}
+            className={`w-5 h-5 rounded text-[9px] font-bold transition-colors ${
+              master.eqOn
+                ? "bg-accent text-white"
+                : "bg-surface-2 text-muted hover:bg-surface-3"
+            }`}
+            title="Master 3-band EQ"
+          >
+            EQ
+          </button>
+          <button
             onClick={() => setMaster("compressorOn", !master.compressorOn)}
-            className={`w-6 h-5 rounded text-[9px] font-bold transition-colors ${
+            className={`w-5 h-5 rounded text-[9px] font-bold transition-colors ${
               master.compressorOn
                 ? "bg-accent text-white"
                 : "bg-surface-2 text-muted hover:bg-surface-3"
             }`}
+            title="Master compressor"
           >
             C
           </button>
           <button
             onClick={() => setMaster("limiterOn", !master.limiterOn)}
-            className={`w-6 h-5 rounded text-[9px] font-bold transition-colors ${
+            className={`w-5 h-5 rounded text-[9px] font-bold transition-colors ${
               master.limiterOn
                 ? "bg-accent text-white"
                 : "bg-surface-2 text-muted hover:bg-surface-3"
             }`}
+            title="Brickwall limiter"
           >
             L
           </button>
@@ -664,6 +677,43 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
       {expanded && (
         <div className="flex flex-col gap-2 p-2 bg-surface rounded border border-border">
           <div className="h-0.5 w-full rounded bg-accent" />
+
+          {/* EQ */}
+          <div className="flex flex-col gap-1">
+            <span className="text-[9px] text-accent font-bold">EQ (3-BAND)</span>
+            <div className="flex gap-1">
+              <MiniSlider
+                label="Low"
+                value={master.eqLow}
+                min={-24}
+                max={24}
+                step={0.5}
+                onChange={(v) => setMaster("eqLow", v)}
+                unit="dB"
+                disabled={!master.eqOn}
+              />
+              <MiniSlider
+                label="Mid"
+                value={master.eqMid}
+                min={-24}
+                max={24}
+                step={0.5}
+                onChange={(v) => setMaster("eqMid", v)}
+                unit="dB"
+                disabled={!master.eqOn}
+              />
+              <MiniSlider
+                label="High"
+                value={master.eqHigh}
+                min={-24}
+                max={24}
+                step={0.5}
+                onChange={(v) => setMaster("eqHigh", v)}
+                unit="dB"
+                disabled={!master.eqOn}
+              />
+            </div>
+          </div>
 
           {/* Compressor */}
           <div className="flex flex-col gap-1">
