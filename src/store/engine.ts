@@ -289,6 +289,11 @@ export interface EngineState {
   loadSample: (trackId: number, url: string, name: string) => void;
   clearSample: (trackId: number) => void;
 
+  // Sound design — per-track synth params and voice swap
+  setTrackSoundOptions: (trackId: number, options: Record<string, unknown>) => void;
+  setTrackSynthType: (trackId: number, synth: TrackSound["synth"]) => void;
+  resetTrackSound: (trackId: number) => void;
+
   setNoteLength: (trackId: number, length: number) => void;
   setStepNudge: (trackId: number, step: number, nudge: number) => void;
 
@@ -1176,6 +1181,40 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
       tracks: state.tracks.map((t) =>
         t.id === trackId ? { ...t, customSampleUrl: null, customSampleName: null } : t
       ),
+    }));
+  },
+
+  // ── Sound design ─────────────────────────────────────────────
+  setTrackSoundOptions: (trackId, options) => {
+    pushHistory();
+    set((state) => ({
+      tracks: state.tracks.map((t) =>
+        t.id === trackId
+          ? { ...t, sound: { ...t.sound, options: { ...(t.sound.options ?? {}), ...options } } }
+          : t
+      ),
+    }));
+  },
+
+  setTrackSynthType: (trackId, synth) => {
+    pushHistory();
+    set((state) => ({
+      tracks: state.tracks.map((t) =>
+        t.id === trackId ? { ...t, sound: { ...t.sound, synth, options: {} } } : t
+      ),
+    }));
+  },
+
+  resetTrackSound: (trackId) => {
+    pushHistory();
+    set((state) => ({
+      tracks: state.tracks.map((t) => {
+        if (t.id !== trackId) return t;
+        const idx = state.tracks.indexOf(t);
+        const def = DEFAULT_KIT[idx];
+        if (!def) return t;
+        return { ...t, sound: { ...def } };
+      }),
     }));
   },
 

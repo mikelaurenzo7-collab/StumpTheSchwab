@@ -494,6 +494,54 @@ export function useAudioEngine() {
     return unsub;
   }, []);
 
+  // Hot-swap / live-update synth params when track.sound changes
+  // (Sound Editor: tweaking ADSR, oscillator type, filter env, or full voice swap.)
+  useEffect(() => {
+    const prevSounds: TrackSound[] = useEngineStore
+      .getState()
+      .tracks.map((t) => t.sound);
+
+    const unsub = useEngineStore.subscribe((state) => {
+      state.tracks.forEach((track, i) => {
+        const prev = prevSounds[i];
+        const curr = track.sound;
+        if (prev === curr) return;
+        prevSounds[i] = curr;
+
+        // Skip while a custom sample is loaded — the sampler owns that slot.
+        if (track.customSampleUrl) return;
+
+        const fx = fxChainsRef.current[i];
+        if (!fx) return;
+        const oldSynth = synthsRef.current[i];
+
+        // If the synth voice type changed, we must recreate.
+        if (!prev || prev.synth !== curr.synth) {
+          const synth = createSynth(curr);
+          synth.connect(fx.drive);
+          synthsRef.current[i] = synth;
+          oldSynth?.dispose();
+          return;
+        }
+
+        // Same voice — try to apply new options in-place to avoid clicks.
+        if (oldSynth && curr.options) {
+          try {
+            // Tone synths accept partial option objects via .set()
+            (oldSynth as unknown as { set: (o: Record<string, unknown>) => void }).set(curr.options);
+          } catch {
+            // Fallback: rebuild
+            const synth = createSynth(curr);
+            synth.connect(fx.drive);
+            synthsRef.current[i] = synth;
+            oldSynth.dispose();
+          }
+        }
+      });
+    });
+    return unsub;
+  }, []);
+
   // Sync master bus
   useEffect(() => {
     const unsub = useEngineStore.subscribe((state) => {

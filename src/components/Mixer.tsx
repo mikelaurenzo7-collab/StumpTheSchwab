@@ -13,6 +13,7 @@ import {
 } from "@/store/engine";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SpectrumAnalyzer } from "./SpectrumAnalyzer";
+import { SoundEditor } from "./SoundEditor";
 
 // ── Knob-style mini slider ────────────────────────────────────
 function MiniSlider({
@@ -486,6 +487,7 @@ const ChannelStrip = memo(function ChannelStrip({
   onLoadSample,
   onClearSample,
   onNoteLength,
+  onEditSound,
 }: {
   trackId: number;
   name: string;
@@ -509,6 +511,7 @@ const ChannelStrip = memo(function ChannelStrip({
   onLoadSample: (id: number) => void;
   onClearSample: (id: number) => void;
   onNoteLength: (id: number, length: number) => void;
+  onEditSound: (id: number) => void;
 }) {
   const hasFX =
     effects.driveOn ||
@@ -576,6 +579,16 @@ const ChannelStrip = memo(function ChannelStrip({
             </button>
           )}
         </div>
+
+        {/* Sound editor — tweak synth params, swap voice */}
+        <button
+          onClick={() => onEditSound(trackId)}
+          className="button-secondary h-5 w-full rounded-lg text-[8px] font-bold tracking-wider"
+          title="Edit synth parameters (oscillator, envelope, filter, …)"
+          disabled={hasSample}
+        >
+          {hasSample ? "SMP MODE" : "EDIT SOUND"}
+        </button>
 
         {/* Note length — staccato / half / legato. Cycles with one click. */}
         <div className="flex w-full gap-0.5 justify-center" title={`Note length: ${noteLength.toFixed(2)}× step`}>
@@ -971,6 +984,9 @@ export function Mixer({
     [setNoteLength]
   );
 
+  const [editingSoundId, setEditingSoundId] = useState<number | null>(null);
+  const handleEditSound = useCallback((id: number) => setEditingSoundId(id), []);
+
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -1056,6 +1072,7 @@ export function Mixer({
             onLoadSample={handleLoadSample}
             onClearSample={handleClearSample}
             onNoteLength={handleNoteLength}
+            onEditSound={handleEditSound}
           />
         ))}
 
@@ -1072,6 +1089,11 @@ export function Mixer({
         onChange={handleFileChange}
         className="hidden"
       />
+
+      {/* Sound Editor modal — per-track synth params + voice swap */}
+      {editingSoundId !== null && (
+        <SoundEditor trackId={editingSoundId} onClose={() => setEditingSoundId(null)} />
+      )}
     </div>
   );
 }
