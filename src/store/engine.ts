@@ -87,7 +87,9 @@ export interface Track {
 export interface Pattern {
   name: string;
   steps: number[][];
+  notes: string[][];
   probabilities: number[][];
+  nudge: number[][];
 }
 
 export const PATTERN_LABELS = ["A", "B", "C", "D", "E", "F", "G", "H"] as const;
@@ -334,7 +336,7 @@ interface SessionData {
     noteLength?: number;
     nudge?: number[];
   }[];
-  patterns?: { name: string; steps: number[][]; probabilities?: number[][] }[];
+  patterns?: { name: string; steps: number[][]; notes?: string[][]; probabilities?: number[][]; nudge?: number[][] }[];
   currentPattern?: number;
   chain?: number[];
   songMode?: boolean;
@@ -342,6 +344,7 @@ interface SessionData {
 }
 
 function serializeSession(state: EngineState): SessionData {
+  const currentSnapshot = snapshotPattern(state.tracks);
   return {
     bpm: state.bpm,
     swing: state.swing,
@@ -361,10 +364,12 @@ function serializeSession(state: EngineState): SessionData {
       noteLength: t.noteLength,
       nudge: t.nudge,
     })),
-    patterns: state.patterns.map((p) => ({
+    patterns: state.patterns.map((p, i) => ({
       name: p.name,
-      steps: p.steps,
-      probabilities: p.probabilities,
+      steps: i === state.currentPattern ? currentSnapshot.steps : p.steps,
+      notes: i === state.currentPattern ? currentSnapshot.notes : p.notes,
+      probabilities: i === state.currentPattern ? currentSnapshot.probabilities : p.probabilities,
+      nudge: i === state.currentPattern ? currentSnapshot.nudge : p.nudge,
     })),
     chain: state.chain,
     songMode: state.songMode,
@@ -377,25 +382,37 @@ function createEmptyPattern(name: string, trackCount: number, totalSteps: number
   return {
     name,
     steps: Array.from({ length: trackCount }, () => Array(totalSteps).fill(0)),
+    notes: Array.from({ length: trackCount }, () => Array(totalSteps).fill("")),
     probabilities: Array.from({ length: trackCount }, () => Array(totalSteps).fill(1.0)),
+    nudge: Array.from({ length: trackCount }, () => Array(totalSteps).fill(0)),
   };
 }
 
-function snapshotPattern(tracks: Track[]): { steps: number[][]; probabilities: number[][] } {
+function snapshotPattern(tracks: Track[]): { steps: number[][]; notes: string[][]; probabilities: number[][]; nudge: number[][] } {
   return {
     steps: tracks.map((t) => [...t.steps]),
+    notes: tracks.map((t) => [...t.notes]),
     probabilities: tracks.map((t) => [...t.probabilities]),
+    nudge: tracks.map((t) => [...t.nudge]),
   };
 }
 
-function applyPatternToTracks(tracks: Track[], pattern: { steps: number[][]; probabilities: number[][] }, totalSteps: number): Track[] {
+function applyPatternToTracks(
+  tracks: Track[],
+  pattern: { steps: number[][]; notes?: string[][]; probabilities: number[][]; nudge?: number[][] },
+  totalSteps: number
+): Track[] {
   return tracks.map((t, i) => {
     const srcSteps = pattern.steps[i] ?? [];
+    const srcNotes = pattern.notes?.[i] ?? [];
     const srcProbs = pattern.probabilities[i] ?? [];
+    const srcNudge = pattern.nudge?.[i] ?? [];
     return {
       ...t,
       steps: Array(totalSteps).fill(0).map((_, j) => srcSteps[j] ?? 0),
+      notes: Array(totalSteps).fill("").map((_, j) => srcNotes[j] ?? ""),
       probabilities: Array(totalSteps).fill(1.0).map((_, j) => srcProbs[j] ?? 1.0),
+      nudge: Array(totalSteps).fill(0).map((_, j) => srcNudge[j] ?? 0),
     };
   });
 }
@@ -531,8 +548,14 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         steps: p.steps.map((trackSteps) =>
           Array(totalSteps).fill(0).map((_, i) => trackSteps[i] ?? 0)
         ),
+        notes: p.notes.map((trackNotes) =>
+          Array(totalSteps).fill("").map((_, i) => trackNotes[i] ?? "")
+        ),
         probabilities: p.probabilities.map((trackProbs) =>
           Array(totalSteps).fill(1.0).map((_, i) => trackProbs[i] ?? 1.0)
+        ),
+        nudge: p.nudge.map((trackNudge) =>
+          Array(totalSteps).fill(0).map((_, i) => trackNudge[i] ?? 0)
         ),
       })),
     }));
@@ -576,7 +599,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
       const snapshot = snapshotPattern(state.tracks);
       const updatedPatterns = state.patterns.map((p, i) =>
         i === state.currentPattern
-          ? { ...p, steps: snapshot.steps, probabilities: snapshot.probabilities }
+          ? { ...p, steps: snapshot.steps, notes: snapshot.notes, probabilities: snapshot.probabilities, nudge: snapshot.nudge }
           : p
       );
 
@@ -599,11 +622,15 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
           ? snapshotPattern(state.tracks)
           : {
               steps: state.patterns[from].steps.map((s) => [...s]),
+              notes: state.patterns[from].notes.map((n) => [...n]),
               probabilities: state.patterns[from].probabilities.map((probs) => [...probs]),
+              nudge: state.patterns[from].nudge.map((n) => [...n]),
             };
 
       const updatedPatterns = state.patterns.map((p, i) =>
-        i === to ? { ...p, steps: source.steps, probabilities: source.probabilities } : p
+        i === to
+          ? { ...p, steps: source.steps, notes: source.notes, probabilities: source.probabilities, nudge: source.nudge }
+          : p
       );
 
       if (to === state.currentPattern) {
@@ -622,7 +649,9 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
     set((state) => {
       const empty = {
         steps: Array.from({ length: state.tracks.length }, () => Array(state.totalSteps).fill(0)),
+        notes: Array.from({ length: state.tracks.length }, () => Array(state.totalSteps).fill("")),
         probabilities: Array.from({ length: state.tracks.length }, () => Array(state.totalSteps).fill(1.0)),
+        nudge: Array.from({ length: state.tracks.length }, () => Array(state.totalSteps).fill(0)),
       };
 
       const updatedPatterns = state.patterns.map((p, i) =>
@@ -635,7 +664,9 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
           tracks: state.tracks.map((t) => ({
             ...t,
             steps: t.steps.map(() => 0),
+            notes: t.notes.map(() => ""),
             probabilities: t.probabilities.map(() => 1.0),
+            nudge: t.nudge.map(() => 0),
           })),
         };
       }
@@ -658,10 +689,16 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
       const defaultProbs = Array.from({ length: trackCount }, () =>
         Array(totalSteps).fill(1.0)
       );
+      const defaultNotes = Array.from({ length: trackCount }, () =>
+        Array(totalSteps).fill("")
+      );
+      const defaultNudge = Array.from({ length: trackCount }, () =>
+        Array(totalSteps).fill(0)
+      );
 
       const updatedPatterns = state.patterns.map((p, i) =>
         i === state.currentPattern
-          ? { ...p, steps: presetSteps, probabilities: defaultProbs }
+          ? { ...p, steps: presetSteps, notes: defaultNotes, probabilities: defaultProbs, nudge: defaultNudge }
           : p
       );
 
@@ -674,14 +711,22 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
           steps: p.steps.map((trackSteps) =>
             Array(totalSteps).fill(0).map((_, i) => trackSteps[i] ?? 0)
           ),
+          notes: p.notes.map((trackNotes) =>
+            Array(totalSteps).fill("").map((_, i) => trackNotes[i] ?? "")
+          ),
           probabilities: p.probabilities.map((trackProbs) =>
             Array(totalSteps).fill(1.0).map((_, i) => trackProbs[i] ?? 1.0)
+          ),
+          nudge: p.nudge.map((trackNudge) =>
+            Array(totalSteps).fill(0).map((_, i) => trackNudge[i] ?? 0)
           ),
         })),
         tracks: state.tracks.map((t, i) => ({
           ...t,
           steps: presetSteps[i] ?? Array(totalSteps).fill(0),
+          notes: defaultNotes[i] ?? Array(totalSteps).fill(""),
           probabilities: defaultProbs[i] ?? Array(totalSteps).fill(1.0),
+          nudge: defaultNudge[i] ?? Array(totalSteps).fill(0),
         })),
       };
     });
@@ -843,7 +888,9 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
       // the new totalSteps so they don't play half-empty after a switch.
       const snapshot = {
         steps: newTracks.map((t) => [...t.steps]),
+        notes: newTracks.map((t) => [...t.notes]),
         probabilities: newTracks.map((t) => [...t.probabilities]),
+        nudge: newTracks.map((t) => [...t.nudge]),
       };
       const updatedPatterns = state.patterns.map((p, i) => {
         if (i === state.currentPattern) {
@@ -851,17 +898,25 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
             ...p,
             name: (beat.name || PATTERN_LABELS[state.currentPattern]).slice(0, 16),
             steps: snapshot.steps,
+            notes: snapshot.notes,
             probabilities: snapshot.probabilities,
+            nudge: snapshot.nudge,
           };
         }
-        // Other patterns: pad/truncate their step + probability arrays to total.
+        // Other patterns: pad/truncate their pattern arrays to total.
         return {
           ...p,
           steps: p.steps.map((row) =>
             Array(total).fill(0).map((_, j) => row[j] ?? 0)
           ),
+          notes: p.notes.map((row) =>
+            Array(total).fill("").map((_, j) => row[j] ?? "")
+          ),
           probabilities: p.probabilities.map((row) =>
             Array(total).fill(1.0).map((_, j) => row[j] ?? 1.0)
+          ),
+          nudge: p.nudge.map((row) =>
+            Array(total).fill(0).map((_, j) => row[j] ?? 0)
           ),
         };
       });
@@ -882,7 +937,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
       const snapshot = snapshotPattern(state.tracks);
       const updatedPatterns = state.patterns.map((p, i) =>
         i === state.currentPattern
-          ? { ...p, steps: snapshot.steps, probabilities: snapshot.probabilities }
+          ? { ...p, steps: snapshot.steps, notes: snapshot.notes, probabilities: snapshot.probabilities, nudge: snapshot.nudge }
           : p
       );
       const target = updatedPatterns[index];
@@ -1021,9 +1076,22 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         patterns: data.patterns
           ? data.patterns.map((p, i) => ({
               name: p.name,
-              steps: p.steps,
-              probabilities: p.probabilities ?? state.patterns[i]?.probabilities ??
-                Array.from({ length: state.tracks.length }, () => Array(data.totalSteps).fill(1.0)),
+              steps: Array.from({ length: state.tracks.length }, (_, trackIdx) =>
+                Array(data.totalSteps).fill(0).map((_, stepIdx) => p.steps[trackIdx]?.[stepIdx] ?? 0)
+              ),
+              notes: Array.from({ length: state.tracks.length }, (_, trackIdx) =>
+                Array(data.totalSteps).fill("").map((_, stepIdx) => p.notes?.[trackIdx]?.[stepIdx] ?? "")
+              ),
+              probabilities: Array.from({ length: state.tracks.length }, (_, trackIdx) =>
+                Array(data.totalSteps).fill(1.0).map((_, stepIdx) =>
+                  p.probabilities?.[trackIdx]?.[stepIdx] ??
+                  state.patterns[i]?.probabilities[trackIdx]?.[stepIdx] ??
+                  1.0
+                )
+              ),
+              nudge: Array.from({ length: state.tracks.length }, (_, trackIdx) =>
+                Array(data.totalSteps).fill(0).map((_, stepIdx) => p.nudge?.[trackIdx]?.[stepIdx] ?? 0)
+              ),
             }))
           : state.patterns,
         chain: data.chain ?? [],

@@ -148,8 +148,8 @@ export function buildMidiFile(state: ReturnType<typeof useEngineStore.getState>)
   const sequenceLength = inSongMode ? totalSteps * chain.length : totalSteps;
   const ticksPerStep = (PPQ * 4) / totalSteps; // 16 steps → 120, 32 steps → 60
 
-  // Pull effective per-track step + note arrays. In song mode we concatenate
-  // each pattern's data; otherwise we use the live track state.
+  // Pull effective per-track arrays. In song mode we concatenate each
+  // pattern's data; otherwise we use the live track state.
   const effectiveStepsByTrack: number[][] = tracks.map((t, i) => {
     if (!inSongMode) return [...t.steps];
     const out: number[] = [];
@@ -162,9 +162,31 @@ export function buildMidiFile(state: ReturnType<typeof useEngineStore.getState>)
     }
     return out;
   });
+  const effectiveNotesByTrack: string[][] = tracks.map((t, i) => {
+    if (!inSongMode) return [...t.notes];
+    const out: string[] = [];
+    for (const patternIdx of chain) {
+      const src =
+        patternIdx === currentPattern
+          ? t.notes
+          : patterns[patternIdx]?.notes?.[i] ?? Array(totalSteps).fill("");
+      for (let s = 0; s < totalSteps; s++) out.push(src[s] ?? "");
+    }
+    return out;
+  });
+  const effectiveNudgeByTrack: number[][] = tracks.map((t, i) => {
+    if (!inSongMode) return [...t.nudge];
+    const out: number[] = [];
+    for (const patternIdx of chain) {
+      const src =
+        patternIdx === currentPattern
+          ? t.nudge
+          : patterns[patternIdx]?.nudge?.[i] ?? Array(totalSteps).fill(0);
+      for (let s = 0; s < totalSteps; s++) out.push(src[s] ?? 0);
+    }
+    return out;
+  });
 
-  // Notes are not stored per-pattern in this engine, so they're shared across
-  // chained patterns. For MIDI we modulo into the live notes array.
   const trackChunks: Uint8Array[] = [];
 
   tracks.forEach((track: Track, trackIdx) => {
@@ -173,6 +195,8 @@ export function buildMidiFile(state: ReturnType<typeof useEngineStore.getState>)
     const events: NoteEvent[] = [];
 
     const stepsArr = effectiveStepsByTrack[trackIdx];
+    const notesArr = effectiveNotesByTrack[trackIdx];
+    const nudgeArr = effectiveNudgeByTrack[trackIdx];
     for (let step = 0; step < sequenceLength; step++) {
       const velocity = stepsArr[step] ?? 0;
       if (velocity <= 0) continue;
@@ -180,7 +204,7 @@ export function buildMidiFile(state: ReturnType<typeof useEngineStore.getState>)
 
       let midiNote: number | null = null;
       if (isMelodic) {
-        const noteName = track.notes[step % totalSteps];
+        const noteName = notesArr[step];
         midiNote = noteName ? parseNoteName(noteName) : null;
         if (midiNote === null) {
           // No note assigned — fall back to track's default note (e.g., G1 for tom)
@@ -194,7 +218,7 @@ export function buildMidiFile(state: ReturnType<typeof useEngineStore.getState>)
         midiNote = DRUM_GM_NOTE[track.sound.name] ?? 60;
       }
 
-      const nudgeOffset = (track.nudge[step % totalSteps] ?? 0) * ticksPerStep;
+      const nudgeOffset = (nudgeArr[step] ?? 0) * ticksPerStep;
       const onTick = Math.max(0, Math.round(step * ticksPerStep + nudgeOffset));
       const offTick = Math.max(onTick + 1, Math.round((step + 1) * ticksPerStep + nudgeOffset));
       const vel = Math.max(1, Math.min(127, Math.round(velocity * 127)));

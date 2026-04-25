@@ -126,6 +126,30 @@ export function useExport() {
         }
         return out;
       });
+      const flatNotes: string[][] = tracks.map((t, i) => {
+        if (!inSongMode) return [...t.notes];
+        const out: string[] = [];
+        for (const patternIdx of chain) {
+          const src =
+            patternIdx === currentPattern
+              ? t.notes
+              : patterns[patternIdx]?.notes?.[i] ?? Array(totalSteps).fill("");
+          for (let s = 0; s < totalSteps; s++) out.push(src[s] ?? "");
+        }
+        return out;
+      });
+      const flatNudge: number[][] = tracks.map((t, i) => {
+        if (!inSongMode) return [...t.nudge];
+        const out: number[] = [];
+        for (const patternIdx of chain) {
+          const src =
+            patternIdx === currentPattern
+              ? t.nudge
+              : patterns[patternIdx]?.nudge?.[i] ?? Array(totalSteps).fill(0);
+          for (let s = 0; s < totalSteps; s++) out.push(src[s] ?? 0);
+        }
+        return out;
+      });
 
       const beatsPerStep = 4 / totalSteps;
       const secondsPerBeat = 60 / bpm;
@@ -230,6 +254,8 @@ export function useExport() {
 
           const trackSteps = flatSteps[trackIdx];
           const trackProbs = flatProbs[trackIdx];
+          const trackNotes = flatNotes[trackIdx];
+          const trackNudge = flatNudge[trackIdx];
           const stepIndices = Array.from({ length: sequenceLength }, (_, i) => i);
 
           const noteDur = stepDurationSeconds * (track.noteLength ?? 1.0);
@@ -240,8 +266,8 @@ export function useExport() {
               if (!velocity) return;
               const probability = trackProbs[stepIndex] ?? 1.0;
               if (probability < 1.0 && Math.random() > probability) return;
-              const noteOverride = track.notes[stepIndex % totalSteps] || undefined;
-              const nudgeOffset = (track.nudge[stepIndex % totalSteps] ?? 0) * stepDurationSeconds;
+              const noteOverride = trackNotes[stepIndex] || undefined;
+              const nudgeOffset = (trackNudge[stepIndex] ?? 0) * stepDurationSeconds;
               const trigTime = time + nudgeOffset;
               if (synth instanceof Tone.NoiseSynth) {
                 synth.triggerAttackRelease(noteDur, trigTime, velocity);
