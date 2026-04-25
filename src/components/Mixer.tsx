@@ -1160,7 +1160,15 @@ export function Mixer({
   }, []);
 
   return (
-    <div className="border-t border-border bg-surface px-4 py-3">
+    <div className="border-t border-border bg-surface">
+      {/* ── Section header ─────────────────────────────────────── */}
+      <div className="sec-head">
+        <div className="dot" />
+        <span>Mixer</span>
+        <span className="tag">8 CH</span>
+      </div>
+
+      <div className="px-4 py-3">
       {/* ── Visual learning surface ────────────────────────────────────
           Two stacked teaching panels above the channel strips:
           1. Sonic X-Ray — per-track frequency overlay with zone labels and
@@ -1223,6 +1231,7 @@ export function Mixer({
         onChange={handleFileChange}
         className="hidden"
       />
+      </div>
     </div>
   );
 }

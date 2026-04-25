@@ -411,23 +411,72 @@ export function GeneratorModal() {
         )}
 
         {lastResult && !error && (
-          <div className="mt-4 p-3.5 bg-accent/8 border border-accent/25 rounded-xl" style={{ animation: "fade-in-up 0.2s ease-out both" }}>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-bold text-accent">
-                {lastResult.refined ? "✦ Refined: " : "✓ Applied: "}
-                {lastResult.beat.name}
-              </span>
-              <span className="text-[9px] text-muted font-mono">
+          <div
+            className="mt-4 rounded-xl overflow-hidden border border-accent/25"
+            style={{ background: "var(--surface-deep)", animation: "fade-in-up 0.2s ease-out both" }}
+          >
+            {/* Preview header */}
+            <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-border/50">
+              <div className="flex items-center gap-2">
+                <span className="text-accent text-sm">✦</span>
+                <span className="text-[13px] font-semibold text-foreground">
+                  {lastResult.beat.name}
+                </span>
+                {lastResult.refined && (
+                  <span className="text-[8px] font-bold font-mono tracking-wider px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/25">
+                    REFINED
+                  </span>
+                )}
+                {lastResult.cached && (
+                  <span className="text-[8px] text-muted font-mono">⚡ cached</span>
+                )}
+              </div>
+              <span className="text-[9px] text-muted font-mono tracking-wide">
                 {lastResult.beat.bpm} BPM · {lastResult.beat.totalSteps} steps
-                {lastResult.beat.swing > 0
-                  ? ` · ${Math.round(lastResult.beat.swing * 100)}% swing`
-                  : ""}
-                {lastResult.cached ? " · ⚡ cached" : ""}
+                {lastResult.beat.swing > 0 ? ` · ${Math.round(lastResult.beat.swing * 100)}% swing` : ""}
               </span>
             </div>
-            <p className="text-[11px] text-muted leading-relaxed">
-              {lastResult.beat.explanation}
-            </p>
+
+            {/* Track density mini-grid */}
+            <div className="px-3.5 py-2.5 grid gap-1">
+              {GENERATED_TRACK_KEYS.map((key) => {
+                const steps = lastResult.beat.tracks[key] ?? [];
+                if (steps.every((v) => v === 0)) return null;
+                const TRACK_COLORS: Record<string, string> = {
+                  kick: "#ff5a3c", snare: "#f5b547", hihat: "#8ee27a", openhat: "#6fe3ff",
+                  clap: "#c38bff", tom: "#ff7ec2", perc: "#5ee0c2", bass: "#8a90ff",
+                };
+                const color = TRACK_COLORS[key] ?? "var(--accent)";
+                return (
+                  <div key={key} className="grid items-center gap-1.5" style={{ gridTemplateColumns: "44px 1fr" }}>
+                    <span className="text-[9px] font-mono text-muted text-right uppercase tracking-wide">{key}</span>
+                    <div
+                      className="grid gap-[2px] h-[14px]"
+                      style={{ gridTemplateColumns: `repeat(${steps.length}, 1fr)` }}
+                    >
+                      {steps.map((v, i) => (
+                        <div
+                          key={i}
+                          className="rounded-sm transition-all"
+                          style={{
+                            background: v > 0 ? color : "var(--surface-3)",
+                            opacity: v > 0 ? 0.4 + v * 0.6 : 1,
+                            boxShadow: v > 0 ? `0 0 4px ${color}66` : "none",
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Notes */}
+            {lastResult.beat.explanation && (
+              <div className="mx-3.5 mb-2.5 px-3 py-2 rounded-lg bg-surface-2/80 border border-border/40 text-[11px] text-muted italic leading-relaxed">
+                {lastResult.beat.explanation}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -499,11 +499,6 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
         ?
       </button>
 
-      {lastSaved && (
-        <span className="text-[9px] text-muted/50 font-mono" title="Auto-saved">
-          saved {lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-        </span>
-      )}
     </div>
   );
 }

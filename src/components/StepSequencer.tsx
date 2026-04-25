@@ -411,7 +411,13 @@ export function StepSequencer() {
   const handleCloseEuclidean = useCallback(() => setEuclideanTrack(null), []);
 
   return (
-    <div className="flex-1 overflow-auto p-4 relative">
+    <div className="flex-1 overflow-auto relative">
+      <div className="sec-head">
+        <div className="dot" />
+        <span>Step Sequencer</span>
+        <span className="tag">{tracks[0]?.steps.length ?? 16} STEPS</span>
+      </div>
+      <div className="p-4">
       {detailStep && (
         <StepDetailPopover
           trackId={detailStep.trackId}
@@ -428,9 +434,17 @@ export function StepSequencer() {
             {tracks[0]?.steps.map((_, i) => (
               <div
                 key={i}
-                className={`w-8 text-center text-[10px] font-mono ${
-                  currentStep === i ? "text-accent" : "text-muted/50"
-                } ${i > 0 && i % 4 === 0 ? "ml-1" : ""}`}
+                className={`w-8 text-center text-[10px] font-mono transition-colors ${
+                  i > 0 && i % 4 === 0 ? "ml-1.5" : ""
+                }`}
+                style={currentStep === i ? {
+                  color: "var(--cyan)",
+                  textShadow: "0 0 8px var(--cyan-glow)",
+                } : i % 4 === 0 ? {
+                  color: "var(--muted)",
+                } : {
+                  color: "var(--muted-dim)",
+                }}
               >
                 {i + 1}
               </div>
@@ -466,6 +480,7 @@ export function StepSequencer() {
             onCloseEuclidean={handleCloseEuclidean}
           />
         ))}
+      </div>
       </div>
     </div>
   );

@@ -58,16 +58,19 @@ export function SongChain() {
 
   if (!songMode) {
     return (
-      <div className="flex items-center gap-2 px-4 py-1.5 bg-surface/60 border-b border-border">
+      <div className="sec-head">
+        <div className="dot" />
+        <span>Song Chain</span>
         <button
           onClick={handleToggle}
-          className="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider border border-border/50 bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground hover:border-border transition-colors"
+          className="px-2.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border border-border bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground hover:border-border-bright transition-colors ml-1"
           title="Enable Song Mode to chain patterns into an arrangement"
         >
-          Song Mode
+          Enable
         </button>
-        <span className="text-[10px] text-muted/60">
-          Chain patterns A–H into an arrangement
+        <span className="tag">OFF</span>
+        <span className="text-[10px] text-muted/50 font-normal tracking-normal normal-case">
+          chain patterns into an arrangement
         </span>
       </div>
     );
@@ -76,15 +79,17 @@ export function SongChain() {
   const isPlaying = playbackState === "playing";
 
   return (
-    <div className="flex items-center gap-2 px-4 py-1.5 bg-surface/60 border-b border-border flex-wrap">
+    <div className="sec-head flex-wrap" style={{ paddingTop: "6px", paddingBottom: "6px" }}>
+      <div className="dot" style={{ boxShadow: "0 0 10px var(--accent-glow)" }} />
       <button
         onClick={handleToggle}
-        className="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-accent text-white hover:bg-accent-hover transition-colors"
+        className="px-2.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-accent text-white hover:bg-accent-hover transition-colors"
         style={{ boxShadow: "0 0 10px var(--accent-glow)" }}
         title="Disable Song Mode"
       >
         Song Mode
       </button>
+      <span className="tag" style={{ color: "var(--accent)", borderColor: "rgba(139,92,246,0.3)", background: "var(--accent-subtle)" }}>ON</span>
 
       {/* Add current pattern */}
       <button

@@ -125,18 +125,69 @@ export default function DAW() {
         onClose={() => setMixDoctorOpen(false)}
       />
 
-      {/* Mix Doctor entry point — always-visible fab when closed */}
-      {!mixDoctorOpen && (
+      {/* ── Status bar ──────────────────────────────────────────── */}
+      <div
+        className="flex items-center gap-3 px-4 py-1.5 border-t border-border font-mono text-[10px] text-muted shrink-0"
+        style={{ background: "var(--surface)", letterSpacing: "0.08em" }}
+      >
+        <span className="flex items-center gap-1.5">
+          <span
+            className="w-1.5 h-1.5 rounded-full inline-block"
+            style={{
+              background: "var(--accent)",
+              boxShadow: "0 0 6px var(--accent-glow)",
+              animation: "blink 1s ease infinite",
+            }}
+          />
+          <span className="text-foreground/60">STUDIO</span>
+        </span>
+        <span className="flex-1" />
+        <span
+          className="px-1.5 py-0.5 rounded border border-border"
+          style={{ background: "var(--surface-2)" }}
+        >
+          SPACE play
+        </span>
+        <span
+          className="px-1.5 py-0.5 rounded border border-border"
+          style={{ background: "var(--surface-2)" }}
+        >
+          G generate
+        </span>
+        <span
+          className="px-1.5 py-0.5 rounded border border-border"
+          style={{ background: "var(--surface-2)" }}
+        >
+          D mix doctor
+        </span>
+        <span
+          className="px-1.5 py-0.5 rounded border border-border"
+          style={{ background: "var(--surface-2)" }}
+        >
+          ? help
+        </span>
+
+        {/* Mix Doctor entry */}
         <button
           onClick={() => setMixDoctorOpen(true)}
-          className="fixed bottom-4 right-4 z-40 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent text-white text-[11px] font-bold shadow-lg hover:bg-accent-hover transition-all"
+          className={`flex items-center gap-1 px-2 py-0.5 rounded border transition-colors ${
+            mixDoctorOpen
+              ? "border-accent/40 text-accent"
+              : "border-border text-muted hover:text-foreground hover:border-accent/40"
+          }`}
+          style={{ background: "var(--surface-2)" }}
           title="Open Mix Doctor (D)"
         >
-          <span className="w-1.5 h-1.5 rounded-full bg-white/80" />
+          <span className="w-1 h-1 rounded-full" style={{ background: "var(--accent)", boxShadow: "0 0 4px var(--accent-glow)" }} />
           Mix Doctor
-          <span className="text-white/50 text-[9px]">D</span>
         </button>
-      )}
+
+        {lastSaved && (
+          <span className="text-muted/50">
+            saved {lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

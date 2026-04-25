@@ -104,24 +104,25 @@ export function PianoRoll() {
       onMouseLeave={handleMouseUp}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-surface border-b border-border/60">
+      <div className="sec-head justify-between">
         <div className="flex items-center gap-2">
           <div
-            className="w-2.5 h-2.5 rounded-sm"
-            style={{ backgroundColor: track.sound.color, boxShadow: `0 0 8px ${track.sound.color}66` }}
+            className="w-2 h-2 rounded-full shrink-0"
+            style={{ backgroundColor: track.sound.color, boxShadow: `0 0 8px ${track.sound.color}99` }}
           />
-          <span className="text-sm font-medium text-foreground">
-            {track.sound.name} — Piano Roll
+          <span>Piano Roll</span>
+          <span className="tag" style={{ color: track.sound.color, background: `${track.sound.color}15`, fontFamily: "inherit" }}>
+            {track.sound.name}
           </span>
-          <span className="text-xs text-muted">
-            Click to place notes. Drag to paint.
+          <span className="text-[9px] text-muted/60 font-normal tracking-normal normal-case">
+            click to place notes · drag to paint
           </span>
         </div>
         <button
           onClick={() => setPianoRollTrack(null)}
-          className="text-muted hover:text-foreground text-sm px-2 py-0.5 rounded hover:bg-surface-2 transition-colors"
+          className="text-muted hover:text-foreground text-xs px-2 py-0.5 rounded hover:bg-surface-2 transition-colors border border-transparent hover:border-border"
         >
-          Close
+          Close ✕
         </button>
       </div>
 
