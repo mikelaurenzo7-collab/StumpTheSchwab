@@ -1,7 +1,8 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useEngineStore } from "@/store/engine";
+import { analyzeReference } from "@/lib/refAnalyzer";
 
 // ── Frequency zones a producer actually thinks about ─────────────
 // Boundaries are the standard mixing-textbook splits. The "what lives here"
@@ -134,11 +135,13 @@ export const SonicXRay = memo(function SonicXRay({
   height = 180,
   onConflictsChange,
   onOpenMixDoctor,
+  onMatchEq,
 }: {
   getTrackSpectrum: (index: number) => Float32Array | null;
   height?: number;
   onConflictsChange?: (c: Record<string, string[]>) => void;
   onOpenMixDoctor?: () => void;
+  onMatchEq?: (low: number, mid: number, high: number) => void;
 }) {
   const tracks = useEngineStore((s) => s.tracks);
   const trackInfos = useMemo<TrackInfo[]>(
@@ -157,11 +160,66 @@ export const SonicXRay = memo(function SonicXRay({
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hoverZone, setHoverZone] = useState<number | null>(null);
-  // Conflicts: zone index -> list of track names currently fighting in it.
   const [conflicts, setConflicts] = useState<Record<number, string[]>>({});
   const [focusedTrack, setFocusedTrack] = useState<number | null>(null);
   const onConflictsChangeRef = useRef(onConflictsChange);
   onConflictsChangeRef.current = onConflictsChange;
+
+  // Reference track
+  const [refSpectrum, setRefSpectrum] = useState<Float32Array | null>(null);
+  const [refAnalyzing, setRefAnalyzing] = useState(false);
+  const refFileInputRef = useRef<HTMLInputElement>(null);
+  // Latest zone energies per track — written by the RAF loop, read by handleMatchEq
+  const currentZoneEnergiesRef = useRef<(number[] | null)[]>([]);
+
+  const handleRefFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setRefAnalyzing(true);
+    try {
+      setRefSpectrum(await analyzeReference(file));
+    } catch {
+      // silently ignore — file may be unsupported
+    } finally {
+      setRefAnalyzing(false);
+    }
+  }, []);
+
+  const handleMatchEq = useCallback(() => {
+    if (!refSpectrum || !onMatchEq) return;
+    const mixZoneEnergies = currentZoneEnergiesRef.current;
+    if (mixZoneEnergies.length === 0) return;
+
+    const sampleRate = 44100;
+    const refZones = zoneEnergies(refSpectrum, sampleRate);
+
+    // Average zone energies across all active tracks
+    const mixZones = new Array<number>(ZONES.length).fill(0);
+    const counts = new Array<number>(ZONES.length).fill(0);
+    for (const ze of mixZoneEnergies) {
+      if (!ze) continue;
+      for (let z = 0; z < ZONES.length; z++) {
+        if (isFinite(ze[z])) { mixZones[z] += ze[z]; counts[z]++; }
+      }
+    }
+    for (let z = 0; z < ZONES.length; z++) {
+      if (counts[z] > 0) mixZones[z] /= counts[z];
+    }
+
+    // Delta per zone, mapped to 3-band EQ
+    const delta = (z: number) =>
+      isFinite(refZones[z]) && counts[z] > 0
+        ? Math.max(-12, Math.min(12, refZones[z] - mixZones[z]))
+        : 0;
+    const round = (v: number) => Math.round(v * 2) / 2;
+
+    onMatchEq(
+      round((delta(0) + delta(1)) / 2),           // Low: Sub + Bass
+      round((delta(2) + delta(3) + delta(4)) / 3), // Mid: Lo-Mid + Mid + Presence
+      round(delta(5))                              // High: Air
+    );
+  }, [refSpectrum, onMatchEq]);
 
   // Stable mouse handler: convert x position to a zone index for the tooltip.
   const handleMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -203,7 +261,7 @@ export const SonicXRay = memo(function SonicXRay({
       const h = rect.height;
 
       // Background
-      ctx.fillStyle = "rgba(15, 14, 23, 0.92)";
+      ctx.fillStyle = "rgba(10, 10, 18, 0.96)";
       ctx.fillRect(0, 0, w, h);
 
       // ── Frequency-zone bands (subtle vertical regions w/ labels) ─────
@@ -244,10 +302,37 @@ export const SonicXRay = memo(function SonicXRay({
         );
       }
 
+      // ── Reference ghost spectrum ──────────────────────────────────────
+      if (refSpectrum) {
+        ctx.beginPath();
+        ctx.moveTo(0, h);
+        const refBins = refSpectrum.length;
+        for (let i = 0; i <= 96; i++) {
+          const xN = i / 96;
+          const hz = xToHz(xN);
+          const center = (hz / (sampleRate / 2)) * refBins;
+          const lo = Math.max(0, Math.floor(center - 1));
+          const hi = Math.min(refBins, Math.ceil(center + 2));
+          let sum = 0;
+          for (let b = lo; b < hi; b++) sum += refSpectrum[b];
+          const db = sum / Math.max(1, hi - lo);
+          const norm = Math.max(0, Math.min(1, (db + 90) / 80));
+          ctx.lineTo(xN * w, h - norm * (h - 18) - 2);
+        }
+        ctx.lineTo(w, h);
+        ctx.closePath();
+        ctx.fillStyle = "rgba(255,255,255,0.04)";
+        ctx.fill();
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = "rgba(255,255,255,0.55)";
+        ctx.lineWidth = 1.5;
+        ctx.globalAlpha = 1;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
       // ── Per-track FFT lines ──────────────────────────────────────────
-      // Each track is drawn as a soft filled area + a bright stroke on top.
-      // The track in `focusedTrack` is opaque; everything else is dimmed.
-      // Frequency points are sampled along a log-spaced curve (96 cols).
+      // Each track is drawn as a gradient fill + dual-pass glow stroke.
       const cols = 96;
       const zoneEnergiesPerTrack: (number[] | null)[] = [];
 
@@ -287,19 +372,31 @@ export const SonicXRay = memo(function SonicXRay({
         ctx.lineTo(w, h);
         ctx.closePath();
 
-        // Fill
-        ctx.fillStyle = `${trackInfos[t].color}${Math.round(fillAlpha * 255)
-          .toString(16)
-          .padStart(2, "0")}`;
+        // Gradient fill (bright at line, fades to transparent at floor)
+        const grad = ctx.createLinearGradient(0, 0, 0, h);
+        const fa = dim ? 0.03 : 0.22;
+        const hex2 = (v: number) => Math.round(v * 255).toString(16).padStart(2, "0");
+        grad.addColorStop(0, `${trackInfos[t].color}${hex2(fa)}`);
+        grad.addColorStop(1, `${trackInfos[t].color}00`);
+        ctx.fillStyle = grad;
         ctx.fill();
 
-        // Stroke
+        // Glow pass (wide, soft halo)
+        if (!dim) {
+          ctx.strokeStyle = trackInfos[t].color;
+          ctx.globalAlpha = alpha * 0.15;
+          ctx.lineWidth = 8;
+          ctx.stroke();
+        }
+        // Sharp pass
         ctx.strokeStyle = trackInfos[t].color;
         ctx.globalAlpha = alpha;
-        ctx.lineWidth = dim ? 1 : 1.5;
+        ctx.lineWidth = dim ? 0.8 : 1.5;
         ctx.stroke();
         ctx.globalAlpha = 1;
       }
+
+      currentZoneEnergiesRef.current = zoneEnergiesPerTrack;
 
       // ── EQ response curves — drawn BELOW the FFT lines, one per track ─────
       // The curve shows the EQ transfer function (gain vs. frequency) as a
@@ -391,7 +488,7 @@ export const SonicXRay = memo(function SonicXRay({
       cancelAnimationFrame(raf);
       ro.disconnect();
     };
-  }, [getTrackSpectrum, trackInfos, focusedTrack, hoverZone, conflicts]);
+  }, [getTrackSpectrum, trackInfos, focusedTrack, hoverZone, conflicts, refSpectrum]);
 
   const conflictCount = Object.keys(conflicts).length;
 
@@ -437,6 +534,49 @@ export const SonicXRay = memo(function SonicXRay({
               Show all
             </button>
           )}
+
+          {/* Reference track controls */}
+          <div className="w-px h-3.5 bg-border mx-0.5" />
+          {refSpectrum ? (
+            <>
+              <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-surface-3 text-foreground/80">
+                <span className="w-1.5 h-1.5 rounded-full bg-white/60" />
+                REF
+                <button
+                  onClick={() => setRefSpectrum(null)}
+                  className="ml-0.5 text-muted hover:text-danger transition-colors leading-none"
+                  title="Remove reference"
+                >
+                  ✕
+                </button>
+              </span>
+              {onMatchEq && (
+                <button
+                  onClick={handleMatchEq}
+                  className="px-2 py-0.5 rounded text-[9px] font-bold bg-accent/20 text-accent hover:bg-accent/30 transition-colors"
+                  title="Apply EQ correction to master bus to match reference tonal balance"
+                >
+                  Match EQ →
+                </button>
+              )}
+            </>
+          ) : (
+            <button
+              onClick={() => refFileInputRef.current?.click()}
+              disabled={refAnalyzing}
+              className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground transition-colors disabled:opacity-50"
+              title="Load a reference track to compare tonal balance — WAV or MP3"
+            >
+              {refAnalyzing ? "…" : "+ REF"}
+            </button>
+          )}
+          <input
+            ref={refFileInputRef}
+            type="file"
+            accept="audio/wav,audio/mpeg,audio/mp3,.wav,.mp3"
+            onChange={handleRefFile}
+            className="hidden"
+          />
         </div>
       </div>
 

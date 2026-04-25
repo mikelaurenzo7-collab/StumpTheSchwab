@@ -131,13 +131,14 @@ const SuggestionCard = memo(function SuggestionCard({
 
   return (
     <div
-      className={`flex flex-col gap-1.5 p-2.5 rounded border transition-all ${
+      className={`flex flex-col gap-1.5 p-3 rounded-lg border transition-all ${
         applied
           ? "border-success/40 bg-success/5"
           : suggestion.urgency === "critical"
-            ? "border-danger/40 bg-danger/5"
-            : "border-border bg-surface"
+            ? "border-danger/30 bg-danger/5"
+            : "border-border/60 bg-surface-2/60"
       }`}
+      style={{ animation: "fade-in-up 0.18s ease-out both" }}
     >
       <div className="flex items-center gap-1.5 flex-wrap">
         {/* Urgency badge */}
@@ -242,8 +243,8 @@ export const MixDoctorPanel = memo(function MixDoctorPanel({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-end p-4 pointer-events-none">
       <div
-        className="w-full max-w-lg bg-surface border border-border rounded-lg shadow-2xl flex flex-col gap-0 overflow-hidden pointer-events-auto"
-        style={{ maxHeight: "80vh" }}
+        className="w-full max-w-lg bg-surface border border-border/70 rounded-xl shadow-2xl flex flex-col gap-0 overflow-hidden pointer-events-auto"
+        style={{ maxHeight: "80vh", animation: "slide-in-right 0.22s cubic-bezier(0.22,1,0.36,1) both" }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-surface-2">

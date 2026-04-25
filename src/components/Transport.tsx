@@ -151,7 +151,14 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Play/Pause */}
       <button
         onClick={handlePlay}
-        className="w-10 h-10 rounded-lg bg-accent hover:bg-accent-hover text-white flex items-center justify-center transition-colors font-mono text-lg"
+        className={`w-10 h-10 rounded-lg text-white flex items-center justify-center transition-all font-mono text-lg ${
+          playbackState === "playing"
+            ? "bg-success hover:bg-success/90"
+            : "bg-accent hover:bg-accent-hover"
+        }`}
+        style={playbackState === "playing"
+          ? { boxShadow: "0 0 16px var(--success-glow)" }
+          : undefined}
         title={playbackState === "playing" ? "Pause (Space)" : "Play (Space)"}
       >
         {playbackState === "playing" ? "⏸" : "▶"}

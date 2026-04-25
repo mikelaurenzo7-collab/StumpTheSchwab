@@ -79,27 +79,37 @@ const StepCell = memo(function StepCell({
           : "Click or drag to paint · right-click: edit step"
       }
       className={`
-        relative w-8 h-8 rounded-sm transition-all duration-75 border overflow-hidden select-none
-        ${beatStart ? "ml-1" : ""}
+        relative w-8 h-8 rounded transition-all duration-75 overflow-hidden select-none
+        ${beatStart ? "ml-1.5" : ""}
         ${
           active
-            ? `border-transparent shadow-sm`
-            : "border-border/50 bg-surface-2 hover:bg-surface-3"
+            ? "shadow-sm"
+            : "border border-border/40 bg-surface-2 hover:bg-surface-3 hover:border-border/70"
         }
-        ${isCurrent && !active ? "ring-1 ring-accent/50" : ""}
-        ${isCurrent && active ? "ring-1 ring-white/60 scale-105" : ""}
+        ${isCurrent && !active ? "ring-1 ring-accent/60 bg-accent/10" : ""}
+        ${isCurrent && active ? "ring-1 ring-white/40 scale-[1.08] z-10" : ""}
         ${hasProb ? "ring-1 ring-white/20" : ""}
       `}
+      style={isCurrent && active ? { boxShadow: `0 0 16px ${color}99, 0 0 6px ${color}55` } : undefined}
     >
       {active && (
-        <div
-          className="absolute bottom-0 left-0 right-0 rounded-sm transition-all duration-75"
-          style={{
-            backgroundColor: color,
-            height: `${velocity * 100}%`,
-            opacity: isCurrent ? 1 : 0.8,
-          }}
-        />
+        <>
+          <div
+            className="absolute bottom-0 left-0 right-0 transition-all duration-75"
+            style={{
+              backgroundColor: color,
+              height: `${velocity * 100}%`,
+              opacity: isCurrent ? 1 : 0.88,
+              boxShadow: `0 -2px 8px ${color}55`,
+            }}
+          />
+          <div
+            className="absolute top-0 left-0 right-0 h-px pointer-events-none"
+            style={{
+              background: "linear-gradient(to right, transparent 10%, rgba(255,255,255,0.25) 50%, transparent 90%)",
+            }}
+          />
+        </>
       )}
       {hasProb && (
         <span
@@ -170,7 +180,14 @@ const TrackRow = memo(function TrackRow({
   onCloseEuclidean: () => void;
 }) {
   return (
-    <div className="flex items-center gap-0.5 group relative">
+    <div
+      className="flex items-center gap-0.5 group relative rounded"
+      style={{
+        borderLeft: `2px solid ${color}`,
+        paddingLeft: "6px",
+        background: `linear-gradient(to right, ${color}0d 0%, transparent 35%)`,
+      }}
+    >
       {/* Track label */}
       <div
         className={`w-20 shrink-0 flex items-center gap-1.5 pr-2 ${

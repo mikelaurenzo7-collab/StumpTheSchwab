@@ -1,79 +1,184 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0a0f;
-  --foreground: #e4e4e7;
-  --surface: #18181b;
-  --surface-2: #27272a;
-  --surface-3: #3f3f46;
-  --border: #3f3f46;
-  --accent: #8b5cf6;
-  --accent-hover: #a78bfa;
-  --accent-dim: #7c3aed;
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-  --muted: #71717a;
+  /* ── Depth surfaces (void → raised) ─────────────────────────── */
+  --background:      #07070c;
+  --surface-deep:    #0d0d16;
+  --surface:         #131320;
+  --surface-2:       #1b1b2a;
+  --surface-3:       #272738;
+  --surface-raised:  #1f1f2e;
+  --surface-glass:   rgba(255, 255, 255, 0.025);
+
+  /* ── Text ─────────────────────────────────────────────────────── */
+  --foreground:      #e8e8f2;
+  --muted:           #7070a0;
+  --muted-dim:       #42425a;
+
+  /* ── Borders ──────────────────────────────────────────────────── */
+  --border:          #27273a;
+  --border-subtle:   rgba(255, 255, 255, 0.04);
+  --border-bright:   rgba(255, 255, 255, 0.14);
+
+  /* ── Accent (violet) ──────────────────────────────────────────── */
+  --accent:          #8b5cf6;
+  --accent-hover:    #a78bfa;
+  --accent-dim:      #6d28d9;
+  --accent-subtle:   rgba(139, 92, 246, 0.10);
+  --accent-glow:     rgba(139, 92, 246, 0.45);
+
+  /* ── Semantic ─────────────────────────────────────────────────── */
+  --success:         #22c55e;
+  --success-glow:    rgba(34, 197, 94, 0.40);
+  --warning:         #f59e0b;
+  --warning-glow:    rgba(245, 158, 11, 0.40);
+  --danger:          #ef4444;
+  --danger-glow:     rgba(239, 68, 68, 0.40);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-surface: var(--surface);
-  --color-surface-2: var(--surface-2);
-  --color-surface-3: var(--surface-3);
-  --color-border: var(--border);
-  --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-accent-dim: var(--accent-dim);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-danger: var(--danger);
-  --color-muted: var(--muted);
+  --color-background:      var(--background);
+  --color-foreground:      var(--foreground);
+  --color-surface:         var(--surface);
+  --color-surface-2:       var(--surface-2);
+  --color-surface-3:       var(--surface-3);
+  --color-surface-deep:    var(--surface-deep);
+  --color-surface-raised:  var(--surface-raised);
+  --color-border:          var(--border);
+  --color-accent:          var(--accent);
+  --color-accent-hover:    var(--accent-hover);
+  --color-accent-dim:      var(--accent-dim);
+  --color-success:         var(--success);
+  --color-warning:         var(--warning);
+  --color-danger:          var(--danger);
+  --color-muted:           var(--muted);
   --font-sans: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "SF Mono", "Cascadia Code", "Fira Code", "JetBrains Mono", ui-monospace, monospace;
 }
 
+/* ── Keyframe animations ─────────────────────────────────────────── */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px var(--accent-glow); }
+  50%       { box-shadow: 0 0 22px var(--accent-glow), 0 0 40px var(--accent-glow); }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ── Base ─────────────────────────────────────────────────────────── */
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
-/* Scrollbar styling */
+/* ── Scrollbar ────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 ::-webkit-scrollbar-track {
   background: var(--surface);
 }
 ::-webkit-scrollbar-thumb {
   background: var(--surface-3);
-  border-radius: 3px;
+  border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--muted);
+  background: var(--muted-dim);
 }
 
-/* Range input styling */
+/* ── Range inputs — premium hardware knob feel ───────────────────── */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   background: transparent;
   cursor: pointer;
+  outline: none;
 }
-input[type="range"]::-webkit-slider-track {
+
+input[type="range"]::-webkit-slider-runnable-track {
   background: var(--surface-3);
-  height: 4px;
+  height: 3px;
   border-radius: 2px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
 }
+
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: var(--accent);
-  margin-top: -4px;
+  background: var(--foreground);
+  border: 2px solid var(--accent);
+  margin-top: -4.5px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+input[type="range"]:hover::-webkit-slider-thumb {
+  transform: scale(1.25);
+  box-shadow: 0 0 0 3px var(--accent-subtle), 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 5px var(--accent-glow), 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+input[type="range"]:disabled::-webkit-slider-thumb {
+  border-color: var(--surface-3);
+  background: var(--surface-3);
+}
+
+input[type="range"]::-moz-range-track {
+  background: var(--surface-3);
+  height: 3px;
+  border-radius: 2px;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--foreground);
+  border: 2px solid var(--accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Focus ring ───────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ── Number input arrows ──────────────────────────────────────────── */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  opacity: 0.4;
+}
+
+/* ── Shimmer utility (loading skeleton) ──────────────────────────── */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 0%,
+    var(--surface-3) 50%,
+    var(--surface-2) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
 }

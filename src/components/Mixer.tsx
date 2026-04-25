@@ -523,18 +523,21 @@ const ChannelStrip = memo(function ChannelStrip({
 
   return (
     <div className="flex flex-col items-center gap-1">
-      <div className="flex flex-col items-center gap-2 w-16">
-        {/* Track color dot + name */}
+      <div className="flex flex-col items-center gap-1.5 w-16">
+        {/* Full-width track color header */}
         <div
-          className="rounded-full transition-all duration-100"
+          className="w-full h-[3px] rounded-full transition-all duration-100"
           style={{
-            width: flashing ? "10px" : "8px",
-            height: flashing ? "10px" : "8px",
             backgroundColor: color,
-            boxShadow: flashing ? `0 0 12px 2px ${color}` : "none",
+            boxShadow: flashing
+              ? `0 0 12px 3px ${color}`
+              : `0 0 5px ${color}60`,
           }}
         />
-        <span className="text-[10px] text-muted truncate w-full text-center">
+        <span
+          className={`text-[10px] truncate w-full text-center transition-colors ${flashing ? "" : "text-muted"}`}
+          style={flashing ? { color } : undefined}
+        >
           {hasSample ? sampleName ?? "Sample" : name}
         </span>
 
@@ -648,13 +651,18 @@ const ChannelStrip = memo(function ChannelStrip({
         {/* FX toggle button */}
         <button
           onClick={() => onToggleFX(trackId)}
-          className={`w-full h-5 rounded text-[9px] font-bold transition-colors ${
+          className={`w-full h-5 rounded text-[9px] font-bold transition-all ${
             fxOpen
               ? "bg-accent text-white"
               : hasFX
                 ? "bg-accent-dim text-white"
                 : "bg-surface-2 text-muted hover:bg-surface-3"
           }`}
+          style={hasFX ? {
+            boxShadow: fxOpen
+              ? "0 0 10px var(--accent-glow)"
+              : "0 0 5px rgba(109,40,217,0.35)",
+          } : undefined}
         >
           FX{hasFX ? " \u2022" : ""}
         </button>
@@ -769,9 +777,15 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
 
   return (
     <div className="flex flex-col items-center gap-1 border-l border-border pl-3 ml-1">
-      <div className="flex flex-col items-center gap-2 w-16">
-        {/* Master label */}
-        <div className="w-2 h-2 rounded-full bg-accent" />
+      <div className="flex flex-col items-center gap-1.5 w-16">
+        {/* Full-width master header */}
+        <div
+          className="w-full h-[3px] rounded-full"
+          style={{
+            backgroundColor: "var(--accent)",
+            boxShadow: "0 0 8px var(--accent-glow)",
+          }}
+        />
         <span className="text-[10px] text-accent font-bold truncate w-full text-center">
           MASTER
         </span>
@@ -1044,6 +1058,7 @@ export function Mixer({
   const loadSample = useEngineStore((s) => s.loadSample);
   const clearSample = useEngineStore((s) => s.clearSample);
   const setNoteLength = useEngineStore((s) => s.setNoteLength);
+  const setMaster = useEngineStore((s) => s.setMaster);
 
   // Compact track info for the sidechain source picker — built once per track
   // change (not per render of every channel strip).
@@ -1122,6 +1137,16 @@ export function Mixer({
     [loadSample]
   );
 
+  const handleMatchEq = useCallback(
+    (low: number, mid: number, high: number) => {
+      setMaster("eqOn", true);
+      setMaster("eqLow", low);
+      setMaster("eqMid", mid);
+      setMaster("eqHigh", high);
+    },
+    [setMaster]
+  );
+
   const handleToggleFX = useCallback((id: number) => {
     setOpenFX((prev) => {
       const next = new Set(prev);
@@ -1148,6 +1173,7 @@ export function Mixer({
           getTrackSpectrum={getTrackSpectrum}
           onConflictsChange={onConflictsChange}
           onOpenMixDoctor={onOpenMixDoctor}
+          onMatchEq={handleMatchEq}
         />
         <LoudnessPanel getLoudness={getLoudness} getTruePeak={getTruePeak} />
         <SpectrumAnalyzer

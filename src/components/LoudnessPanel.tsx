@@ -170,7 +170,7 @@ export const LoudnessPanel = memo(function LoudnessPanel({
   const targetHiPct = lufsToPct(t.lufs + 1);
 
   return (
-    <div className="flex flex-col gap-2 rounded bg-surface-2 px-3 py-2">
+    <div className="flex flex-col gap-2 rounded-md bg-surface px-3 py-2.5 border border-border/50">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
