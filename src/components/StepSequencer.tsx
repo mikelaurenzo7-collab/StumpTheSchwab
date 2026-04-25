@@ -27,6 +27,7 @@ const StepCell = memo(function StepCell({
   onPaint,
   onErase,
   onRightClick,
+  onOpenDetail,
   onCtrlClick,
   beatStart,
 }: {
@@ -38,6 +39,7 @@ const StepCell = memo(function StepCell({
   onPaint: () => void;
   onErase: () => void;
   onRightClick: (rect: DOMRect) => void;
+  onOpenDetail: (rect: DOMRect) => void;
   onCtrlClick: () => void;
   beatStart: boolean;
 }) {
@@ -49,6 +51,12 @@ const StepCell = memo(function StepCell({
     <button
       onMouseDown={(e) => {
         if (e.button !== 0) return;
+        if (e.detail > 1) {
+          paintState.mode = null;
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          onOpenDetail(rect);
+          return;
+        }
         if (e.ctrlKey || e.metaKey) {
           onCtrlClick();
           return;
@@ -73,37 +81,46 @@ const StepCell = memo(function StepCell({
         const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
         onRightClick(rect);
       }}
+      onDoubleClick={(e) => {
+        e.preventDefault();
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        onOpenDetail(rect);
+      }}
       title={
         active
-          ? `${velLabel(velocity)} (${Math.round(velocity * 100)}%)${hasProb ? ` — ${probLabel(probability)} chance` : ""}${hasNudge ? ` — nudge ${nudge > 0 ? "+" : ""}${Math.round(nudge * 100)}%` : ""} — right-click: edit step`
-          : "Click or drag to paint · right-click: edit step"
+          ? `${velLabel(velocity)} (${Math.round(velocity * 100)}%)${hasProb ? ` — ${probLabel(probability)} chance` : ""}${hasNudge ? ` — nudge ${nudge > 0 ? "+" : ""}${Math.round(nudge * 100)}%` : ""} — double-click: shape step`
+          : "Click or drag to paint · double-click: shape step"
       }
       className={`
-        relative w-8 h-8 rounded-sm transition-all duration-75 border overflow-hidden select-none
+        relative w-9 h-9 rounded-xl transition-all duration-75 border overflow-hidden select-none
         ${beatStart ? "ml-1" : ""}
         ${
           active
-            ? `border-transparent shadow-sm`
-            : "border-border/50 bg-surface-2 hover:bg-surface-3"
+            ? `border-white/10 shadow-sm shadow-black/30`
+            : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
         }
-        ${isCurrent && !active ? "ring-1 ring-accent/50" : ""}
-        ${isCurrent && active ? "ring-1 ring-white/60 scale-105" : ""}
-        ${hasProb ? "ring-1 ring-white/20" : ""}
+        ${isCurrent && !active ? "ring-2 ring-accent/70 bg-accent/10" : ""}
+        ${isCurrent && active ? "ring-2 ring-white/70 scale-105" : ""}
+        ${hasProb ? "ring-1 ring-cyan/40" : ""}
       `}
     >
       {active && (
         <div
-          className="absolute bottom-0 left-0 right-0 rounded-sm transition-all duration-75"
+          className="absolute bottom-0 left-0 right-0 rounded-lg transition-all duration-75"
           style={{
-            backgroundColor: color,
+            background: `linear-gradient(180deg, ${color}, ${color}cc)`,
             height: `${velocity * 100}%`,
             opacity: isCurrent ? 1 : 0.8,
+            boxShadow: `0 0 18px ${color}55`,
           }}
         />
       )}
+      {active && (
+        <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-white/80" />
+      )}
       {hasProb && (
         <span
-          className="absolute bottom-0 left-0.5 text-[7px] font-mono leading-none text-white/80 font-bold"
+          className="absolute bottom-1 left-1 text-[8px] font-mono leading-none text-white/90 font-bold"
           style={{ textShadow: "0 0 3px rgba(0,0,0,0.8)" }}
         >
           {Math.round(probability * 100)}
@@ -111,7 +128,7 @@ const StepCell = memo(function StepCell({
       )}
       {hasNudge && (
         <span
-          className="absolute top-0 right-0.5 text-[7px] font-mono leading-none text-yellow-400/80 font-bold"
+          className="absolute top-1 right-1 text-[8px] font-mono leading-none text-yellow-300 font-bold"
           style={{ textShadow: "0 0 3px rgba(0,0,0,0.8)" }}
         >
           {nudge > 0 ? ">" : "<"}
@@ -170,24 +187,24 @@ const TrackRow = memo(function TrackRow({
   onCloseEuclidean: () => void;
 }) {
   return (
-    <div className="flex items-center gap-0.5 group relative">
+    <div className="flex items-center gap-2 rounded-2xl border border-white/[0.05] bg-black/10 px-2 py-1.5 relative">
       {/* Track label */}
       <div
-        className={`w-20 shrink-0 flex items-center gap-1.5 pr-2 ${
+        className={`w-28 shrink-0 flex items-center gap-2 pr-2 ${
           melodic ? "cursor-pointer hover:opacity-80" : ""
         }`}
         onClick={() => melodic && onTogglePianoRoll(trackId)}
         title={melodic ? `${pianoRollOpen ? "Close" : "Open"} piano roll` : ""}
       >
         <div
-          className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+          className={`w-3 h-8 rounded-full shrink-0 ${
             pianoRollOpen ? "ring-2 ring-accent ring-offset-1 ring-offset-background" : ""
           }`}
           style={{ backgroundColor: color }}
         />
-        <span className={`text-xs font-medium truncate ${pianoRollOpen ? "text-accent" : "text-muted"}`}>
+        <span className={`text-sm font-bold truncate ${pianoRollOpen ? "text-accent" : "text-foreground"}`}>
           {name}
-          {melodic && <span className="text-[8px] ml-0.5 opacity-50">♪</span>}
+          {melodic && <span className="text-[10px] ml-1 opacity-60">♪</span>}
         </span>
       </div>
 
@@ -205,58 +222,55 @@ const TrackRow = memo(function TrackRow({
             onPaint={() => onPaintStep(trackId, stepIdx)}
             onErase={() => onEraseStep(trackId, stepIdx)}
             onRightClick={(rect: DOMRect) => onRightClickStep(trackId, stepIdx, rect)}
+            onOpenDetail={(rect: DOMRect) => onRightClickStep(trackId, stepIdx, rect)}
             onCtrlClick={() => onCtrlClick(trackId, stepIdx)}
           />
         ))}
       </div>
 
-      {/* Track actions — visible on hover (and while popover is open) */}
+      {/* Track actions */}
       <div
-        className={`ml-2 flex items-center gap-0.5 transition-opacity relative ${
-          euclideanOpen
-            ? "opacity-100"
-            : "opacity-0 group-hover:opacity-100"
-        }`}
+        className="ml-2 flex items-center gap-1 relative"
       >
         <button
           onClick={() => onCopyTrack(trackId)}
-          className="w-5 h-5 rounded text-[9px] font-bold bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground transition-colors"
+          className="h-7 rounded-full bg-white/[0.06] px-2 text-[9px] font-bold text-muted transition-colors hover:bg-white/[0.12] hover:text-foreground"
           title={`Copy ${name} pattern`}
         >
-          C
+          Copy
         </button>
         <button
           onClick={() => onPasteTrack(trackId)}
           disabled={!canPaste}
-          className="w-5 h-5 rounded text-[9px] font-bold bg-surface-2 text-muted hover:bg-accent-dim/30 hover:text-accent disabled:opacity-25 disabled:hover:bg-surface-2 disabled:hover:text-muted transition-colors"
+          className="h-7 rounded-full bg-white/[0.06] px-2 text-[9px] font-bold text-muted transition-colors hover:bg-accent-dim/30 hover:text-accent disabled:opacity-25 disabled:hover:bg-white/[0.06] disabled:hover:text-muted"
           title={canPaste ? `Paste into ${name}` : "Copy a track first"}
         >
-          P
+          Paste
         </button>
         <button
           onClick={() => onHumanizeTrack(trackId)}
-          className="w-5 h-5 rounded text-[9px] font-bold bg-surface-2 text-muted hover:bg-accent-dim/30 hover:text-accent transition-colors"
+          className="h-7 rounded-full bg-white/[0.06] px-2 text-[9px] font-bold text-muted transition-colors hover:bg-accent-dim/30 hover:text-accent"
           title={`Humanize ${name} — slight velocity randomization`}
         >
-          ~
+          Feel
         </button>
         <button
           onClick={() => onOpenEuclidean(trackId)}
-          className={`w-5 h-5 rounded text-[9px] font-bold transition-colors ${
+          className={`h-7 rounded-full px-2 text-[9px] font-bold transition-colors ${
             euclideanOpen
               ? "bg-accent text-white"
-              : "bg-surface-2 text-muted hover:bg-accent-dim/30 hover:text-accent"
+              : "bg-white/[0.06] text-muted hover:bg-accent-dim/30 hover:text-accent"
           }`}
           title={`Euclidean fill for ${name}`}
         >
-          E
+          Fill
         </button>
         <button
           onClick={() => onClearTrack(trackId)}
-          className="w-5 h-5 rounded text-[9px] font-bold bg-surface-2 text-muted hover:bg-danger/20 hover:text-danger transition-colors"
+          className="h-7 rounded-full bg-white/[0.06] px-2 text-[9px] font-bold text-muted transition-colors hover:bg-danger/20 hover:text-danger"
           title={`Clear ${name}`}
         >
-          ✕
+          Clear
         </button>
 
         {euclideanOpen && (
@@ -390,7 +404,7 @@ export function StepSequencer() {
   const handleCloseEuclidean = useCallback(() => setEuclideanTrack(null), []);
 
   return (
-    <div className="flex-1 overflow-auto p-4 relative">
+    <div className="flex-1 overflow-auto p-5 relative">
       {detailStep && (
         <StepDetailPopover
           trackId={detailStep.trackId}
@@ -399,16 +413,32 @@ export function StepSequencer() {
           onClose={() => setDetailStep(null)}
         />
       )}
-      <div className="inline-flex flex-col gap-1">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-accent-hover">
+            Compose
+          </p>
+          <h2 className="text-2xl font-black tracking-[-0.04em] text-white">
+            Step canvas
+          </h2>
+        </div>
+        <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
+          <span className="rounded-full bg-white/[0.06] px-3 py-1.5">Drag to paint</span>
+          <span className="rounded-full bg-white/[0.06] px-3 py-1.5">Double-click shape</span>
+          <span className="rounded-full bg-white/[0.06] px-3 py-1.5">Ctrl-click chance</span>
+        </div>
+      </div>
+
+      <div className="inline-flex flex-col gap-2">
         {/* Step numbers */}
-        <div className="flex items-center gap-0.5">
-          <div className="w-20 shrink-0" />
+        <div className="flex items-center gap-2">
+          <div className="w-28 shrink-0" />
           <div className="flex items-center gap-0.5">
             {tracks[0]?.steps.map((_, i) => (
               <div
                 key={i}
-                className={`w-8 text-center text-[10px] font-mono ${
-                  currentStep === i ? "text-accent" : "text-muted/50"
+                className={`w-9 text-center text-[10px] font-mono ${
+                  currentStep === i ? "text-accent font-black" : "text-muted/50"
                 } ${i > 0 && i % 4 === 0 ? "ml-1" : ""}`}
               >
                 {i + 1}

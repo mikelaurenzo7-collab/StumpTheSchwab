@@ -58,16 +58,16 @@ export function SongChain() {
 
   if (!songMode) {
     return (
-      <div className="flex items-center gap-2 px-4 py-1.5 bg-surface/60 border-b border-border">
+      <div className="flex items-center gap-3 rounded-2xl bg-white/[0.04] p-3">
         <button
           onClick={handleToggle}
-          className="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground transition-colors"
+          className="rounded-full bg-white/[0.08] px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted transition-colors hover:bg-accent hover:text-white"
           title="Enable Song Mode to chain patterns into an arrangement"
         >
           Song Mode
         </button>
-        <span className="text-[10px] text-muted/60">
-          Chain patterns A–H into an arrangement
+        <span className="text-xs leading-relaxed text-muted">
+          Chain patterns A–H into a visible arrangement.
         </span>
       </div>
     );
@@ -76,10 +76,10 @@ export function SongChain() {
   const isPlaying = playbackState === "playing";
 
   return (
-    <div className="flex items-center gap-2 px-4 py-1.5 bg-surface/60 border-b border-border flex-wrap">
+    <div className="flex items-center gap-2 rounded-2xl bg-white/[0.04] p-3 flex-wrap">
       <button
         onClick={handleToggle}
-        className="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-accent text-white hover:bg-accent-hover transition-colors"
+        className="rounded-full bg-accent px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-white transition-colors hover:bg-accent-hover"
         title="Disable Song Mode"
       >
         Song Mode
@@ -88,7 +88,7 @@ export function SongChain() {
       {/* Add current pattern */}
       <button
         onClick={handleAddCurrent}
-        className="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground transition-colors"
+        className="rounded-full bg-white/[0.08] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted transition-colors hover:bg-white/[0.14] hover:text-foreground"
         title={`Append pattern ${PATTERN_LABELS[currentPattern]} to the chain`}
       >
         + {PATTERN_LABELS[currentPattern]}
@@ -97,23 +97,23 @@ export function SongChain() {
       {/* Direct add buttons */}
       <div className="flex gap-0.5">
         {PATTERN_LABELS.map((label, i) => (
-          <button
-            key={label}
-            onClick={() => addToChain(i)}
-            className="w-5 h-5 rounded text-[9px] font-bold bg-surface-2 text-muted/70 hover:bg-surface-3 hover:text-foreground transition-colors"
-            title={`Append ${patterns[i]?.name ?? label}`}
-          >
+            <button
+              key={label}
+              onClick={() => addToChain(i)}
+              className="h-7 w-7 rounded-xl bg-white/[0.08] text-[9px] font-bold text-muted/80 transition-colors hover:bg-white/[0.14] hover:text-foreground"
+              title={`Append ${patterns[i]?.name ?? label}`}
+            >
             {label}
           </button>
         ))}
       </div>
 
-      <div className="w-px h-5 bg-border mx-1" />
+      <div className="w-px h-6 bg-white/10 mx-1" />
 
       {/* Chain visualization */}
       {chain.length === 0 ? (
-        <span className="text-[10px] text-muted/60 italic">
-          Empty — add patterns to build an arrangement
+        <span className="text-xs text-muted/70 italic">
+          Empty — add patterns to build an arrangement.
         </span>
       ) : (
         <div className="flex items-center gap-0.5 flex-wrap" onDragLeave={() => setDragOver(null)}>
@@ -133,17 +133,17 @@ export function SongChain() {
                 onDrop={(e) => handleDrop(e, position)}
                 onDragEnd={handleDragEnd}
                 onClick={() => removeFromChain(position)}
-                className={`group relative h-6 rounded text-[10px] font-bold transition-all ${
-                  customName ? "px-1.5 min-w-[1.75rem]" : "w-7"
-                } ${
-                  isCurrent
-                    ? "bg-accent text-white shadow-sm shadow-accent/40 scale-110"
-                    : isDropTarget
-                      ? "bg-accent/40 text-white ring-2 ring-accent"
-                      : isDragging
-                        ? "bg-surface-3 text-muted opacity-40"
-                        : "bg-surface-2 text-foreground hover:bg-danger/30 hover:text-danger cursor-grab"
-                }`}
+                 className={`group relative h-8 rounded-xl text-[10px] font-bold transition-all ${
+                   customName ? "px-2 min-w-[2rem]" : "w-8"
+                 } ${
+                   isCurrent
+                     ? "bg-accent text-white shadow-sm shadow-accent/40 scale-105"
+                   : isDropTarget
+                     ? "bg-accent/40 text-white ring-2 ring-accent"
+                   : isDragging
+                       ? "bg-surface-3 text-muted opacity-40"
+                       : "bg-white/[0.08] text-foreground hover:bg-danger/30 hover:text-danger cursor-grab"
+                 }`}
                 title={`${position + 1}. ${patternName}${customName ? ` (${PATTERN_LABELS[patternIdx]})` : ""} — drag to reorder · click to remove`}
               >
                 {customName ? (
@@ -169,7 +169,7 @@ export function SongChain() {
           </span>
           <button
             onClick={clearChain}
-            className="ml-1 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-surface-2 text-muted hover:bg-danger/20 hover:text-danger transition-colors"
+             className="ml-1 rounded-full bg-white/[0.08] px-3 py-1 text-[9px] font-bold uppercase tracking-wider text-muted transition-colors hover:bg-danger/20 hover:text-danger"
             title="Clear the chain"
           >
             Clear
