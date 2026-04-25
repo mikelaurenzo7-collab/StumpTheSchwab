@@ -59,7 +59,27 @@ export interface MasterBus {
   eqLow: number;   // dB, -24..+24
   eqMid: number;   // dB
   eqHigh: number;  // dB
+  // Tape "Warmth" — a single-knob analog character. Internally combines a tiny
+  // bit of saturation (Tone.Distortion at low values, oversampled) with a
+  // gentle high-shelf roll-off. Pros chase this sound on hardware; we expose
+  // it as one knob so beginners can dial it in without learning what it is.
+  warmthOn: boolean;
+  warmth: number;  // 0..1
+  // Streaming loudness target. The Loudness panel shows where the user is
+  // relative to this target, so a beginner doesn't have to memorize that
+  // Spotify is -14 LUFS — they just pick "Spotify" and follow the green zone.
+  loudnessTarget: LoudnessTarget;
 }
+
+export type LoudnessTarget = "spotify" | "apple" | "youtube" | "club" | "off";
+
+export const LOUDNESS_TARGETS: Record<LoudnessTarget, { label: string; lufs: number; hint: string }> = {
+  spotify: { label: "Spotify", lufs: -14, hint: "Streaming standard. Anything louder gets turned down on playback." },
+  apple:   { label: "Apple Music", lufs: -16, hint: "Apple's Sound Check normalizes to -16 LUFS." },
+  youtube: { label: "YouTube", lufs: -14, hint: "YouTube normalizes to roughly -14 LUFS." },
+  club:    { label: "Club Master", lufs: -8,  hint: "Loud, punchy master for DJs and club PA systems." },
+  off:     { label: "Off", lufs: 0, hint: "No target — meter shows raw loudness only." },
+};
 
 export interface Track {
   id: number;
@@ -278,6 +298,9 @@ const DEFAULT_MASTER: MasterBus = {
   eqLow: 0,
   eqMid: 0,
   eqHigh: 0,
+  warmthOn: false,
+  warmth: 0.25,
+  loudnessTarget: "spotify",
 };
 
 export const VELOCITY_LEVELS = [1.0, 0.75, 0.5, 0.25] as const;

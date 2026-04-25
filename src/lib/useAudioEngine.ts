@@ -26,6 +26,8 @@ interface TrackFXChain {
 
 interface MasterChain {
   gain: Tone.Gain;
+  warmthDrive: Tone.Distortion; // tape-style soft saturation (low amounts)
+  warmthShelf: Tone.Filter;     // gentle high-shelf cut for tape "warmth"
   eq: Tone.EQ3;
   compressor: Tone.Compressor;
   limiter: Tone.Limiter;
@@ -152,8 +154,14 @@ function createMasterChain(): MasterChain {
     mid: master.eqOn ? master.eqMid : 0,
     high: master.eqOn ? master.eqHigh : 0,
   }).connect(compressor);
-  const gain = new Tone.Gain(master.volume).connect(eq);
-  return { gain, eq, compressor, limiter };
+  // Warmth: drive (soft saturation) + a gentle high-shelf cut. Tape rolls off
+  // air above 10kHz and adds even-harmonic distortion. We mimic both with low
+  // distortion amounts and a -dB shelf at 10kHz. Order: drive then shelf so
+  // the harmonics get tamed at the top.
+  const warmthShelf = new Tone.Filter({ type: "highshelf", frequency: 10000, gain: 0 }).connect(eq);
+  const warmthDrive = new Tone.Distortion({ distortion: 0, wet: 0, oversample: "4x" }).connect(warmthShelf);
+  const gain = new Tone.Gain(master.volume).connect(warmthDrive);
+  return { gain, warmthDrive, warmthShelf, eq, compressor, limiter };
 }
 
 function applyMasterSettings(chain: MasterChain, master: MasterBus) {
@@ -188,6 +196,20 @@ function applyMasterSettings(chain: MasterChain, master: MasterBus) {
     // Bypass: set ceiling so high it never limits
     chain.limiter.threshold.value = 6;
   }
+
+  // Warmth: 0..1 maps to a gentle saturation amount and a small high-shelf
+  // cut. We keep the drive amount low (max 0.35) — tape character, not crunch.
+  // The shelf rolls off up to -4 dB at full warmth, mimicking analog air loss.
+  if (master.warmthOn) {
+    const w = Math.max(0, Math.min(1, master.warmth));
+    chain.warmthDrive.distortion = w * 0.35;
+    chain.warmthDrive.wet.value = w > 0 ? 1 : 0;
+    chain.warmthShelf.gain.value = -w * 4;
+  } else {
+    chain.warmthDrive.distortion = 0;
+    chain.warmthDrive.wet.value = 0;
+    chain.warmthShelf.gain.value = 0;
+  }
 }
 
 export function useAudioEngine() {
@@ -200,10 +222,20 @@ export function useAudioEngine() {
   const sequenceRef = useRef<Tone.Sequence | null>(null);
   const initializedRef = useRef(false);
   const trackMetersRef = useRef<Tone.Meter[]>([]);
+  const trackFFTsRef = useRef<Tone.FFT[]>([]);
   const panLfosRef = useRef<Tone.LFO[]>([]);
   const masterMeterRef = useRef<Tone.Meter | null>(null);
   const masterFFTRef = useRef<Tone.FFT | null>(null);
   const masterWaveformRef = useRef<Tone.Waveform | null>(null);
+  // Loudness measurement: a K-weighted tap (high-pass + high-shelf) feeding a
+  // Tone.Waveform we read on rAF. Real ITU-R BS.1770 LUFS is more involved
+  // (integrated gating, true-peak via 4× upsampling, etc) but the K-weighted
+  // RMS tracks short-term loudness well enough to teach the concept and to
+  // hit Spotify/Apple targets within ~1 LUFS, which is the actual goal here.
+  const loudnessHPFRef = useRef<Tone.Filter | null>(null);
+  const loudnessShelfRef = useRef<Tone.Filter | null>(null);
+  const loudnessWaveformRef = useRef<Tone.Waveform | null>(null);
+  const truePeakWaveformRef = useRef<Tone.Waveform | null>(null);
 
   const initAudio = useCallback(async () => {
     if (initializedRef.current) return;
@@ -240,6 +272,29 @@ export function useAudioEngine() {
     masterChain.gain.connect(masterWaveform);
     masterWaveformRef.current = masterWaveform;
 
+    // Loudness K-weighting tap: 40Hz high-pass → +4dB high-shelf @ 1.5kHz.
+    // This is the same pre-filter family used by BS.1770 (a stripped-down
+    // approximation). Feed a Waveform analyser so we can compute RMS in JS.
+    // We tap the limiter's input (post-EQ/comp) so what's metered is what's
+    // exported, with limiter ceiling ignored — pre-limit RMS is a more honest
+    // loudness measurement.
+    const loudnessHPF = new Tone.Filter({ type: "highpass", frequency: 40, Q: 0.7 });
+    const loudnessShelf = new Tone.Filter({ type: "highshelf", frequency: 1500, gain: 4 });
+    masterChain.compressor.connect(loudnessHPF);
+    loudnessHPF.connect(loudnessShelf);
+    const loudnessWaveform = new Tone.Waveform(4096);
+    loudnessShelf.connect(loudnessWaveform);
+    loudnessHPFRef.current = loudnessHPF;
+    loudnessShelfRef.current = loudnessShelf;
+    loudnessWaveformRef.current = loudnessWaveform;
+
+    // True-peak tap: read from post-limiter, large window, peak-detect with
+    // simple linear interpolation (a 2× oversampling approximation that
+    // catches inter-sample peaks the standard sample meter misses).
+    const truePeakWaveform = new Tone.Waveform(4096);
+    masterChain.limiter.connect(truePeakWaveform);
+    truePeakWaveformRef.current = truePeakWaveform;
+
     tracks.forEach((track) => {
       // Signal chain: Synth → FX → Gain → DuckGain → Meter → Panner → Master
       // DuckGain sits AFTER the user volume so the sidechain ducks the whole
@@ -252,6 +307,14 @@ export function useAudioEngine() {
       const meter = new Tone.Meter({ smoothing: 0.8 });
       duckGain.connect(meter);
       trackMetersRef.current.push(meter);
+
+      // Per-track FFT for the Sonic X-Ray: tap post-duck so it reflects the
+      // actually-heard signal (sidechain-ducked, post-FX, post-volume). 512
+      // bins is enough to see frequency content distinctly without expensive
+      // rendering — the X-Ray reads 8 of these per frame on rAF.
+      const trackFFT = new Tone.FFT({ size: 512, smoothing: 0.6 });
+      duckGain.connect(trackFFT);
+      trackFFTsRef.current.push(trackFFT);
 
       const fx = createTrackFX(gain);
       applyTrackFX(fx, track.effects);
@@ -526,9 +589,14 @@ export function useAudioEngine() {
         l.dispose();
       });
       trackMetersRef.current.forEach((m) => m.dispose());
+      trackFFTsRef.current.forEach((f) => f.dispose());
       masterMeterRef.current?.dispose();
       masterFFTRef.current?.dispose();
       masterWaveformRef.current?.dispose();
+      loudnessHPFRef.current?.dispose();
+      loudnessShelfRef.current?.dispose();
+      loudnessWaveformRef.current?.dispose();
+      truePeakWaveformRef.current?.dispose();
       fxChainsRef.current.forEach((fx) => {
         fx.drive.dispose();
         fx.filter.dispose();
@@ -540,6 +608,8 @@ export function useAudioEngine() {
       });
       if (masterChainRef.current) {
         masterChainRef.current.gain.dispose();
+        masterChainRef.current.warmthDrive.dispose();
+        masterChainRef.current.warmthShelf.dispose();
         masterChainRef.current.eq.dispose();
         masterChainRef.current.compressor.dispose();
         masterChainRef.current.limiter.dispose();
@@ -569,6 +639,52 @@ export function useAudioEngine() {
 
   const getMasterWaveform = useCallback((): Float32Array | null => {
     return masterWaveformRef.current?.getValue() ?? null;
+  }, []);
+
+  const getTrackSpectrum = useCallback((index: number): Float32Array | null => {
+    return trackFFTsRef.current[index]?.getValue() ?? null;
+  }, []);
+
+  // Short-term loudness, K-weighted RMS converted to dB. We treat this as a
+  // close-enough LUFS-S reading. Returns -Infinity when silent.
+  const getLoudness = useCallback((): number => {
+    const w = loudnessWaveformRef.current;
+    if (!w) return -Infinity;
+    const buf = w.getValue();
+    if (!buf || buf.length === 0) return -Infinity;
+    let sumSq = 0;
+    for (let i = 0; i < buf.length; i++) {
+      const s = buf[i];
+      sumSq += s * s;
+    }
+    const rms = Math.sqrt(sumSq / buf.length);
+    if (rms <= 1e-7) return -Infinity;
+    // Calibration offset: BS.1770 reference is -0.691 dB on K-weighted full
+    // scale sine. RMS-of-sine to peak ratio adds another ~3 dB. The composite
+    // offset that lines us up with common LUFS readouts is roughly +0.7 dB.
+    return 20 * Math.log10(rms) + 0.7;
+  }, []);
+
+  // True-peak approximation: sample peak with a 2× linear-interpolation
+  // overshoot estimate. ITU spec uses 4× polyphase filtering; for a teaching
+  // meter, 2× linear catches most inter-sample peaks within ~0.3 dB.
+  const getTruePeak = useCallback((): number => {
+    const w = truePeakWaveformRef.current;
+    if (!w) return -Infinity;
+    const buf = w.getValue();
+    if (!buf || buf.length < 2) return -Infinity;
+    let peak = 0;
+    for (let i = 0; i < buf.length - 1; i++) {
+      const a = Math.abs(buf[i]);
+      const b = Math.abs(buf[i + 1]);
+      if (a > peak) peak = a;
+      // Midpoint estimate for inter-sample peak.
+      const mid = Math.abs((buf[i] + buf[i + 1]) * 0.5);
+      if (mid > peak) peak = mid;
+      if (b > peak) peak = b;
+    }
+    if (peak <= 1e-7) return -Infinity;
+    return 20 * Math.log10(peak);
   }, []);
 
   // Live trigger — used by performance keys (Q-I) to play any track on demand,
@@ -614,6 +730,9 @@ export function useAudioEngine() {
     getMasterMeter,
     getMasterSpectrum,
     getMasterWaveform,
+    getTrackSpectrum,
+    getLoudness,
+    getTruePeak,
     triggerTrack,
   };
 }

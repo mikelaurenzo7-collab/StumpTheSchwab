@@ -20,6 +20,9 @@ export default function DAW() {
     getMasterMeter,
     getMasterSpectrum,
     getMasterWaveform,
+    getTrackSpectrum,
+    getLoudness,
+    getTruePeak,
     triggerTrack,
   } = useAudioEngine();
   useKeyboardShortcuts(initAudio, triggerTrack);
@@ -72,6 +75,9 @@ export default function DAW() {
         getMasterMeter={getMasterMeter}
         getMasterSpectrum={getMasterSpectrum}
         getMasterWaveform={getMasterWaveform}
+        getTrackSpectrum={getTrackSpectrum}
+        getLoudness={getLoudness}
+        getTruePeak={getTruePeak}
       />
       <HelpOverlay />
       <GeneratorModal />

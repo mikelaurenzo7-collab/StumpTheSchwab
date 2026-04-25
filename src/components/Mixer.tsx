@@ -11,6 +11,8 @@ import {
 } from "@/store/engine";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SpectrumAnalyzer } from "./SpectrumAnalyzer";
+import { SonicXRay } from "./SonicXRay";
+import { LoudnessPanel } from "./LoudnessPanel";
 
 // ── Knob-style mini slider ────────────────────────────────────
 function MiniSlider({
@@ -672,8 +674,8 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
             : `${(20 * Math.log10(master.volume)).toFixed(1)}`}dB
         </span>
 
-        {/* EQ / Comp / Limiter toggles */}
-        <div className="flex gap-1">
+        {/* EQ / Comp / Limiter / Warmth toggles */}
+        <div className="flex gap-1 flex-wrap justify-center">
           <button
             onClick={() => setMaster("eqOn", !master.eqOn)}
             className={`w-5 h-5 rounded text-[9px] font-bold transition-colors ${
@@ -706,6 +708,17 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
             title="Brickwall limiter"
           >
             L
+          </button>
+          <button
+            onClick={() => setMaster("warmthOn", !master.warmthOn)}
+            className={`w-5 h-5 rounded text-[9px] font-bold transition-colors ${
+              master.warmthOn
+                ? "bg-warning text-black"
+                : "bg-surface-2 text-muted hover:bg-surface-3"
+            }`}
+            title="Tape Warmth — single-knob analog character (saturation + air shelf)"
+          >
+            W
           </button>
         </div>
 
@@ -824,6 +837,27 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
               disabled={!master.limiterOn}
             />
           </div>
+
+          {/* Warmth — one-knob tape character (subtle saturation + air shelf).
+              The trick: low values smooth transients without coloring, high
+              values give that "expensive analog" weight pros chase. */}
+          <div className="flex flex-col gap-1">
+            <span className="text-[9px] text-warning font-bold">TAPE WARMTH</span>
+            <div className="flex gap-1 items-end">
+              <MiniSlider
+                label="Amount"
+                value={master.warmth}
+                min={0}
+                max={1}
+                step={0.01}
+                onChange={(v) => setMaster("warmth", v)}
+                disabled={!master.warmthOn}
+              />
+              <span className="text-[8px] text-muted leading-tight max-w-[80px]">
+                soft saturation + a touch off the top — the analog glue trick
+              </span>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -836,11 +870,17 @@ export function Mixer({
   getMasterMeter,
   getMasterSpectrum,
   getMasterWaveform,
+  getTrackSpectrum,
+  getLoudness,
+  getTruePeak,
 }: {
   getTrackMeter: (index: number) => number;
   getMasterMeter: () => number;
   getMasterSpectrum: () => Float32Array | null;
   getMasterWaveform: () => Float32Array | null;
+  getTrackSpectrum: (index: number) => Float32Array | null;
+  getLoudness: () => number;
+  getTruePeak: () => number;
 }) {
   const tracks = useEngineStore((s) => s.tracks);
   const setTrackVolume = useEngineStore((s) => s.setTrackVolume);
@@ -942,8 +982,16 @@ export function Mixer({
 
   return (
     <div className="border-t border-border bg-surface px-4 py-3">
-      {/* Master visualizer — spectrum bars + oscilloscope overlay. */}
-      <div className="mb-3">
+      {/* ── Visual learning surface ────────────────────────────────────
+          Two stacked teaching panels above the channel strips:
+          1. Sonic X-Ray — per-track frequency overlay with zone labels and
+             collision detection. Shows beginners *what* a mix is.
+          2. Loudness panel — LUFS-S + dBTP with streaming targets. Shows
+             beginners *when* a mix is ready to ship.
+          The classic spectrum + scope sits below as the live overall view. */}
+      <div className="mb-3 flex flex-col gap-3">
+        <SonicXRay getTrackSpectrum={getTrackSpectrum} />
+        <LoudnessPanel getLoudness={getLoudness} getTruePeak={getTruePeak} />
         <SpectrumAnalyzer
           getSpectrum={getMasterSpectrum}
           getWaveform={getMasterWaveform}
