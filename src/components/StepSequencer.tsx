@@ -46,6 +46,9 @@ const StepCell = memo(function StepCell({
   const active = velocity > 0;
   const hasProb = active && probability < 1;
   const hasNudge = active && nudge !== 0;
+  const activeStateClass = active
+    ? "border-white/10 shadow-sm shadow-black/30"
+    : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]";
 
   return (
     <button
@@ -94,11 +97,7 @@ const StepCell = memo(function StepCell({
       className={`
         relative w-9 h-9 rounded-xl transition-all duration-75 border overflow-hidden select-none
         ${beatStart ? "ml-1" : ""}
-        ${
-          active
-            ? `border-white/10 shadow-sm shadow-black/30`
-            : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
-        }
+        ${activeStateClass}
         ${isCurrent && !active ? "ring-2 ring-accent/70 bg-accent/10" : ""}
         ${isCurrent && active ? "ring-2 ring-white/70 scale-105" : ""}
         ${hasProb ? "ring-1 ring-cyan/40" : ""}
