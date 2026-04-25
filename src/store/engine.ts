@@ -92,6 +92,8 @@ export interface Pattern {
   nudge: number[][];
 }
 
+type PatternSnapshot = Pick<Pattern, "steps" | "notes" | "probabilities" | "nudge">;
+
 export const PATTERN_LABELS = ["A", "B", "C", "D", "E", "F", "G", "H"] as const;
 export const MAX_PATTERNS = PATTERN_LABELS.length;
 
@@ -388,7 +390,7 @@ function createEmptyPattern(name: string, trackCount: number, totalSteps: number
   };
 }
 
-function snapshotPattern(tracks: Track[]): { steps: number[][]; notes: string[][]; probabilities: number[][]; nudge: number[][] } {
+function snapshotPattern(tracks: Track[]): PatternSnapshot {
   return {
     steps: tracks.map((t) => [...t.steps]),
     notes: tracks.map((t) => [...t.notes]),
@@ -399,7 +401,7 @@ function snapshotPattern(tracks: Track[]): { steps: number[][]; notes: string[][
 
 function applyPatternToTracks(
   tracks: Track[],
-  pattern: { steps: number[][]; notes?: string[][]; probabilities: number[][]; nudge?: number[][] },
+  pattern: PatternSnapshot | { steps: number[][]; notes?: string[][]; probabilities: number[][]; nudge?: number[][] },
   totalSteps: number
 ): Track[] {
   return tracks.map((t, i) => {
