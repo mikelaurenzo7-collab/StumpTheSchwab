@@ -92,6 +92,11 @@ type PatternRenderData = {
   nudge?: number[][];
 };
 
+/**
+ * Concatenates one per-track pattern field across the song chain.
+ * Uses live track values for the current pattern, stored pattern values for
+ * other chain entries, and the provided fill value for older saved sessions.
+ */
 function flattenPatternArray<T>(
   tracks: Track[],
   patterns: PatternRenderData[],
