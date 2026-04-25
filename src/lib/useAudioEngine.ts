@@ -183,6 +183,8 @@ export function useAudioEngine() {
   const initializedRef = useRef(false);
   const trackMetersRef = useRef<Tone.Meter[]>([]);
   const masterMeterRef = useRef<Tone.Meter | null>(null);
+  const masterFFTRef = useRef<Tone.FFT | null>(null);
+  const masterWaveformRef = useRef<Tone.Waveform | null>(null);
 
   const initAudio = useCallback(async () => {
     if (initializedRef.current) return;
@@ -207,6 +209,16 @@ export function useAudioEngine() {
     const masterMeter = new Tone.Meter({ smoothing: 0.8 });
     masterChain.gain.connect(masterMeter);
     masterMeterRef.current = masterMeter;
+
+    // Master FFT + waveform for the visualizer. 1024 bins is plenty for a
+    // log-scaled bar display; we only read it from rAF, not the audio thread.
+    const masterFFT = new Tone.FFT({ size: 1024, smoothing: 0.7 });
+    masterChain.gain.connect(masterFFT);
+    masterFFTRef.current = masterFFT;
+
+    const masterWaveform = new Tone.Waveform(512);
+    masterChain.gain.connect(masterWaveform);
+    masterWaveformRef.current = masterWaveform;
 
     tracks.forEach((track) => {
       // Signal chain: Synth → FX → Gain → DuckGain → Meter → Panner → Master
@@ -457,6 +469,8 @@ export function useAudioEngine() {
       panNodesRef.current.forEach((p) => p.dispose());
       trackMetersRef.current.forEach((m) => m.dispose());
       masterMeterRef.current?.dispose();
+      masterFFTRef.current?.dispose();
+      masterWaveformRef.current?.dispose();
       fxChainsRef.current.forEach((fx) => {
         fx.drive.dispose();
         fx.filter.dispose();
@@ -490,5 +504,19 @@ export function useAudioEngine() {
     return typeof val === "number" ? val : val[0];
   }, []);
 
-  return { initAudio, getTrackMeter, getMasterMeter };
+  const getMasterSpectrum = useCallback((): Float32Array | null => {
+    return masterFFTRef.current?.getValue() ?? null;
+  }, []);
+
+  const getMasterWaveform = useCallback((): Float32Array | null => {
+    return masterWaveformRef.current?.getValue() ?? null;
+  }, []);
+
+  return {
+    initAudio,
+    getTrackMeter,
+    getMasterMeter,
+    getMasterSpectrum,
+    getMasterWaveform,
+  };
 }

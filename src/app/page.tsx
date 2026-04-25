@@ -12,7 +12,13 @@ import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
 import "@/store/history";
 
 export default function DAW() {
-  const { initAudio, getTrackMeter, getMasterMeter } = useAudioEngine();
+  const {
+    initAudio,
+    getTrackMeter,
+    getMasterMeter,
+    getMasterSpectrum,
+    getMasterWaveform,
+  } = useAudioEngine();
   useKeyboardShortcuts(initAudio);
 
   return (
@@ -21,7 +27,12 @@ export default function DAW() {
       <SongChain />
       <StepSequencer />
       <PianoRoll />
-      <Mixer getTrackMeter={getTrackMeter} getMasterMeter={getMasterMeter} />
+      <Mixer
+        getTrackMeter={getTrackMeter}
+        getMasterMeter={getMasterMeter}
+        getMasterSpectrum={getMasterSpectrum}
+        getMasterWaveform={getMasterWaveform}
+      />
       <HelpOverlay />
       <GeneratorModal />
     </div>

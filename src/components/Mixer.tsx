@@ -2,6 +2,7 @@
 
 import { useEngineStore, type TrackEffects, type FilterType } from "@/store/engine";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SpectrumAnalyzer } from "./SpectrumAnalyzer";
 
 // ── Knob-style mini slider ────────────────────────────────────
 function MiniSlider({
@@ -714,9 +715,13 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
 export function Mixer({
   getTrackMeter,
   getMasterMeter,
+  getMasterSpectrum,
+  getMasterWaveform,
 }: {
   getTrackMeter: (index: number) => number;
   getMasterMeter: () => number;
+  getMasterSpectrum: () => Float32Array | null;
+  getMasterWaveform: () => Float32Array | null;
 }) {
   const tracks = useEngineStore((s) => s.tracks);
   const setTrackVolume = useEngineStore((s) => s.setTrackVolume);
@@ -818,6 +823,14 @@ export function Mixer({
 
   return (
     <div className="border-t border-border bg-surface px-4 py-3">
+      {/* Master visualizer — spectrum bars + oscilloscope overlay. */}
+      <div className="mb-3">
+        <SpectrumAnalyzer
+          getSpectrum={getMasterSpectrum}
+          getWaveform={getMasterWaveform}
+        />
+      </div>
+
       <div className="flex items-start gap-2 overflow-x-auto">
         {tracks.map((track, i) => (
           <ChannelStrip
