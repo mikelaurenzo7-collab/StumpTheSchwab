@@ -132,26 +132,21 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       : `${tapTimes.length}/6`;
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 bg-surface border-b border-border flex-wrap">
-      {/* Logo */}
-      <div className="font-bold text-accent text-lg tracking-tight mr-1 select-none">
-        STS
-      </div>
-
+    <div className="glass-control flex items-center gap-3 rounded-3xl px-3 py-3 flex-wrap">
       {/* AI Generate */}
       <button
         onClick={() => useUiStore.getState().setGeneratorOpen(true)}
-        className="px-3 py-2 rounded-lg bg-gradient-to-br from-accent to-accent-dim hover:from-accent-hover hover:to-accent text-white text-xs font-bold uppercase tracking-wider transition-all shadow-sm shadow-accent/30 flex items-center gap-1.5"
-        title="Generate a beat with Claude (G)"
+        className="group rounded-2xl bg-gradient-to-br from-accent via-accent-dim to-cyan px-4 py-3 text-xs font-black uppercase tracking-[0.2em] text-white shadow-lg shadow-accent/30 transition-all hover:scale-[1.02] hover:shadow-accent/50 flex items-center gap-2"
+        title="Generate or mutate a groove (G)"
       >
-        <span className="text-sm leading-none">✦</span>
+        <span className="text-base leading-none transition-transform group-hover:rotate-12">✦</span>
         Generate
       </button>
 
       {/* Play/Pause */}
       <button
         onClick={handlePlay}
-        className="w-10 h-10 rounded-lg bg-accent hover:bg-accent-hover text-white flex items-center justify-center transition-colors font-mono text-lg"
+        className="h-12 w-12 rounded-2xl bg-white text-background flex items-center justify-center transition-all font-mono text-lg shadow-lg shadow-white/10 hover:scale-105"
         title={playbackState === "playing" ? "Pause (Space)" : "Play (Space)"}
       >
         {playbackState === "playing" ? "⏸" : "▶"}
@@ -160,26 +155,26 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Stop */}
       <button
         onClick={handleStop}
-        className="w-10 h-10 rounded-lg bg-surface-2 hover:bg-surface-3 text-foreground flex items-center justify-center transition-colors font-mono text-lg"
+        className="h-12 w-12 rounded-2xl bg-white/[0.08] hover:bg-white/[0.14] text-foreground flex items-center justify-center transition-colors font-mono text-lg"
         title="Stop"
       >
         ⏹
       </button>
 
       {/* BPM */}
-      <div className="flex items-center gap-2">
-        <label className="text-xs text-muted uppercase tracking-wider">BPM</label>
+      <div className="flex items-center gap-2 rounded-2xl bg-black/20 px-3 py-2">
+        <label className="text-[10px] font-black text-muted uppercase tracking-[0.2em]">BPM</label>
         <input
           type="number"
           min={30}
           max={300}
           value={bpm}
           onChange={(e) => setBpm(Number(e.target.value))}
-          className="w-16 bg-surface-2 border border-border rounded px-2 py-1 text-center text-sm font-mono text-foreground focus:outline-none focus:border-accent"
+          className="w-16 bg-white/[0.08] border border-white/10 rounded-xl px-2 py-1.5 text-center text-sm font-mono text-foreground focus:outline-none focus:border-accent"
         />
         <button
           onClick={handleTap}
-          className="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-2 hover:bg-surface-3 text-muted hover:text-foreground transition-colors min-w-[3rem]"
+          className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/[0.08] hover:bg-white/[0.14] text-muted hover:text-foreground transition-colors min-w-[3rem]"
           title="Tap to set BPM — tap repeatedly at the desired tempo"
         >
           {tapHint}
@@ -187,8 +182,8 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       </div>
 
       {/* Swing */}
-      <div className="flex items-center gap-2">
-        <label className="text-xs text-muted uppercase tracking-wider">Swing</label>
+      <div className="flex items-center gap-2 rounded-2xl bg-black/20 px-3 py-2">
+        <label className="text-[10px] font-black text-muted uppercase tracking-[0.2em]">Swing</label>
         <input
           type="range"
           min={0}
@@ -204,12 +199,12 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       </div>
 
       {/* Steps */}
-      <div className="flex items-center gap-2">
-        <label className="text-xs text-muted uppercase tracking-wider">Steps</label>
+      <div className="flex items-center gap-2 rounded-2xl bg-black/20 px-3 py-2">
+        <label className="text-[10px] font-black text-muted uppercase tracking-[0.2em]">Steps</label>
         <select
           value={totalSteps}
           onChange={(e) => setTotalSteps(Number(e.target.value))}
-          className="bg-surface-2 border border-border rounded px-2 py-1 text-sm font-mono text-foreground focus:outline-none focus:border-accent"
+          className="bg-white/[0.08] border border-white/10 rounded-xl px-2 py-1.5 text-sm font-mono text-foreground focus:outline-none focus:border-accent"
         >
           <option value={8}>8</option>
           <option value={16}>16</option>
@@ -219,22 +214,22 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       </div>
 
       {/* Separator */}
-      <div className="w-px h-6 bg-border mx-1" />
+      <div className="w-px h-8 bg-white/10 mx-1" />
 
       {/* Pattern Selector */}
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs text-muted uppercase tracking-wider">Pattern</span>
+      <div className="flex items-center gap-1.5 rounded-2xl bg-black/20 px-3 py-2">
+        <span className="text-[10px] font-black text-muted uppercase tracking-[0.2em]">Pattern</span>
         <div className="flex gap-0.5">
           {PATTERN_LABELS.map((label, i) => (
             <button
               key={label}
               onClick={() => handlePatternClick(i)}
-              className={`w-7 h-7 rounded text-xs font-bold transition-all ${
+              className={`w-7 h-7 rounded-xl text-xs font-bold transition-all ${
                 i === currentPattern
-                  ? "bg-accent text-white shadow-sm shadow-accent/30"
-                  : copySource === i
-                    ? "bg-warning text-black animate-pulse"
-                    : "bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground"
+                  ? "bg-accent text-white shadow-sm shadow-accent/40"
+                : copySource === i
+                  ? "bg-warning text-black animate-pulse"
+                    : "bg-white/[0.08] text-muted hover:bg-white/[0.14] hover:text-foreground"
               }`}
               title={
                 copySource !== null
@@ -250,11 +245,11 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
         {/* Copy button */}
         <button
           onClick={handleCopy}
-          className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${
-            copySource !== null
-              ? "bg-warning text-black"
-              : "bg-surface-2 text-muted hover:bg-surface-3"
-          }`}
+            className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors ${
+              copySource !== null
+                ? "bg-warning text-black"
+                : "bg-white/[0.08] text-muted hover:bg-white/[0.14]"
+            }`}
           title={copySource !== null ? "Cancel copy" : "Copy current pattern"}
         >
           {copySource !== null ? "ESC" : "CPY"}
@@ -278,12 +273,12 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
             }}
             maxLength={16}
             placeholder={PATTERN_LABELS[currentPattern]}
-            className="bg-surface-2 border border-accent rounded px-2 py-0.5 text-xs font-medium text-foreground w-24 focus:outline-none"
+            className="bg-white/[0.08] border border-accent rounded-xl px-2 py-1 text-xs font-medium text-foreground w-24 focus:outline-none"
           />
         ) : (
           <button
             onClick={startRename}
-            className="text-xs font-medium text-muted hover:text-foreground px-1 truncate max-w-[8rem]"
+             className="text-xs font-medium text-muted hover:text-foreground px-1 truncate max-w-[8rem]"
             title="Click to rename this pattern"
           >
             {currentPatternName}
@@ -292,11 +287,11 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       </div>
 
       {/* Separator */}
-      <div className="w-px h-6 bg-border mx-1" />
+      <div className="w-px h-8 bg-white/10 mx-1" />
 
       {/* Preset Loader */}
-      <div className="flex items-center gap-2">
-        <label className="text-xs text-muted uppercase tracking-wider">Preset</label>
+      <div className="flex items-center gap-2 rounded-2xl bg-black/20 px-3 py-2">
+        <label className="text-[10px] font-black text-muted uppercase tracking-[0.2em]">Preset</label>
         <select
           value=""
           onChange={(e) => {
@@ -305,7 +300,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
               loadPreset(PRESETS[idx]);
             }
           }}
-          className="bg-surface-2 border border-border rounded px-2 py-1 text-sm font-mono text-foreground focus:outline-none focus:border-accent"
+          className="bg-white/[0.08] border border-white/10 rounded-xl px-2 py-1.5 text-sm font-mono text-foreground focus:outline-none focus:border-accent"
         >
           <option value="" disabled>
             Load...
@@ -326,7 +321,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
         <button
           onClick={undo}
           disabled={!canUndo}
-          className="w-8 h-8 rounded text-sm transition-colors disabled:opacity-25 bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground"
+          className="w-9 h-9 rounded-xl text-sm transition-colors disabled:opacity-25 bg-white/[0.08] text-muted hover:bg-white/[0.14] hover:text-foreground"
           title="Undo (Ctrl+Z)"
         >
           ↶
@@ -334,7 +329,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
         <button
           onClick={redo}
           disabled={!canRedo}
-          className="w-8 h-8 rounded text-sm transition-colors disabled:opacity-25 bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground"
+          className="w-9 h-9 rounded-xl text-sm transition-colors disabled:opacity-25 bg-white/[0.08] text-muted hover:bg-white/[0.14] hover:text-foreground"
           title="Redo (Ctrl+Shift+Z)"
         >
           ↷
@@ -346,7 +341,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
         <select
           value={exportFormat}
           onChange={(e) => setExportFormat(e.target.value as "wav" | "midi")}
-          className="bg-surface-2 border border-border rounded px-1.5 py-1 text-[10px] font-mono text-muted focus:outline-none focus:border-accent"
+          className="bg-white/[0.08] border border-white/10 rounded-xl px-2 py-1.5 text-[10px] font-mono text-muted focus:outline-none focus:border-accent"
           title="Export format"
         >
           <option value="wav">WAV</option>
@@ -356,7 +351,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
           <select
             value={exportLoops}
             onChange={(e) => setExportLoops(Number(e.target.value))}
-            className="bg-surface-2 border border-border rounded px-1.5 py-1 text-[10px] font-mono text-muted focus:outline-none focus:border-accent w-14"
+              className="bg-white/[0.08] border border-white/10 rounded-xl px-2 py-1.5 text-[10px] font-mono text-muted focus:outline-none focus:border-accent w-14"
             title="Number of loops to export (WAV only)"
           >
             <option value={1}>1x</option>
@@ -374,11 +369,11 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
             }
           }}
           disabled={exporting || exportingMidi}
-          className={`px-3 py-1.5 rounded text-xs uppercase tracking-wider transition-colors font-bold ${
+           className={`px-4 py-2 rounded-xl text-xs uppercase tracking-wider transition-colors font-bold ${
             exporting || exportingMidi
               ? "bg-accent/50 text-white/50 cursor-wait"
-              : "bg-accent hover:bg-accent-hover text-white"
-          }`}
+              : "bg-white text-background hover:bg-accent-hover hover:text-white"
+           }`}
           title={
             exportFormat === "midi"
               ? "Export pattern as a Standard MIDI File (.mid) — drag into any DAW"
@@ -395,7 +390,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Humanize */}
       <button
         onClick={() => humanize(null, 0.15)}
-        className="px-3 py-1.5 rounded bg-surface-2 hover:bg-accent-dim/30 text-muted hover:text-accent text-xs uppercase tracking-wider transition-colors"
+        className="px-3 py-2 rounded-xl bg-white/[0.08] hover:bg-accent-dim/30 text-muted hover:text-accent text-xs uppercase tracking-wider transition-colors"
         title="Humanize all tracks — randomize velocities slightly for a more natural feel (H)"
       >
         Humanize
@@ -404,7 +399,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Clear */}
       <button
         onClick={clearAll}
-        className="px-3 py-1.5 rounded bg-surface-2 hover:bg-danger/20 text-muted hover:text-danger text-xs uppercase tracking-wider transition-colors"
+        className="px-3 py-2 rounded-xl bg-white/[0.08] hover:bg-danger/20 text-muted hover:text-danger text-xs uppercase tracking-wider transition-colors"
       >
         Clear All
       </button>
@@ -412,7 +407,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Help */}
       <button
         onClick={() => useUiStore.getState().toggleHelp()}
-        className="w-8 h-8 rounded-full bg-surface-2 hover:bg-surface-3 text-muted hover:text-foreground text-sm transition-colors"
+        className="w-9 h-9 rounded-full bg-white/[0.08] hover:bg-white/[0.14] text-muted hover:text-foreground text-sm transition-colors"
         title="Keyboard shortcuts (?)"
       >
         ?

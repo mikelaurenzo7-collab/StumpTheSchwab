@@ -941,13 +941,23 @@ export function Mixer({
   }, []);
 
   return (
-    <div className="border-t border-border bg-surface px-4 py-3">
+    <div className="px-4 py-3">
       {/* Master visualizer — spectrum bars + oscilloscope overlay. */}
-      <div className="mb-3">
+      <div className="mb-3 flex items-center justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-cyan">
+            Perform / Mix
+          </p>
+          <h2 className="text-lg font-black tracking-tight text-white">
+            Color, motion, level
+          </h2>
+        </div>
+        <div className="min-w-0 flex-1">
         <SpectrumAnalyzer
           getSpectrum={getMasterSpectrum}
           getWaveform={getMasterWaveform}
         />
+        </div>
       </div>
 
       <div className="flex items-start gap-2 overflow-x-auto">

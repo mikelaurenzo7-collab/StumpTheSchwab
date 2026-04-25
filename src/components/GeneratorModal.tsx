@@ -20,14 +20,14 @@ const SUGGESTIONS = [
 ];
 
 const REFINE_CHIPS = [
-  "Make it darker",
-  "More sparse",
-  "Punchier kick",
-  "Add a fill on the last bar",
-  "Add hi-hat rolls",
-  "Swing it more",
-  "Brighter / more uplifting",
-  "Stripped-down version",
+  "Mutate: make it darker",
+  "Simplify: more sparse",
+  "Punch: stronger kick",
+  "Fill: last-bar turnaround",
+  "Fill: add hi-hat rolls",
+  "Humanize: swing it more",
+  "Expand: brighter B-section",
+  "Simplify: strip it down",
 ];
 
 // Build a GeneratedBeat from the live engine state so refinements operate on
@@ -205,29 +205,34 @@ export function GeneratorModal() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md"
       onClick={() => !loading && setOpen(false)}
     >
       <div
-        className="bg-surface border border-border rounded-xl shadow-2xl p-6 max-w-2xl w-[90%] max-h-[85vh] overflow-y-auto"
+        className="panel relative max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] p-6"
         onClick={(e) => e.stopPropagation()}
       >
+        <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-[radial-gradient(circle_at_10%_0%,rgba(155,92,255,0.18),transparent_18rem)]" />
+        <div className="relative">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+            <p className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-cyan">
+              Creative instrument
+            </p>
+            <h2 className="text-2xl font-black tracking-[-0.04em] text-white flex items-center gap-2">
               <span className="text-accent">✦</span>
-              {mode === "create" ? "Generate Beat with Claude" : "Refine with Claude"}
+              {mode === "create" ? "Generate a groove" : "Mutate the current groove"}
             </h2>
             <p className="text-xs text-muted mt-1">
               {mode === "create"
-                ? "Describe a vibe, genre, or mood. Claude returns a complete pattern that drops into your current slot."
-                : "Tell Claude how to evolve the current pattern. Targeted edits — kick, snare, fills, swing, key — keep what's working."}
+                ? "Describe a vibe, genre, or mood. A complete pattern drops into the current slot."
+                : "Push the live pattern toward a direction: mutate, expand, simplify, fill, or arrange while keeping what works."}
             </p>
           </div>
           <button
             onClick={() => !loading && setOpen(false)}
             disabled={loading}
-            className="text-muted hover:text-foreground text-xl leading-none px-2 disabled:opacity-30"
+            className="rounded-full px-3 py-1 text-2xl leading-none text-muted hover:bg-white/[0.08] hover:text-foreground disabled:opacity-30"
             title="Close (Esc)"
           >
             ×
@@ -235,26 +240,26 @@ export function GeneratorModal() {
         </div>
 
         {/* Mode tabs */}
-        <div className="flex gap-1 mb-4 border-b border-border">
+        <div className="mb-5 flex gap-2 rounded-2xl bg-white/[0.05] p-1">
           <button
             onClick={() => !loading && setMode("create")}
-            className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors border-b-2 -mb-px ${
+            className={`flex-1 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${
               mode === "create"
-                ? "border-accent text-accent"
-                : "border-transparent text-muted hover:text-foreground"
+                ? "bg-accent text-white"
+                : "text-muted hover:bg-white/[0.06] hover:text-foreground"
             }`}
           >
-            Create
+            Generate
           </button>
           <button
             onClick={() => !loading && setMode("refine")}
-            className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors border-b-2 -mb-px ${
+            className={`flex-1 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${
               mode === "refine"
-                ? "border-accent text-accent"
-                : "border-transparent text-muted hover:text-foreground"
+                ? "bg-accent text-white"
+                : "text-muted hover:bg-white/[0.06] hover:text-foreground"
             }`}
           >
-            Refine
+            Mutate
           </button>
         </div>
 
@@ -262,8 +267,8 @@ export function GeneratorModal() {
           <>
             {/* Suggestion chips */}
             <div className="mb-3">
-              <div className="text-[9px] uppercase tracking-wider text-muted mb-1.5">
-                Try one
+              <div className="text-[9px] font-black uppercase tracking-[0.22em] text-muted mb-2">
+                Starting points
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {SUGGESTIONS.map((s) => (
@@ -271,7 +276,7 @@ export function GeneratorModal() {
                     key={s}
                     onClick={() => handleSuggestion(s)}
                     disabled={loading}
-                    className="px-2 py-1 rounded text-[10px] bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="rounded-full bg-white/[0.07] px-3 py-1.5 text-[10px] text-muted transition-colors hover:bg-white/[0.13] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
                   >
                     {s}
                   </button>
@@ -294,7 +299,7 @@ export function GeneratorModal() {
               rows={3}
               placeholder="e.g. dusty boom-bap at 92 with ghost-note snare and a deep bass walking through Dm..."
               disabled={loading}
-              className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted/50 focus:outline-none focus:border-accent resize-none disabled:opacity-50"
+              className="w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-foreground placeholder:text-muted/50 focus:border-accent focus:outline-none disabled:opacity-50"
             />
             <div className="flex justify-between items-center mt-1 mb-3">
               <span className="text-[10px] text-muted/70">
@@ -306,8 +311,8 @@ export function GeneratorModal() {
           <>
             {/* Refinement chips */}
             <div className="mb-3">
-              <div className="text-[9px] uppercase tracking-wider text-muted mb-1.5">
-                Quick refinements
+              <div className="text-[9px] font-black uppercase tracking-[0.22em] text-muted mb-2">
+                Creative moves
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {REFINE_CHIPS.map((s) => (
@@ -315,7 +320,7 @@ export function GeneratorModal() {
                     key={s}
                     onClick={() => handleRefineChip(s)}
                     disabled={loading}
-                    className="px-2 py-1 rounded text-[10px] bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="rounded-full bg-white/[0.07] px-3 py-1.5 text-[10px] text-muted transition-colors hover:bg-white/[0.13] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
                   >
                     {s}
                   </button>
@@ -338,11 +343,11 @@ export function GeneratorModal() {
               rows={2}
               placeholder="e.g. drop the open hat, add a tom fill on steps 13-16, raise kick velocity"
               disabled={loading}
-              className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted/50 focus:outline-none focus:border-accent resize-none disabled:opacity-50"
+              className="w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-foreground placeholder:text-muted/50 focus:border-accent focus:outline-none disabled:opacity-50"
             />
             <div className="flex justify-between items-center mt-1 mb-3">
               <span className="text-[10px] text-muted/70">
-                {refineDraft.length}/500 · Cmd/Ctrl+Enter to refine · operates on the LIVE pattern
+                {refineDraft.length}/500 · Cmd/Ctrl+Enter to mutate · operates on the live pattern
               </span>
             </div>
           </>
@@ -352,14 +357,14 @@ export function GeneratorModal() {
         <div className="flex items-center justify-between gap-2">
           <div className="text-[10px] text-muted/60">
             {loading
-              ? "Claude is composing…"
+              ? "Shaping the groove…"
               : "Replaces the current pattern. Undoable with Ctrl+Z."}
           </div>
           <div className="flex gap-2">
             {loading && (
               <button
                 onClick={() => abortRef.current?.abort()}
-                className="px-3 py-1.5 rounded text-xs uppercase tracking-wider bg-surface-2 text-muted hover:bg-surface-3 transition-colors"
+                 className="rounded-full bg-white/[0.08] px-4 py-2 text-xs uppercase tracking-wider text-muted transition-colors hover:bg-white/[0.14]"
               >
                 Cancel
               </button>
@@ -377,18 +382,18 @@ export function GeneratorModal() {
                   ? description.trim().length === 0
                   : refineDraft.trim().length === 0)
               }
-              className={`px-4 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-colors ${
+              className={`rounded-full px-5 py-2 text-xs font-black uppercase tracking-[0.18em] transition-colors ${
                 loading
                   ? "bg-accent/40 text-white/60 cursor-wait"
-                  : "bg-accent hover:bg-accent-hover text-white disabled:bg-surface-2 disabled:text-muted/50 disabled:cursor-not-allowed"
+                  : "bg-accent hover:bg-accent-hover text-white disabled:bg-white/[0.06] disabled:text-muted/50 disabled:cursor-not-allowed"
               }`}
             >
               {loading
                 ? mode === "refine"
-                  ? "Refining…"
+                   ? "Mutating…"
                   : "Generating…"
                 : mode === "refine"
-                  ? "Refine"
+                   ? "Mutate"
                   : "Generate"}
             </button>
           </div>
@@ -396,16 +401,16 @@ export function GeneratorModal() {
 
         {/* Result / error */}
         {error && (
-          <div className="mt-4 p-3 bg-danger/10 border border-danger/30 rounded text-xs text-danger whitespace-pre-wrap">
+          <div className="mt-4 rounded-2xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger whitespace-pre-wrap">
             {error}
           </div>
         )}
 
         {lastResult && !error && (
-          <div className="mt-4 p-3 bg-accent/10 border border-accent/30 rounded">
+          <div className="mt-4 rounded-2xl border border-accent/30 bg-accent/10 p-3">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-bold text-accent">
-                {lastResult.refined ? "✦ Refined: " : "✓ Applied: "}
+                 {lastResult.refined ? "✦ Mutated: " : "✓ Applied: "}
                 {lastResult.beat.name}
               </span>
               <span className="text-[9px] text-muted font-mono">
@@ -421,6 +426,7 @@ export function GeneratorModal() {
             </p>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
