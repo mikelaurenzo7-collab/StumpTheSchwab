@@ -104,18 +104,41 @@ function zoneEnergies(spectrum: Float32Array, sampleRate: number): number[] {
 // A "loud" track in a zone: dB above this threshold counts as occupying it.
 const ZONE_OCCUPY_DB = -55;
 
+// Approximate EQ frequency response for a Tone.EQ3-style setup.
+// loShelf @ 250Hz, midPeak @ 1500Hz (Q≈1), hiShelf @ 6000Hz.
+// Returns gain in dB at the given frequency.
+function eqResponseDb(hz: number, low: number, mid: number, high: number): number {
+  const smoothStep = (x: number) => {
+    const c = Math.max(-1, Math.min(1, x));
+    return 0.5 - 0.5 * (3 * c - c * c * c) / 2;
+  };
+  const loGain = low * smoothStep(-Math.log2(hz / 250) * 1.5);
+  const hiGain = high * smoothStep(Math.log2(hz / 6000) * 1.5);
+  const midOctaves = Math.log2(hz / 1500);
+  const midGain = mid * Math.exp(-0.5 * (midOctaves * 1.0) ** 2);
+  return loGain + midGain + hiGain;
+}
+
 interface TrackInfo {
   id: number;
   name: string;
   color: string;
+  eqOn: boolean;
+  eqLow: number;
+  eqMid: number;
+  eqHigh: number;
 }
 
 export const SonicXRay = memo(function SonicXRay({
   getTrackSpectrum,
   height = 180,
+  onConflictsChange,
+  onOpenMixDoctor,
 }: {
   getTrackSpectrum: (index: number) => Float32Array | null;
   height?: number;
+  onConflictsChange?: (c: Record<string, string[]>) => void;
+  onOpenMixDoctor?: () => void;
 }) {
   const tracks = useEngineStore((s) => s.tracks);
   const trackInfos = useMemo<TrackInfo[]>(
@@ -124,6 +147,10 @@ export const SonicXRay = memo(function SonicXRay({
         id: t.id,
         name: t.customSampleName ?? t.sound.name,
         color: t.sound.color,
+        eqOn: t.effects.trackEqOn,
+        eqLow: t.effects.trackEqLow,
+        eqMid: t.effects.trackEqMid,
+        eqHigh: t.effects.trackEqHigh,
       })),
     [tracks]
   );
@@ -133,6 +160,8 @@ export const SonicXRay = memo(function SonicXRay({
   // Conflicts: zone index -> list of track names currently fighting in it.
   const [conflicts, setConflicts] = useState<Record<number, string[]>>({});
   const [focusedTrack, setFocusedTrack] = useState<number | null>(null);
+  const onConflictsChangeRef = useRef(onConflictsChange);
+  onConflictsChangeRef.current = onConflictsChange;
 
   // Stable mouse handler: convert x position to a zone index for the tooltip.
   const handleMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -272,6 +301,52 @@ export const SonicXRay = memo(function SonicXRay({
         ctx.globalAlpha = 1;
       }
 
+      // ── EQ response curves — drawn BELOW the FFT lines, one per track ─────
+      // The curve shows the EQ transfer function (gain vs. frequency) as a
+      // glowing line at the bottom of the canvas. Center = 0dB, ±18dB fills
+      // the zone. This is the visual-learning moment: you SEE what EQ does.
+      // Only rendered when trackEqOn is true for that track.
+      const eqZoneH = h * 0.22;    // EQ display uses bottom 22% of canvas
+      const eqZeroY = h - 8;       // 0dB line near the bottom
+      const eqScale = (eqZoneH - 4) / 18; // pixels per dB
+
+      // Draw 0dB reference line
+      ctx.strokeStyle = "rgba(255,255,255,0.07)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 5]);
+      ctx.beginPath();
+      ctx.moveTo(0, eqZeroY);
+      ctx.lineTo(w, eqZeroY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      for (let t = 0; t < trackInfos.length; t++) {
+        const info = trackInfos[t];
+        if (!info.eqOn) continue;
+        if (info.eqLow === 0 && info.eqMid === 0 && info.eqHigh === 0) continue;
+        const dim = focusedTrack !== null && focusedTrack !== info.id;
+        if (dim) continue;
+
+        ctx.beginPath();
+        const eqCols = 120;
+        for (let i = 0; i <= eqCols; i++) {
+          const xN = i / eqCols;
+          const hz = xToHz(xN);
+          const db = eqResponseDb(hz, info.eqLow, info.eqMid, info.eqHigh);
+          const x = xN * w;
+          const y = eqZeroY - db * eqScale;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = info.color;
+        ctx.globalAlpha = 0.75;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+      }
+
       // ── Collision detection (every ~10 frames so the labels don't flicker)
       conflictTick++;
       if (conflictTick % 10 === 0) {
@@ -286,6 +361,7 @@ export const SonicXRay = memo(function SonicXRay({
           if (occupants.length >= 2) next[zi] = occupants;
         }
         setConflicts(next);
+        onConflictsChangeRef.current?.(next as Record<string, string[]>);
       }
 
       // Conflict glow on the zone divider for any contested zone.
@@ -406,14 +482,21 @@ export const SonicXRay = memo(function SonicXRay({
             </div>
           </div>
         ) : conflictCount > 0 ? (
-          <div className="flex items-center gap-2 text-danger">
-            <span className="font-bold">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-danger font-bold">
               {conflictCount} frequency conflict{conflictCount > 1 ? "s" : ""}
             </span>
             <span className="text-foreground/70">
-              · hover any red zone to see who&apos;s fighting and how to fix
-              it. tip: sidechain or carve a notch.
+              · hover any red zone to see who&apos;s fighting and how to fix it.
             </span>
+            {onOpenMixDoctor && (
+              <button
+                onClick={onOpenMixDoctor}
+                className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-accent text-white hover:bg-accent-hover transition-colors"
+              >
+                Fix with Mix Doctor
+              </button>
+            )}
           </div>
         ) : (
           <div className="text-muted">

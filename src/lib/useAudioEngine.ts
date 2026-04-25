@@ -16,6 +16,7 @@ export type SynthNode =
 
 interface TrackFXChain {
   drive: Tone.Distortion;
+  trackEq: Tone.EQ3;   // 3-band post-drive EQ (250Hz/1.5kHz/6kHz fixed crossovers)
   filter: Tone.Filter;
   delay: Tone.FeedbackDelay;
   reverb: Tone.Reverb;
@@ -73,11 +74,16 @@ export function triggerSynth(
 }
 
 function createTrackFX(destination: Tone.InputNode): TrackFXChain {
-  // Signal: synth → drive → filter → (dry / delay / reverb sends) → destination
-  // Drive shapes harmonics BEFORE the filter so the filter can tame any harshness.
+  // Signal: synth → drive → trackEq → filter → (dry / delay / reverb sends) → destination
+  // Drive first: saturates harmonics. EQ next: shapes the result. Filter last: dramatic cuts/sweeps.
   const drive = new Tone.Distortion({ distortion: 0, wet: 1 });
+  // Crossover freqs match SonicXRay zone boundaries: 250Hz (bass/lo-mid),
+  // 1500Hz (mid character), 6000Hz (presence/air). Fixed here — users only
+  // control gain. This is intentional: fewer knobs, faster learning.
+  const trackEq = new Tone.EQ3({ low: 0, mid: 0, high: 0, lowFrequency: 250, highFrequency: 6000 });
+  drive.connect(trackEq);
   const filter = new Tone.Filter({ frequency: 20000, type: "lowpass", Q: 1 });
-  drive.connect(filter);
+  trackEq.connect(filter);
 
   const delay = new Tone.FeedbackDelay({ delayTime: 0.25, feedback: 0.3, wet: 1 });
   const delayGain = new Tone.Gain(0);
@@ -97,7 +103,7 @@ function createTrackFX(destination: Tone.InputNode): TrackFXChain {
   delayGain.connect(destination as unknown as Tone.ToneAudioNode);
   reverbGain.connect(destination as unknown as Tone.ToneAudioNode);
 
-  return { drive, filter, delay, reverb, delayGain, reverbGain, dryGain };
+  return { drive, trackEq, filter, delay, reverb, delayGain, reverbGain, dryGain };
 }
 
 function applyTrackFX(fx: TrackFXChain, effects: TrackEffects) {
@@ -110,6 +116,16 @@ function applyTrackFX(fx: TrackFXChain, effects: TrackEffects) {
   } else {
     fx.drive.distortion = 0;
     fx.drive.wet.value = 0;
+  }
+
+  if (effects.trackEqOn) {
+    fx.trackEq.low.value = Math.max(-18, Math.min(18, effects.trackEqLow));
+    fx.trackEq.mid.value = Math.max(-18, Math.min(18, effects.trackEqMid));
+    fx.trackEq.high.value = Math.max(-18, Math.min(18, effects.trackEqHigh));
+  } else {
+    fx.trackEq.low.value = 0;
+    fx.trackEq.mid.value = 0;
+    fx.trackEq.high.value = 0;
   }
 
   if (effects.filterOn) {
@@ -599,6 +615,7 @@ export function useAudioEngine() {
       truePeakWaveformRef.current?.dispose();
       fxChainsRef.current.forEach((fx) => {
         fx.drive.dispose();
+        fx.trackEq.dispose();
         fx.filter.dispose();
         fx.delay.dispose();
         fx.reverb.dispose();

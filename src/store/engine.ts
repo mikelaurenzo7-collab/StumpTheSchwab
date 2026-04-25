@@ -39,6 +39,14 @@ export interface TrackEffects {
   panLfoRate: LfoRate;
   panLfoDepth: number; // 0..1 (full sweep = 1)
   panLfoShape: LfoShape;
+  // Per-track 3-band EQ. Crossovers are fixed (250Hz low shelf, 1.5kHz mid
+  // peak, 6kHz high shelf) — exposing frequency sliders adds complexity that
+  // beginners don't need. Gain is ±18dB. Lives AFTER drive in the signal
+  // chain so the EQ can tame saturation harmonics.
+  trackEqOn: boolean;
+  trackEqLow: number;  // dB, -18..+18
+  trackEqMid: number;  // dB
+  trackEqHigh: number; // dB
 }
 
 export type LfoRate = "1n" | "2n" | "4n" | "8n" | "16n" | "32n";
@@ -283,6 +291,10 @@ export const DEFAULT_EFFECTS: TrackEffects = {
   panLfoRate: "4n",
   panLfoDepth: 0.5,
   panLfoShape: "sine",
+  trackEqOn: false,
+  trackEqLow: 0,
+  trackEqMid: 0,
+  trackEqHigh: 0,
 };
 
 const DEFAULT_MASTER: MasterBus = {

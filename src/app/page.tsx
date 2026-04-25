@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Transport } from "@/components/Transport";
 import { StepSequencer } from "@/components/StepSequencer";
 import { PianoRoll } from "@/components/PianoRoll";
@@ -8,6 +8,7 @@ import { Mixer } from "@/components/Mixer";
 import { SongChain } from "@/components/SongChain";
 import { HelpOverlay } from "@/components/HelpOverlay";
 import { GeneratorModal } from "@/components/GeneratorModal";
+import { MixDoctorPanel } from "@/components/MixDoctorPanel";
 import { useAudioEngine } from "@/lib/useAudioEngine";
 import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
 import { useAutoSave } from "@/lib/useAutoSave";
@@ -32,6 +33,25 @@ export default function DAW() {
     if (typeof window === "undefined") return false;
     try { return localStorage.getItem("sts_session___autosave") !== null; } catch { return false; }
   });
+
+  const [mixDoctorOpen, setMixDoctorOpen] = useState(false);
+  // Live conflict state bubbled up from the Sonic X-Ray canvas so the Mix
+  // Doctor gets real-time zone collision data without re-computing it.
+  const [xrayConflicts, setXrayConflicts] = useState<Record<string, string[]>>({});
+
+  // D key opens/closes the Mix Doctor
+  const mixDoctorRef = useRef(mixDoctorOpen);
+  mixDoctorRef.current = mixDoctorOpen;
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === "d" || e.key === "D") {
+        setMixDoctorOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   const handleRecover = useCallback(() => {
     recoverAutosave();
@@ -78,9 +98,33 @@ export default function DAW() {
         getTrackSpectrum={getTrackSpectrum}
         getLoudness={getLoudness}
         getTruePeak={getTruePeak}
+        onConflictsChange={setXrayConflicts}
+        onOpenMixDoctor={() => setMixDoctorOpen(true)}
       />
       <HelpOverlay />
       <GeneratorModal />
+
+      {/* Mix Doctor — floating overlay, D key to toggle */}
+      <MixDoctorPanel
+        getLoudness={getLoudness}
+        getTruePeak={getTruePeak}
+        conflicts={xrayConflicts}
+        isOpen={mixDoctorOpen}
+        onClose={() => setMixDoctorOpen(false)}
+      />
+
+      {/* Mix Doctor entry point — always-visible fab when closed */}
+      {!mixDoctorOpen && (
+        <button
+          onClick={() => setMixDoctorOpen(true)}
+          className="fixed bottom-4 right-4 z-40 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent text-white text-[11px] font-bold shadow-lg hover:bg-accent-hover transition-all"
+          title="Open Mix Doctor (D)"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-white/80" />
+          Mix Doctor
+          <span className="text-white/50 text-[9px]">D</span>
+        </button>
+      )}
     </div>
   );
 }

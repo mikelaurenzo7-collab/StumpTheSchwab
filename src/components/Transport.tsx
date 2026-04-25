@@ -41,10 +41,10 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
   const renameInputRef = useRef<HTMLInputElement>(null);
   const [tapTimes, setTapTimes] = useState<number[]>([]);
   const tapResetRef = useRef<number | null>(null);
-  const [exportFormat, setExportFormat] = useState<"wav" | "midi">("wav");
+  const [exportFormat, setExportFormat] = useState<"wav" | "midi" | "stems">("wav");
   const { exportMidi, exporting: exportingMidi } = useMidiExport();
   const [exportLoops, setExportLoops] = useState(2);
-  const { exportWAV, exporting } = useExport();
+  const { exportWAV, exportStems, exporting } = useExport();
   const canUndo = useHistoryStore((s) => s.past.length > 0);
   const canRedo = useHistoryStore((s) => s.future.length > 0);
   const undo = useHistoryStore((s) => s.undo);
@@ -351,13 +351,14 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
         >
           <option value="wav">WAV</option>
           <option value="midi">MIDI</option>
+          <option value="stems">Stems</option>
         </select>
-        {exportFormat === "wav" && (
+        {(exportFormat === "wav" || exportFormat === "stems") && (
           <select
             value={exportLoops}
             onChange={(e) => setExportLoops(Number(e.target.value))}
             className="bg-surface-2 border border-border rounded px-1.5 py-1 text-[10px] font-mono text-muted focus:outline-none focus:border-accent w-14"
-            title="Number of loops to export (WAV only)"
+            title="Number of loops to export"
           >
             <option value={1}>1x</option>
             <option value={2}>2x</option>
@@ -369,6 +370,8 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
           onClick={() => {
             if (exportFormat === "midi") {
               exportMidi();
+            } else if (exportFormat === "stems") {
+              exportStems(exportLoops);
             } else {
               exportWAV(exportLoops);
             }
@@ -382,7 +385,9 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
           title={
             exportFormat === "midi"
               ? "Export pattern as a Standard MIDI File (.mid) — drag into any DAW"
-              : "Export pattern as 16-bit PCM WAV"
+              : exportFormat === "stems"
+                ? "Export each track as a separate WAV file — for collaboration or DAW import"
+                : "Export pattern as 16-bit PCM WAV"
           }
         >
           {exporting ? "Bouncing..." : exportingMidi ? "Writing..." : "Export"}

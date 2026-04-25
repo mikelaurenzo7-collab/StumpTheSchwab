@@ -122,6 +122,45 @@ const TrackFXPanel = memo(function TrackFXPanel({
       {/* Color bar */}
       <div className="h-0.5 w-full rounded" style={{ backgroundColor: color }} />
 
+      {/* 3-Band EQ — fixed crossovers (250/1.5k/6kHz), ±18dB gain.
+          Shown first so it's the first tool a beginner reaches for. The
+          visual EQ curve in the Sonic X-Ray updates in real-time. */}
+      <div className="flex flex-col gap-1">
+        <FXToggle label="EQ" active={effects.trackEqOn} onClick={() => set("trackEqOn", !effects.trackEqOn)} />
+        <div className="flex gap-1">
+          <MiniSlider
+            label="Low"
+            value={effects.trackEqLow}
+            min={-18}
+            max={18}
+            step={0.5}
+            onChange={(v) => set("trackEqLow", v)}
+            unit="dB"
+            disabled={!effects.trackEqOn}
+          />
+          <MiniSlider
+            label="Mid"
+            value={effects.trackEqMid}
+            min={-18}
+            max={18}
+            step={0.5}
+            onChange={(v) => set("trackEqMid", v)}
+            unit="dB"
+            disabled={!effects.trackEqOn}
+          />
+          <MiniSlider
+            label="High"
+            value={effects.trackEqHigh}
+            min={-18}
+            max={18}
+            step={0.5}
+            onChange={(v) => set("trackEqHigh", v)}
+            unit="dB"
+            disabled={!effects.trackEqOn}
+          />
+        </div>
+      </div>
+
       {/* Drive — analog-style saturation. Pre-filter so EQ can tame the harmonics. */}
       <div className="flex flex-col gap-1">
         <FXToggle label="DRV" active={effects.driveOn} onClick={() => set("driveOn", !effects.driveOn)} />
@@ -459,6 +498,7 @@ const ChannelStrip = memo(function ChannelStrip({
   onNoteLength: (id: number, length: number) => void;
 }) {
   const hasFX =
+    effects.trackEqOn ||
     effects.driveOn ||
     effects.filterOn ||
     effects.delayOn ||
@@ -633,12 +673,99 @@ const ChannelStrip = memo(function ChannelStrip({
   );
 });
 
+// ── Vibe Macros — single-click mastering identities ──────────────────────────
+// Each macro is a complete set of master bus settings that creates a specific
+// sonic character. Beginners learn what "punchy" means by hearing what changes.
+const VIBE_MACROS: {
+  label: string;
+  color: string;
+  hint: string;
+  settings: Partial<{
+    eqOn: boolean; eqLow: number; eqMid: number; eqHigh: number;
+    compressorOn: boolean; compressorThreshold: number; compressorRatio: number;
+    compressorAttack: number; compressorRelease: number;
+    limiterOn: boolean; limiterThreshold: number;
+    warmthOn: boolean; warmth: number;
+  }>;
+}[] = [
+  {
+    label: "Punchy",
+    color: "#ef4444",
+    hint: "Hard transients, tight low-end. Fast comp attack, mid cut.",
+    settings: {
+      eqOn: true, eqLow: 2, eqMid: -2, eqHigh: 1,
+      compressorOn: true, compressorThreshold: -16, compressorRatio: 6,
+      compressorAttack: 0.001, compressorRelease: 0.1,
+      limiterOn: true, limiterThreshold: -1,
+      warmthOn: false, warmth: 0.1,
+    },
+  },
+  {
+    label: "Warm",
+    color: "#f59e0b",
+    hint: "Tape saturation, smooth top-end, gentle glue compression.",
+    settings: {
+      eqOn: true, eqLow: 1, eqMid: 0, eqHigh: -1.5,
+      compressorOn: true, compressorThreshold: -20, compressorRatio: 3,
+      compressorAttack: 0.01, compressorRelease: 0.3,
+      limiterOn: true, limiterThreshold: -2,
+      warmthOn: true, warmth: 0.55,
+    },
+  },
+  {
+    label: "Airy",
+    color: "#06b6d4",
+    hint: "High-shelf lift, light compression, room to breathe.",
+    settings: {
+      eqOn: true, eqLow: -1, eqMid: -1, eqHigh: 3,
+      compressorOn: true, compressorThreshold: -24, compressorRatio: 2,
+      compressorAttack: 0.02, compressorRelease: 0.5,
+      limiterOn: true, limiterThreshold: -3,
+      warmthOn: false, warmth: 0.1,
+    },
+  },
+  {
+    label: "Lo-fi",
+    color: "#8b5cf6",
+    hint: "Crushed top-end, heavy warmth, boxy mids. The dusty cassette feel.",
+    settings: {
+      eqOn: true, eqLow: 3, eqMid: 2, eqHigh: -6,
+      compressorOn: true, compressorThreshold: -12, compressorRatio: 8,
+      compressorAttack: 0.005, compressorRelease: 0.2,
+      limiterOn: true, limiterThreshold: -2,
+      warmthOn: true, warmth: 0.85,
+    },
+  },
+  {
+    label: "Club",
+    color: "#22c55e",
+    hint: "Loud, punchy, sub-heavy. Built for big speakers at high volume.",
+    settings: {
+      eqOn: true, eqLow: 4, eqMid: -1, eqHigh: 2,
+      compressorOn: true, compressorThreshold: -14, compressorRatio: 5,
+      compressorAttack: 0.002, compressorRelease: 0.15,
+      limiterOn: true, limiterThreshold: -0.5,
+      warmthOn: true, warmth: 0.3,
+    },
+  },
+];
+
 // ── Master Bus Strip ──────────────────────────────────────────
 function MasterStrip({ getLevel }: { getLevel: () => number }) {
   const master = useEngineStore((s) => s.master);
   const setMaster = useEngineStore((s) => s.setMaster);
 
   const [expanded, setExpanded] = useState(false);
+  const [activeVibe, setActiveVibe] = useState<string | null>(null);
+
+  const applyVibe = useCallback((vibe: typeof VIBE_MACROS[0]) => {
+    const s = vibe.settings;
+    for (const [k, v] of Object.entries(s)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setMaster(k as any, v as any);
+    }
+    setActiveVibe(vibe.label);
+  }, [setMaster]);
 
   return (
     <div className="flex flex-col items-center gap-1 border-l border-border pl-3 ml-1">
@@ -720,6 +847,29 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
           >
             W
           </button>
+        </div>
+
+        {/* Vibe Macros — one-click mastering identity presets */}
+        <div className="flex flex-col gap-0.5 w-full">
+          <span className="text-[7px] uppercase tracking-wider text-muted text-center">Vibe</span>
+          <div className="grid grid-cols-2 gap-0.5">
+            {VIBE_MACROS.map((v) => (
+              <button
+                key={v.label}
+                onClick={() => applyVibe(v)}
+                title={v.hint}
+                className={`h-4 rounded text-[7px] font-bold transition-all ${
+                  activeVibe === v.label ? "text-white ring-1 ring-white/30" : "text-white/70 hover:text-white"
+                }`}
+                style={{
+                  backgroundColor:
+                    activeVibe === v.label ? v.color : `${v.color}55`,
+                }}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Expand controls */}
@@ -873,6 +1023,8 @@ export function Mixer({
   getTrackSpectrum,
   getLoudness,
   getTruePeak,
+  onConflictsChange,
+  onOpenMixDoctor,
 }: {
   getTrackMeter: (index: number) => number;
   getMasterMeter: () => number;
@@ -881,6 +1033,8 @@ export function Mixer({
   getTrackSpectrum: (index: number) => Float32Array | null;
   getLoudness: () => number;
   getTruePeak: () => number;
+  onConflictsChange?: (c: Record<string, string[]>) => void;
+  onOpenMixDoctor?: () => void;
 }) {
   const tracks = useEngineStore((s) => s.tracks);
   const setTrackVolume = useEngineStore((s) => s.setTrackVolume);
@@ -990,7 +1144,11 @@ export function Mixer({
              beginners *when* a mix is ready to ship.
           The classic spectrum + scope sits below as the live overall view. */}
       <div className="mb-3 flex flex-col gap-3">
-        <SonicXRay getTrackSpectrum={getTrackSpectrum} />
+        <SonicXRay
+          getTrackSpectrum={getTrackSpectrum}
+          onConflictsChange={onConflictsChange}
+          onOpenMixDoctor={onOpenMixDoctor}
+        />
         <LoudnessPanel getLoudness={getLoudness} getTruePeak={getTruePeak} />
         <SpectrumAnalyzer
           getSpectrum={getMasterSpectrum}

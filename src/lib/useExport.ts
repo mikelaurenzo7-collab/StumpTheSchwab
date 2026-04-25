@@ -292,5 +292,141 @@ export function useExport() {
     }
   }, []);
 
-  return { exportWAV, exporting };
+  // Render each audible track in isolation and download as separate WAV files.
+  // Useful for collaboration: send stems to a mixing engineer, load into a DAW,
+  // or layer into another project. Each render uses the full FX chain for that
+  // track (drive, EQ, filter, delay, reverb) but strips master bus processing
+  // so the stems remain unmastered.
+  const exportStems = useCallback(async (loops: number = 2) => {
+    setExporting(true);
+    try {
+      const state = useEngineStore.getState();
+      const { bpm, swing, totalSteps, tracks, master } = state;
+      const hasSolo = tracks.some((t: Track) => t.solo);
+
+      const beatsPerStep = 4 / totalSteps;
+      const secondsPerBeat = 60 / bpm;
+      const loopDuration = totalSteps * beatsPerStep * secondsPerBeat;
+      const tail = 0.5;
+      const totalDuration = loopDuration * loops + tail;
+      const stepDurationSeconds = (60 / bpm) * (4 / totalSteps);
+
+      for (const track of tracks) {
+        const audible = hasSolo ? track.solo && !track.muted : !track.muted;
+        const hasContent = track.steps.some((v: number) => v > 0);
+        if (!audible || !hasContent) continue;
+
+        const buffer = await Tone.Offline(({ transport }) => {
+          transport.bpm.value = bpm;
+          transport.swing = swing;
+
+          const dest = new Tone.Gain(track.volume).toDestination();
+          const drive = new Tone.Distortion({
+            distortion: track.effects.driveOn ? track.effects.driveAmount : 0,
+            wet: track.effects.driveOn ? 1 : 0,
+            oversample: "2x",
+          });
+          // Per-track EQ
+          const trackEq = new Tone.EQ3({
+            low: track.effects.trackEqOn ? track.effects.trackEqLow : 0,
+            mid: track.effects.trackEqOn ? track.effects.trackEqMid : 0,
+            high: track.effects.trackEqOn ? track.effects.trackEqHigh : 0,
+            lowFrequency: 250,
+            highFrequency: 6000,
+          });
+          drive.connect(trackEq);
+          const filter = new Tone.Filter({
+            frequency: track.effects.filterOn ? track.effects.filterFreq : 20000,
+            type: track.effects.filterOn ? track.effects.filterType : "lowpass",
+            Q: track.effects.filterOn ? track.effects.filterQ : 1,
+          });
+          trackEq.connect(filter);
+          const dryGain = new Tone.Gain(1).connect(dest);
+          filter.connect(dryGain);
+
+          if (track.effects.delayOn) {
+            const delay = new Tone.FeedbackDelay({
+              delayTime: track.effects.delayTime,
+              feedback: track.effects.delayFeedback,
+              wet: 1,
+            });
+            const dg = new Tone.Gain(track.effects.delayWet).connect(dest);
+            filter.connect(delay);
+            delay.connect(dg);
+          }
+          if (track.effects.reverbOn) {
+            const reverb = new Tone.Reverb({ decay: track.effects.reverbDecay, wet: 1 });
+            const rg = new Tone.Gain(track.effects.reverbWet).connect(dest);
+            filter.connect(reverb);
+            reverb.connect(rg);
+          }
+          if (track.effects.panLfoOn) {
+            const panner = new Tone.Panner(track.pan).connect(dest);
+            const lfo = new Tone.LFO({
+              frequency: track.effects.panLfoRate,
+              type: track.effects.panLfoShape,
+              min: -track.effects.panLfoDepth,
+              max: track.effects.panLfoDepth,
+            });
+            lfo.connect(panner.pan);
+            lfo.start(0);
+            // redirect dry path through panner
+            dryGain.disconnect();
+            dryGain.connect(panner);
+          }
+
+          let synth: SynthNode;
+          if (track.customSampleUrl) {
+            synth = new Tone.Sampler({ urls: { [track.sound.note]: track.customSampleUrl } });
+          } else {
+            synth = createOfflineSynth(track.sound);
+          }
+          synth.connect(drive);
+
+          const noteDur = stepDurationSeconds * (track.noteLength ?? 1.0);
+          const seq = new Tone.Sequence(
+            (time, stepIndex) => {
+              const velocity = track.steps[stepIndex];
+              if (!velocity) return;
+              const prob = track.probabilities[stepIndex] ?? 1.0;
+              if (prob < 1.0 && Math.random() > prob) return;
+              const note = track.notes[stepIndex] || undefined;
+              const nudge = (track.nudge[stepIndex] ?? 0) * stepDurationSeconds;
+              if (synth instanceof Tone.NoiseSynth) {
+                synth.triggerAttackRelease(noteDur, time + nudge, velocity);
+              } else if (synth instanceof Tone.Sampler) {
+                if (!synth.loaded) return;
+                synth.triggerAttackRelease(note ?? track.sound.note, noteDur, time + nudge, velocity);
+              } else {
+                (synth as Tone.Synth).triggerAttackRelease(note ?? track.sound.note, noteDur, time + nudge, velocity);
+              }
+            },
+            Array.from({ length: totalSteps }, (_, i) => i),
+            "16n"
+          );
+          seq.start(0);
+          seq.loop = true;
+          transport.start();
+        }, totalDuration);
+
+        void master; // master bus intentionally excluded from stems
+        const stemName = track.customSampleName ?? track.sound.name;
+        const wav = encodeWAV(buffer.get() as AudioBuffer);
+        const url = URL.createObjectURL(wav);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `sts-stem-${stemName.toLowerCase().replace(/\s+/g, "-")}-${bpm}bpm.wav`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        // Small delay between downloads so browsers don't block the batch
+        await new Promise((r) => setTimeout(r, 120));
+      }
+    } finally {
+      setExporting(false);
+    }
+  }, []);
+
+  return { exportWAV, exportStems, exporting };
 }
