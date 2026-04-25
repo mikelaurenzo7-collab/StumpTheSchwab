@@ -1,7 +1,7 @@
 "use client";
 
 import { useEngineStore, PATTERN_LABELS } from "@/store/engine";
-import { useCallback, useState, type DragEvent } from "react";
+import { useCallback, useState, type DragEvent, type KeyboardEvent } from "react";
 
 export function SongChain() {
   const songMode = useEngineStore((s) => s.songMode);
@@ -55,6 +55,22 @@ export function SongChain() {
     setDragFrom(null);
     setDragOver(null);
   }, []);
+
+  const handleChainKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLButtonElement>, position: number) => {
+      if (e.altKey && e.key === "ArrowUp") {
+        e.preventDefault();
+        if (position > 0) moveChainItem(position, position - 1);
+      } else if (e.altKey && e.key === "ArrowDown") {
+        e.preventDefault();
+        if (position < chain.length - 1) moveChainItem(position, position + 1);
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        removeFromChain(position);
+      }
+    },
+    [chain.length, moveChainItem, removeFromChain]
+  );
 
   if (!songMode) {
     return (
@@ -152,7 +168,7 @@ export function SongChain() {
             </button>
           )}
         </div>
-        <div aria-live="polite" className="sr-only">
+        <div id="song-chain-drag-status" aria-live="polite" className="sr-only">
           {dragFrom === null
             ? ""
             : dragOver === null
@@ -182,8 +198,11 @@ export function SongChain() {
                   onDrop={(e) => handleDrop(e, position)}
                   onDragEnd={handleDragEnd}
                   onClick={() => removeFromChain(position)}
+                  onKeyDown={(e) => handleChainKeyDown(e, position)}
                   aria-current={isCurrent ? "step" : undefined}
-                  aria-label={`${position + 1}. ${patternName}${customName ? `, pattern ${PATTERN_LABELS[patternIdx]}` : ""}${isCurrent ? ", currently playing" : ""}${isDragging ? ", being dragged" : ""}. Drag to reorder, click to remove.`}
+                  aria-describedby={dragFrom !== null ? "song-chain-drag-status" : undefined}
+                  aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown Delete"
+                  aria-label={`${position + 1}. ${patternName}${customName ? `, pattern ${PATTERN_LABELS[patternIdx]}` : ""}${isCurrent ? ", currently playing" : ""}. Click or press Enter to remove. Use Alt plus arrow keys to reorder.`}
                   className={`group flex w-full items-center gap-3 rounded-2xl border px-3 py-2 text-left transition-all ${
                     isCurrent
                       ? "border-accent/50 bg-accent/20 shadow-sm shadow-accent/30"
@@ -207,11 +226,8 @@ export function SongChain() {
                       {isCurrent ? " · playing" : ""}
                     </span>
                   </span>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted group-hover:hidden group-focus-visible:hidden">
-                    Drag
-                  </span>
-                  <span className="hidden text-[10px] font-bold uppercase tracking-[0.18em] text-danger group-hover:block group-focus-visible:block">
-                    Remove
+                  <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted transition-colors group-hover:text-danger group-focus-visible:text-danger">
+                    Drag · Remove
                   </span>
                 </button>
               );
