@@ -14,6 +14,7 @@ type SynthNode =
   | Tone.Synth
   | Tone.AMSynth
   | Tone.FMSynth
+  | Tone.MonoSynth
   | Tone.Sampler;
 
 function createOfflineSynth(sound: TrackSound): SynthNode {
@@ -29,6 +30,8 @@ function createOfflineSynth(sound: TrackSound): SynthNode {
       return new Tone.AMSynth(opts as ConstructorParameters<typeof Tone.AMSynth>[0]);
     case "fm":
       return new Tone.FMSynth(opts as ConstructorParameters<typeof Tone.FMSynth>[0]);
+    case "monosynth":
+      return new Tone.MonoSynth(opts as ConstructorParameters<typeof Tone.MonoSynth>[0]);
     case "synth":
     default:
       return new Tone.Synth(opts as ConstructorParameters<typeof Tone.Synth>[0]);
@@ -550,6 +553,9 @@ async function renderOfflineAudio(
               decay: trackRender.sourceTrack.effects.reverbDecay,
               wet: 1,
             });
+            // Kick off IR generation immediately so the convolver has a tail
+            // by the time the offline render starts hitting it.
+            void reverb.generate();
             const reverbGain = new Tone.Gain(trackRender.sourceTrack.effects.reverbWet).connect(gain);
             filter.connect(reverb);
             reverb.connect(reverbGain);

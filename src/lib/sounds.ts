@@ -5,7 +5,7 @@
 export interface TrackSound {
   name: string;
   color: string;
-  synth: "membrane" | "metal" | "noise" | "synth" | "am" | "fm" | "mic";
+  synth: "membrane" | "metal" | "noise" | "synth" | "am" | "fm" | "monosynth" | "mic";
   note: string;
   melodic: boolean; // true = supports per-step pitch via piano roll
   noteRange?: [string, string]; // [low, high] for piano roll range
@@ -45,7 +45,10 @@ export const DEFAULT_KIT: TrackSound[] = [
     synth: "membrane",
     note: "C1",
     melodic: false,
-    options: { pitchDecay: 0.05, octaves: 6, envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.1 } },
+    // Warm 808-style: 4-octave pitch sweep over a 40 ms decay gives a defined
+    // "thump" without sounding clicky. The amp envelope's longer release lets
+    // the body bloom and tail off naturally rather than choking the low end.
+    options: { pitchDecay: 0.04, octaves: 4, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.5, sustain: 0, release: 0.4 } },
   },
   {
     name: "Snare",
@@ -53,7 +56,10 @@ export const DEFAULT_KIT: TrackSound[] = [
     synth: "noise",
     note: "16n",
     melodic: false,
-    options: { noise: { type: "white" }, envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.05 } },
+    // White noise with a cracky body. Slightly longer decay/release than the
+    // typical 16n burst gives the snare presence and "snap" without stepping
+    // on the next downbeat.
+    options: { noise: { type: "white" }, envelope: { attack: 0.001, decay: 0.18, sustain: 0, release: 0.12 } },
   },
   {
     name: "Hi-Hat",
@@ -61,7 +67,10 @@ export const DEFAULT_KIT: TrackSound[] = [
     synth: "metal",
     note: "C6",
     melodic: false,
-    options: { frequency: 400, envelope: { attack: 0.001, decay: 0.05, release: 0.01 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 },
+    // Tamed metallic burst: lower modulation index avoids the Tone.js default
+    // "angry kettle" sound. Resonance peak around 7 kHz keeps it crisp but
+    // not piercing; brief release prevents ringing into the next 16th.
+    options: { frequency: 250, envelope: { attack: 0.001, decay: 0.05, release: 0.01 }, harmonicity: 4.1, modulationIndex: 16, resonance: 7000, octaves: 1 },
   },
   {
     name: "Open Hat",
@@ -69,7 +78,9 @@ export const DEFAULT_KIT: TrackSound[] = [
     synth: "metal",
     note: "C6",
     melodic: false,
-    options: { frequency: 400, envelope: { attack: 0.001, decay: 0.3, release: 0.1 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 },
+    // Same character as the closed hat with a longer decay/release so it
+    // sustains across beats believably without going washy.
+    options: { frequency: 250, envelope: { attack: 0.001, decay: 0.4, release: 0.2 }, harmonicity: 4.1, modulationIndex: 16, resonance: 7000, octaves: 1 },
   },
   {
     name: "Clap",
@@ -77,16 +88,19 @@ export const DEFAULT_KIT: TrackSound[] = [
     synth: "noise",
     note: "32n",
     melodic: false,
-    options: { noise: { type: "pink" }, envelope: { attack: 0.005, decay: 0.12, sustain: 0, release: 0.08 } },
+    // Pink noise gives a more "hand-shaped" body than white. Slightly slower
+    // attack mimics multi-finger contact; medium decay creates the room reflection.
+    options: { noise: { type: "pink" }, envelope: { attack: 0.002, decay: 0.15, sustain: 0, release: 0.1 } },
   },
   {
     name: "Tom",
     color: "#ec4899",
     synth: "membrane",
-    note: "G1",
+    note: "A2",
     melodic: true,
     noteRange: ["C1", "C3"],
-    options: { pitchDecay: 0.08, octaves: 4, envelope: { attack: 0.001, decay: 0.25, sustain: 0, release: 0.1 } },
+    // Rack-tom range: 3-octave sweep, longer decay than the kick so it sings.
+    options: { pitchDecay: 0.06, octaves: 3, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.2 } },
   },
   {
     name: "Perc",
@@ -95,16 +109,32 @@ export const DEFAULT_KIT: TrackSound[] = [
     note: "C5",
     melodic: true,
     noteRange: ["C4", "C6"],
-    options: { harmonicity: 8, modulationIndex: 2, envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.05 } },
+    // FM bell-pluck: lower modIndex than before keeps the timbre musical not
+    // metallic; carrier/mod envelopes shape a quick "pling" with a short tail.
+    options: {
+      harmonicity: 3.5,
+      modulationIndex: 5,
+      envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.1 },
+      modulation: { type: "sine" },
+      modulationEnvelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 },
+    },
   },
   {
     name: "Bass",
     color: "#6366f1",
-    synth: "synth",
+    synth: "monosynth",
     note: "C2",
     melodic: true,
     noteRange: ["C1", "C4"],
-    options: { oscillator: { type: "triangle" }, envelope: { attack: 0.005, decay: 0.3, sustain: 0.4, release: 0.1 } },
+    // MonoSynth gives us a real filter envelope — the secret to a fat, plucky
+    // bass that opens up on the attack and closes back down. 24 dB/oct lowpass
+    // at moderate Q + saw oscillator = classic synth-bass weight.
+    options: {
+      oscillator: { type: "sawtooth" },
+      envelope: { attack: 0.002, decay: 0.2, sustain: 0.6, release: 0.2 },
+      filterEnvelope: { attack: 0.005, decay: 0.15, sustain: 0.4, release: 0.2, baseFrequency: 60, octaves: 3.5 },
+      filter: { Q: 4, type: "lowpass", rolloff: -24 },
+    },
   },
   {
     name: "Mic / Live",

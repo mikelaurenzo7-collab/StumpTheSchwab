@@ -13,6 +13,7 @@ export type SynthNode =
   | Tone.Synth
   | Tone.AMSynth
   | Tone.FMSynth
+  | Tone.MonoSynth
   | Tone.Sampler
   | Tone.UserMedia;
 
@@ -51,6 +52,8 @@ export function createSynth(sound: TrackSound): SynthNode {
       return new Tone.AMSynth(opts as ConstructorParameters<typeof Tone.AMSynth>[0]);
     case "fm":
       return new Tone.FMSynth(opts as ConstructorParameters<typeof Tone.FMSynth>[0]);
+    case "monosynth":
+      return new Tone.MonoSynth(opts as ConstructorParameters<typeof Tone.MonoSynth>[0]);
     case "synth":
     default:
       return new Tone.Synth(opts as ConstructorParameters<typeof Tone.Synth>[0]);
@@ -93,6 +96,11 @@ function createTrackFX(destination: Tone.InputNode): TrackFXChain {
   const dryGain = new Tone.Gain(1);
 
   const reverb = new Tone.Reverb({ decay: 1.5, wet: 1 });
+  // Tone.Reverb is a convolver — it needs an impulse response generated
+  // before it produces sound. Without this, the reverb send is silent until
+  // the IR finishes rendering on the user's first interaction. Kick it off
+  // immediately so it's ready before playback starts.
+  void reverb.generate();
   const reverbGain = new Tone.Gain(0);
 
   filter.connect(dryGain);
