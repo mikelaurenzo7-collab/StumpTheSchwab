@@ -6,6 +6,7 @@ import { PianoRoll } from "@/components/PianoRoll";
 import { Mixer } from "@/components/Mixer";
 import { SongChain } from "@/components/SongChain";
 import { HelpOverlay } from "@/components/HelpOverlay";
+import { GeneratorModal } from "@/components/GeneratorModal";
 import { useAudioEngine } from "@/lib/useAudioEngine";
 import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
 import "@/store/history";
@@ -22,6 +23,7 @@ export default function DAW() {
       <PianoRoll />
       <Mixer getTrackMeter={getTrackMeter} getMasterMeter={getMasterMeter} />
       <HelpOverlay />
+      <GeneratorModal />
     </div>
   );
 }

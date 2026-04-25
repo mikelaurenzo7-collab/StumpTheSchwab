@@ -57,6 +57,39 @@ export interface Pattern {
 export const PATTERN_LABELS = ["A", "B", "C", "D", "E", "F", "G", "H"] as const;
 export const MAX_PATTERNS = PATTERN_LABELS.length;
 
+// ── AI beat generation types ─────────────────────────────────
+// Track keys here match the order of DEFAULT_KIT in src/lib/sounds.ts.
+export type GeneratedTrackKey =
+  | "kick"
+  | "snare"
+  | "hihat"
+  | "openhat"
+  | "clap"
+  | "tom"
+  | "perc"
+  | "bass";
+
+export const GENERATED_TRACK_KEYS: readonly GeneratedTrackKey[] = [
+  "kick",
+  "snare",
+  "hihat",
+  "openhat",
+  "clap",
+  "tom",
+  "perc",
+  "bass",
+] as const;
+
+export interface GeneratedBeat {
+  name: string;
+  bpm: number;
+  swing: number;
+  totalSteps: 16 | 32;
+  tracks: Record<GeneratedTrackKey, number[]>;
+  melodicNotes: Record<"tom" | "perc" | "bass", string[]>;
+  explanation: string;
+}
+
 export interface EngineState {
   bpm: number;
   swing: number;
@@ -118,6 +151,7 @@ export interface EngineState {
   moveChainItem: (from: number, to: number) => void;
   renamePattern: (index: number, name: string) => void;
   euclideanFill: (trackId: number, hits: number, rotation: number) => void;
+  applyGeneratedBeat: (beat: GeneratedBeat) => void;
 
   copyTrackSteps: (trackId: number) => void;
   pasteTrackSteps: (trackId: number) => void;
@@ -693,6 +727,75 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
             probabilities: t.probabilities.map((p, i) => (pattern[i] ? p : 1.0)),
           };
         }),
+      };
+    });
+  },
+
+  applyGeneratedBeat: (beat) => {
+    pushHistory();
+    set((state) => {
+      const total = beat.totalSteps;
+      const clampVel = (v: unknown): number => {
+        const n = typeof v === "number" ? v : 0;
+        return Math.max(0, Math.min(1, n));
+      };
+      const padArr = <T,>(src: T[] | undefined, length: number, fill: T): T[] =>
+        Array.from({ length }, (_, i) => (src && src[i] !== undefined ? src[i] : fill));
+
+      const newTracks = state.tracks.map((t, i) => {
+        const key = GENERATED_TRACK_KEYS[i];
+        if (!key) return t;
+        const stepsRaw = beat.tracks[key];
+        const stepsPadded = padArr(stepsRaw, total, 0).map(clampVel);
+        const isMelodic = key === "tom" || key === "perc" || key === "bass";
+        const notesRaw = isMelodic
+          ? beat.melodicNotes[key as "tom" | "perc" | "bass"]
+          : undefined;
+        const notesPadded = padArr<string>(notesRaw, total, "").map((n) =>
+          typeof n === "string" ? n : ""
+        );
+        return {
+          ...t,
+          steps: stepsPadded,
+          notes: notesPadded,
+          probabilities: Array(total).fill(1.0),
+        };
+      });
+
+      // Mirror the new pattern data into the current pattern slot so pattern
+      // switching / song mode pick it up. Also resize the OTHER patterns to
+      // the new totalSteps so they don't play half-empty after a switch.
+      const snapshot = {
+        steps: newTracks.map((t) => [...t.steps]),
+        probabilities: newTracks.map((t) => [...t.probabilities]),
+      };
+      const updatedPatterns = state.patterns.map((p, i) => {
+        if (i === state.currentPattern) {
+          return {
+            ...p,
+            name: (beat.name || PATTERN_LABELS[state.currentPattern]).slice(0, 16),
+            steps: snapshot.steps,
+            probabilities: snapshot.probabilities,
+          };
+        }
+        // Other patterns: pad/truncate their step + probability arrays to total.
+        return {
+          ...p,
+          steps: p.steps.map((row) =>
+            Array(total).fill(0).map((_, j) => row[j] ?? 0)
+          ),
+          probabilities: p.probabilities.map((row) =>
+            Array(total).fill(1.0).map((_, j) => row[j] ?? 1.0)
+          ),
+        };
+      });
+
+      return {
+        bpm: Math.max(30, Math.min(300, Math.round(beat.bpm))),
+        swing: Math.max(0, Math.min(1, beat.swing)),
+        totalSteps: total,
+        tracks: newTracks,
+        patterns: updatedPatterns,
       };
     });
   },

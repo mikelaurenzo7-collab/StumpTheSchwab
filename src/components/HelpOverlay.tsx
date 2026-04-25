@@ -53,6 +53,7 @@ const SHORTCUTS: ShortcutGroup[] = [
   {
     title: "Global",
     items: [
+      { keys: ["G"], label: "Generate beat with Claude" },
       { keys: ["H"], label: "Humanize all tracks" },
       { keys: ["?"], label: "Toggle this help overlay" },
     ],

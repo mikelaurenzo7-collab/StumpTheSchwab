@@ -56,6 +56,14 @@ export function useKeyboardShortcuts(onInit: () => Promise<void>) {
           break;
         }
 
+        // G: Open AI generator
+        case "KeyG": {
+          if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) break;
+          e.preventDefault();
+          useUiStore.getState().setGeneratorOpen(true);
+          break;
+        }
+
         // Escape: Close help → close piano roll → stop
         case "Escape": {
           if (useUiStore.getState().helpOpen) {

@@ -135,6 +135,16 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
         STS
       </div>
 
+      {/* AI Generate */}
+      <button
+        onClick={() => useUiStore.getState().setGeneratorOpen(true)}
+        className="px-3 py-2 rounded-lg bg-gradient-to-br from-accent to-accent-dim hover:from-accent-hover hover:to-accent text-white text-xs font-bold uppercase tracking-wider transition-all shadow-sm shadow-accent/30 flex items-center gap-1.5"
+        title="Generate a beat with Claude (G)"
+      >
+        <span className="text-sm leading-none">✦</span>
+        Generate
+      </button>
+
       {/* Play/Pause */}
       <button
         onClick={handlePlay}
