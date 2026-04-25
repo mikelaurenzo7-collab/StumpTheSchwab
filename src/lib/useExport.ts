@@ -11,7 +11,8 @@ type SynthNode =
   | Tone.NoiseSynth
   | Tone.Synth
   | Tone.AMSynth
-  | Tone.FMSynth;
+  | Tone.FMSynth
+  | Tone.Sampler;
 
 function createOfflineSynth(sound: TrackSound): SynthNode {
   const opts = (sound.options ?? {}) as Record<string, unknown>;
@@ -194,7 +195,12 @@ export function useExport() {
             reverb.connect(reverbGain);
           }
 
-          const synth = createOfflineSynth(track.sound);
+          let synth: SynthNode;
+          if (track.customSampleUrl) {
+            synth = new Tone.Sampler({ urls: { [track.sound.note]: track.customSampleUrl } });
+          } else {
+            synth = createOfflineSynth(track.sound);
+          }
           synth.connect(drive);
 
           const trackSteps = flatSteps[trackIdx];
@@ -212,6 +218,10 @@ export function useExport() {
               const noteOverride = track.notes[stepIndex % totalSteps] || undefined;
               if (synth instanceof Tone.NoiseSynth) {
                 synth.triggerAttackRelease(noteDuration as string, time, velocity);
+              } else if (synth instanceof Tone.Sampler) {
+                if (!synth.loaded) return;
+                const note = noteOverride || track.sound.note;
+                synth.triggerAttackRelease(note, noteDuration as string, time, velocity);
               } else {
                 const note = noteOverride || track.sound.note;
                 (synth as Tone.Synth).triggerAttackRelease(note, noteDuration as string, time, velocity);

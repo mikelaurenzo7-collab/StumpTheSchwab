@@ -11,7 +11,8 @@ export type SynthNode =
   | Tone.NoiseSynth
   | Tone.Synth
   | Tone.AMSynth
-  | Tone.FMSynth;
+  | Tone.FMSynth
+  | Tone.Sampler;
 
 interface TrackFXChain {
   drive: Tone.Distortion;
@@ -51,6 +52,10 @@ export function createSynth(sound: TrackSound): SynthNode {
 export function triggerSynth(synth: SynthNode, sound: TrackSound, time: number, velocity: number, duration: string, noteOverride?: string) {
   if (synth instanceof Tone.NoiseSynth) {
     synth.triggerAttackRelease(duration, time, velocity);
+  } else if (synth instanceof Tone.Sampler) {
+    if (!synth.loaded) return;
+    const note = noteOverride || sound.note;
+    synth.triggerAttackRelease(note, duration, time, velocity);
   } else {
     const note = noteOverride || sound.note;
     (synth as Tone.Synth).triggerAttackRelease(note, duration, time, velocity);
@@ -206,7 +211,12 @@ export function useAudioEngine() {
       const fx = createTrackFX(gain);
       applyTrackFX(fx, track.effects);
 
-      const synth = createSynth(track.sound);
+      let synth: SynthNode;
+      if (track.customSampleUrl) {
+        synth = new Tone.Sampler({ urls: { [track.sound.note]: track.customSampleUrl } });
+      } else {
+        synth = createSynth(track.sound);
+      }
       synth.connect(fx.drive);
 
       synthsRef.current.push(synth);
@@ -248,6 +258,43 @@ export function useAudioEngine() {
         const fx = fxChainsRef.current[i];
         if (!fx) return;
         applyTrackFX(fx, track.effects);
+      });
+    });
+    return unsub;
+  }, []);
+
+  // Hot-swap synths when a custom sample is loaded or cleared
+  useEffect(() => {
+    const prevUrls: (string | null)[] = useEngineStore
+      .getState()
+      .tracks.map((t) => t.customSampleUrl);
+
+    const unsub = useEngineStore.subscribe((state) => {
+      state.tracks.forEach((track, i) => {
+        const prev = prevUrls[i] ?? null;
+        const curr = track.customSampleUrl;
+        if (curr === prev) return;
+        prevUrls[i] = curr;
+
+        const fx = fxChainsRef.current[i];
+        if (!fx) return;
+
+        const oldSynth = synthsRef.current[i];
+        if (curr) {
+          const sampler = new Tone.Sampler({
+            urls: { [track.sound.note]: curr },
+            onload: () => {
+              sampler.connect(fx.drive);
+              synthsRef.current[i] = sampler;
+              oldSynth?.dispose();
+            },
+          });
+        } else {
+          const synth = createSynth(track.sound);
+          synth.connect(fx.drive);
+          synthsRef.current[i] = synth;
+          oldSynth?.dispose();
+        }
       });
     });
     return unsub;

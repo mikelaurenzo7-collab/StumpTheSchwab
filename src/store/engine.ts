@@ -48,6 +48,8 @@ export interface Track {
   muted: boolean;
   solo: boolean;
   effects: TrackEffects;
+  customSampleUrl: string | null;
+  customSampleName: string | null;
 }
 
 export interface Pattern {
@@ -160,6 +162,9 @@ export interface EngineState {
 
   humanize: (trackId: number | null, amount: number) => void;
 
+  loadSample: (trackId: number, url: string, name: string) => void;
+  clearSample: (trackId: number) => void;
+
   saveSession: (name: string) => void;
   loadSession: (name: string) => boolean;
   deleteSession: (name: string) => void;
@@ -254,6 +259,8 @@ function createTracks(totalSteps: number): Track[] {
     muted: false,
     solo: false,
     effects: { ...DEFAULT_EFFECTS },
+    customSampleUrl: null,
+    customSampleName: null,
   }));
 }
 
@@ -273,6 +280,8 @@ interface SessionData {
     muted: boolean;
     solo: boolean;
     effects: TrackEffects;
+    customSampleUrl?: string | null;
+    customSampleName?: string | null;
   }[];
   patterns?: { name: string; steps: number[][]; probabilities?: number[][] }[];
   currentPattern?: number;
@@ -296,6 +305,8 @@ function serializeSession(state: EngineState): SessionData {
       muted: t.muted,
       solo: t.solo,
       effects: t.effects,
+      customSampleUrl: t.customSampleUrl,
+      customSampleName: t.customSampleName,
     })),
     patterns: state.patterns.map((p) => ({
       name: p.name,
@@ -822,6 +833,23 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
     });
   },
 
+  // ── Sample loading ───────────────────────────────────────────
+  loadSample: (trackId, url, name) => {
+    set((state) => ({
+      tracks: state.tracks.map((t) =>
+        t.id === trackId ? { ...t, customSampleUrl: url, customSampleName: name } : t
+      ),
+    }));
+  },
+
+  clearSample: (trackId) => {
+    set((state) => ({
+      tracks: state.tracks.map((t) =>
+        t.id === trackId ? { ...t, customSampleUrl: null, customSampleName: null } : t
+      ),
+    }));
+  },
+
   // ── Track clipboard ──────────────────────────────────────────
   copyTrackSteps: (trackId) => {
     const track = get().tracks[trackId];
@@ -901,6 +929,8 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
           muted: data.tracks[i]?.muted ?? t.muted,
           solo: data.tracks[i]?.solo ?? t.solo,
           effects: data.tracks[i]?.effects ?? t.effects,
+          customSampleUrl: data.tracks[i]?.customSampleUrl ?? null,
+          customSampleName: data.tracks[i]?.customSampleName ?? null,
         })),
         patterns: data.patterns
           ? data.patterns.map((p, i) => ({

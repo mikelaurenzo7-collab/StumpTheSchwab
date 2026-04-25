@@ -301,12 +301,16 @@ const ChannelStrip = memo(function ChannelStrip({
   solo,
   effects,
   fxOpen,
+  hasSample,
+  sampleName,
   getLevel,
   onVolume,
   onPan,
   onMute,
   onSolo,
   onToggleFX,
+  onLoadSample,
+  onClearSample,
 }: {
   trackId: number;
   name: string;
@@ -317,12 +321,16 @@ const ChannelStrip = memo(function ChannelStrip({
   solo: boolean;
   effects: TrackEffects;
   fxOpen: boolean;
+  hasSample: boolean;
+  sampleName: string | null;
   getLevel: () => number;
   onVolume: (id: number, vol: number) => void;
   onPan: (id: number, pan: number) => void;
   onMute: (id: number) => void;
   onSolo: (id: number) => void;
   onToggleFX: (id: number) => void;
+  onLoadSample: (id: number) => void;
+  onClearSample: (id: number) => void;
 }) {
   const hasFX = effects.driveOn || effects.filterOn || effects.delayOn || effects.reverbOn;
 
@@ -335,8 +343,32 @@ const ChannelStrip = memo(function ChannelStrip({
           style={{ backgroundColor: color }}
         />
         <span className="text-[10px] text-muted truncate w-full text-center">
-          {name}
+          {hasSample ? sampleName ?? "Sample" : name}
         </span>
+
+        {/* Sample load / clear */}
+        <div className="flex gap-0.5 w-full justify-center">
+          <button
+            onClick={() => onLoadSample(trackId)}
+            className={`flex-1 h-4 rounded text-[8px] font-bold transition-colors ${
+              hasSample
+                ? "bg-success/30 text-success"
+                : "bg-surface-2 text-muted hover:bg-surface-3"
+            }`}
+            title={hasSample ? `Loaded: ${sampleName}` : "Load audio sample (.wav, .mp3, .ogg)"}
+          >
+            {hasSample ? "SMP" : "SMP"}
+          </button>
+          {hasSample && (
+            <button
+              onClick={() => onClearSample(trackId)}
+              className="w-4 h-4 rounded text-[8px] font-bold bg-surface-2 text-muted hover:bg-danger/20 hover:text-danger transition-colors"
+              title="Clear sample — revert to built-in synth"
+            >
+              ✕
+            </button>
+          )}
+        </div>
 
         {/* Pan knob */}
         <div className="flex flex-col items-center gap-0.5 w-full">
@@ -585,8 +617,12 @@ export function Mixer({
   const setTrackPan = useEngineStore((s) => s.setTrackPan);
   const toggleMute = useEngineStore((s) => s.toggleMute);
   const toggleSolo = useEngineStore((s) => s.toggleSolo);
+  const loadSample = useEngineStore((s) => s.loadSample);
+  const clearSample = useEngineStore((s) => s.clearSample);
 
   const [openFX, setOpenFX] = useState<Set<number>>(new Set());
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingTrackRef = useRef<number>(0);
 
   const trackMeterGetters = useMemo(
     () => tracks.map((_, i) => () => getTrackMeter(i)),
@@ -609,6 +645,41 @@ export function Mixer({
     (id: number) => toggleSolo(id),
     [toggleSolo]
   );
+  const handleLoadSample = useCallback(
+    (id: number) => {
+      pendingTrackRef.current = id;
+      fileInputRef.current?.click();
+    },
+    []
+  );
+
+  const handleClearSample = useCallback(
+    (id: number) => clearSample(id),
+    [clearSample]
+  );
+
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      // Reset so the same file can be re-selected
+      e.target.value = "";
+      const maxSize = 512 * 1024;
+      if (file.size > maxSize) {
+        alert(`Sample too large (${Math.round(file.size / 1024)}KB). Max is 512KB.`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        const name = file.name.replace(/\.[^.]+$/, "").slice(0, 12);
+        loadSample(pendingTrackRef.current, dataUrl, name);
+      };
+      reader.readAsDataURL(file);
+    },
+    [loadSample]
+  );
+
   const handleToggleFX = useCallback((id: number) => {
     setOpenFX((prev) => {
       const next = new Set(prev);
@@ -636,18 +707,31 @@ export function Mixer({
             solo={track.solo}
             effects={track.effects}
             fxOpen={openFX.has(track.id)}
+            hasSample={track.customSampleUrl !== null}
+            sampleName={track.customSampleName}
             getLevel={trackMeterGetters[i]}
             onVolume={handleVolume}
             onPan={handlePan}
             onMute={handleMute}
             onSolo={handleSolo}
             onToggleFX={handleToggleFX}
+            onLoadSample={handleLoadSample}
+            onClearSample={handleClearSample}
           />
         ))}
 
         {/* Master bus */}
         <MasterStrip getLevel={getMasterMeter} />
       </div>
+
+      {/* Hidden file input for sample loading */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="audio/wav,audio/mpeg,audio/ogg,audio/mp3,.wav,.mp3,.ogg"
+        onChange={handleFileChange}
+        className="hidden"
+      />
     </div>
   );
 }
