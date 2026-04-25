@@ -163,6 +163,20 @@ interface BeatResult {
   explanation: string;
 }
 
+type GenerateTarget = "full" | "drums" | "bass" | "melody" | "arrangement";
+
+const TARGET_GUIDANCE: Record<GenerateTarget, string> = {
+  full: "Focus on the full groove and feel free to change any element that improves the musical result.",
+  drums:
+    "Focus primarily on the drum architecture (kick, snare, hats, clap, tom, perc). Keep the bassline and overall melodic identity as intact as possible unless tiny supporting edits are musically necessary.",
+  bass:
+    "Focus primarily on the bassline and low-end movement. Preserve the drum programming and upper percussion unless a minimal supporting tweak is required.",
+  melody:
+    "Focus primarily on fills, tom movement, perc ear candy, and melodic embellishment. Preserve the kick/snare backbone and bass groove unless a tiny support change is required.",
+  arrangement:
+    "Focus primarily on energy contour, tension/release, and section feel within this single pattern. Preserve the groove's core identity while reshaping density, accents, and dynamics to imply arrangement movement.",
+};
+
 function isBeatResult(input: unknown): input is BeatResult {
   if (typeof input !== "object" || input === null) return false;
   const o = input as Record<string, unknown>;
@@ -204,6 +218,17 @@ export async function POST(req: NextRequest) {
     typeof body === "object" && body !== null && "description" in body
       ? (body as { description: unknown }).description
       : null;
+  const targetRaw =
+    typeof body === "object" && body !== null && "target" in body
+      ? (body as { target: unknown }).target
+      : null;
+  const target: GenerateTarget =
+    targetRaw === "drums" ||
+    targetRaw === "bass" ||
+    targetRaw === "melody" ||
+    targetRaw === "arrangement"
+      ? targetRaw
+      : "full";
 
   if (
     typeof description !== "string" ||
@@ -227,8 +252,8 @@ export async function POST(req: NextRequest) {
     isBeatResult(currentBeatRaw) ? (currentBeatRaw as BeatResult) : null;
 
   const userMessage = currentBeat
-    ? `CURRENT BEAT:\n\`\`\`json\n${JSON.stringify(currentBeat, null, 2)}\n\`\`\`\n\nINSTRUCTION: ${description}`
-    : description;
+    ? `CURRENT BEAT:\n\`\`\`json\n${JSON.stringify(currentBeat, null, 2)}\n\`\`\`\n\nTARGET FOCUS: ${TARGET_GUIDANCE[target]}\nINSTRUCTION: ${description}`
+    : `TARGET FOCUS: ${TARGET_GUIDANCE[target]}\nDESCRIPTION: ${description}`;
 
   const client = new Anthropic();
 
