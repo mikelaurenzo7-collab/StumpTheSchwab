@@ -216,7 +216,7 @@ export default function DAW() {
       <GeneratorModal />
       <CommandPalette onInit={initAudio} />
 
-      <StatusBar getMasterMeter={getMasterMeter} />
+      <StatusBar getMasterMeter={getMasterMeter} getMasterWaveform={getMasterWaveform} />
 
       <style jsx global>{`
         .kbd {

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { DEFAULT_KIT, type TrackSound } from "@/lib/sounds";
 import type { PatternPreset } from "@/lib/presets";
+import { findKitPack } from "@/lib/kitPacks";
 
 let _checkpoint: (() => void) | null = null;
 export function _setCheckpoint(fn: () => void) { _checkpoint = fn; }
@@ -70,7 +71,32 @@ export interface MasterBus {
   eqLow: number;   // dB, -24..+24
   eqMid: number;   // dB
   eqHigh: number;  // dB
+  // Tape-style saturation — soft clipping on the master bus. Adds harmonic
+  // content and glues the mix without the "loudness war" smash. We model it
+  // as a Tone.Distortion driven gently (max 0..0.4) so even at 1.0 it stays
+  // musical rather than fuzz-pedal aggressive.
+  tapeOn: boolean;
+  tapeAmount: number; // 0..1
+  // Stereo widener via Tone.StereoWidener. 0 = mono, 0.5 = neutral, 1 = wide.
+  // Useful for adding depth to drum-only loops or narrowing for mono-safety.
+  widthOn: boolean;
+  width: number; // 0..1
+  // Loudness target (LUFS-S verdict). Drives the LoudnessChip readout —
+  // does not auto-adjust gain; this is a meter, not a maximizer.
+  loudnessTarget: LoudnessTarget;
 }
+
+export type LoudnessTarget = "off" | "spotify" | "apple" | "youtube" | "club";
+
+// Integrated loudness targets per platform (LUFS-S approx). Sources:
+// Spotify -14 LUFS, Apple Music -16 LUFS (loudness normalization),
+// YouTube -14 LUFS, Club masters typically -8 to -6 LUFS for energy.
+export const LOUDNESS_TARGETS: Record<Exclude<LoudnessTarget, "off">, { lufs: number; label: string; tp: number }> = {
+  spotify: { lufs: -14, label: "Spotify", tp: -1 },
+  apple:   { lufs: -16, label: "Apple",   tp: -1 },
+  youtube: { lufs: -14, label: "YouTube", tp: -1 },
+  club:    { lufs: -8,  label: "Club",    tp: -0.3 },
+};
 
 export interface Track {
   id: number;
@@ -293,6 +319,11 @@ export interface EngineState {
   setTrackSoundOptions: (trackId: number, options: Record<string, unknown>) => void;
   setTrackSynthType: (trackId: number, synth: TrackSound["synth"]) => void;
   resetTrackSound: (trackId: number) => void;
+  // Whole-kit swap — applies a KitPack across the first 8 tracks. Patterns,
+  // melodic notes, FX and mixer state stay intact; only the synth voicing
+  // changes per slot. Optionally pulls in the pack's recommended bpm/swing.
+  loadKitPack: (id: string, applyTempo?: boolean) => void;
+  activeKitPackId: string | null;
 
   setNoteLength: (trackId: number, length: number) => void;
   setStepNudge: (trackId: number, step: number, nudge: number) => void;
@@ -414,6 +445,11 @@ const DEFAULT_MASTER: MasterBus = {
   eqLow: 0,
   eqMid: 0,
   eqHigh: 0,
+  tapeOn: false,
+  tapeAmount: 0.35,
+  widthOn: false,
+  width: 0.5,
+  loudnessTarget: "spotify",
 };
 
 export const VELOCITY_LEVELS = [1.0, 0.75, 0.5, 0.25] as const;
@@ -1193,6 +1229,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
           ? { ...t, sound: { ...t.sound, options: { ...(t.sound.options ?? {}), ...options } } }
           : t
       ),
+      activeKitPackId: null,
     }));
   },
 
@@ -1202,6 +1239,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
       tracks: state.tracks.map((t) =>
         t.id === trackId ? { ...t, sound: { ...t.sound, synth, options: {} } } : t
       ),
+      activeKitPackId: null,
     }));
   },
 
@@ -1215,6 +1253,25 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         if (!def) return t;
         return { ...t, sound: { ...def } };
       }),
+      activeKitPackId: null,
+    }));
+  },
+
+  activeKitPackId: null,
+
+  loadKitPack: (id, applyTempo = false) => {
+    const pack = findKitPack(id);
+    if (!pack) return;
+    pushHistory();
+    set((state) => ({
+      tracks: state.tracks.map((t, idx) => {
+        const slot = pack.sounds[idx];
+        if (!slot) return t; // out-of-pack tracks (e.g. mic) untouched
+        return { ...t, sound: { ...slot }, customSampleUrl: null, customSampleName: null };
+      }),
+      bpm: applyTempo ? pack.bpm : state.bpm,
+      swing: applyTempo ? pack.swing : state.swing,
+      activeKitPackId: id,
     }));
   },
 

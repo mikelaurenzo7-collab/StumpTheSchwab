@@ -29,6 +29,8 @@ interface TrackFXChain {
 
 interface MasterChain {
   gain: Tone.Gain;
+  tape: Tone.Distortion;
+  widener: Tone.StereoWidener;
   eq: Tone.EQ3;
   compressor: Tone.Compressor;
   limiter: Tone.Limiter;
@@ -227,6 +229,9 @@ function routeModLfo(
 
 function createMasterChain(): MasterChain {
   const master = useEngineStore.getState().master;
+  // Order: gain → tape (warmth) → widener (M/S width) → eq → comp → limiter → out.
+  // Tape lives early so its harmonics get shaped by EQ; widener after tape so the
+  // added harmonic content is what we widen, not just the dry signal.
   const limiter = new Tone.Limiter(master.limiterThreshold).toDestination();
   const compressor = new Tone.Compressor({
     threshold: master.compressorThreshold,
@@ -234,19 +239,41 @@ function createMasterChain(): MasterChain {
     attack: master.compressorAttack,
     release: master.compressorRelease,
   }).connect(limiter);
-  // Tone.EQ3 is a 3-band shelf+peak. It's the standard "master tone" tool;
-  // bypass = all bands at 0 dB.
   const eq = new Tone.EQ3({
     low: master.eqOn ? master.eqLow : 0,
     mid: master.eqOn ? master.eqMid : 0,
     high: master.eqOn ? master.eqHigh : 0,
   }).connect(compressor);
-  const gain = new Tone.Gain(master.volume).connect(eq);
-  return { gain, eq, compressor, limiter };
+  // Width: 0 = mono, 0.5 = neutral, 1 = wide. When off we sit at 0.5.
+  const widener = new Tone.StereoWidener({
+    width: master.widthOn ? master.width : 0.5,
+  }).connect(eq);
+  // Tape: drive the distortion gently (cap at 0.4 so even max stays musical).
+  // 2x oversampling avoids the digital alias-hash that makes plug-in distortion
+  // sound brittle on cymbals and hats.
+  const tape = new Tone.Distortion({
+    distortion: master.tapeOn ? master.tapeAmount * 0.4 : 0,
+    wet: master.tapeOn ? 1 : 0,
+    oversample: "2x",
+  }).connect(widener);
+  const gain = new Tone.Gain(master.volume).connect(tape);
+  return { gain, tape, widener, eq, compressor, limiter };
 }
 
 function applyMasterSettings(chain: MasterChain, master: MasterBus) {
   chain.gain.gain.value = master.volume;
+
+  if (master.tapeOn) {
+    chain.tape.distortion = master.tapeAmount * 0.4;
+    chain.tape.wet.value = 1;
+  } else {
+    chain.tape.distortion = 0;
+    chain.tape.wet.value = 0;
+  }
+
+  // Widener exposes width as a single normal-range param (0 mono → 1 wide).
+  // Bypass = sit at 0.5 so the stereo image is left untouched.
+  chain.widener.width.value = master.widthOn ? master.width : 0.5;
 
   if (master.eqOn) {
     chain.eq.low.value = master.eqLow;
@@ -704,6 +731,8 @@ export function useAudioEngine() {
       });
       if (masterChainRef.current) {
         masterChainRef.current.gain.dispose();
+        masterChainRef.current.tape.dispose();
+        masterChainRef.current.widener.dispose();
         masterChainRef.current.eq.dispose();
         masterChainRef.current.compressor.dispose();
         masterChainRef.current.limiter.dispose();

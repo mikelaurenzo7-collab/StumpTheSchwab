@@ -14,6 +14,7 @@ import {
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SpectrumAnalyzer } from "./SpectrumAnalyzer";
 import { SoundEditor } from "./SoundEditor";
+import { KIT_PACKS } from "@/lib/kitPacks";
 
 // ── Knob-style mini slider ────────────────────────────────────
 function MiniSlider({
@@ -786,6 +787,27 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
             L
           </button>
         </div>
+        {/* Tape / Width toggles — vibe row */}
+        <div className="flex gap-1">
+          <button
+            onClick={() => setMaster("tapeOn", !master.tapeOn)}
+            className={`h-6 w-6 rounded-lg text-[9px] font-bold transition-colors ${
+              master.tapeOn ? "bg-accent text-white" : "button-secondary"
+            }`}
+            title="Tape — soft-saturation analog warmth"
+          >
+            T
+          </button>
+          <button
+            onClick={() => setMaster("widthOn", !master.widthOn)}
+            className={`h-6 w-6 rounded-lg text-[9px] font-bold transition-colors ${
+              master.widthOn ? "bg-accent text-white" : "button-secondary"
+            }`}
+            title="Stereo Widener — 0=mono · 0.5=neutral · 1=wide"
+          >
+            W
+          </button>
+        </div>
 
         {/* Expand controls */}
         <button
@@ -902,6 +924,31 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
               disabled={!master.limiterOn}
             />
           </div>
+
+          {/* Tape & Width */}
+          <div className="flex flex-col gap-1">
+            <span className="text-[9px] text-accent font-bold">VIBE</span>
+            <div className="flex gap-1">
+              <MiniSlider
+                label="Tape"
+                value={master.tapeAmount}
+                min={0}
+                max={1}
+                step={0.01}
+                onChange={(v) => setMaster("tapeAmount", v)}
+                disabled={!master.tapeOn}
+              />
+              <MiniSlider
+                label="Width"
+                value={master.width}
+                min={0}
+                max={1}
+                step={0.01}
+                onChange={(v) => setMaster("width", v)}
+                disabled={!master.widthOn}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -987,6 +1034,11 @@ export function Mixer({
   const [editingSoundId, setEditingSoundId] = useState<number | null>(null);
   const handleEditSound = useCallback((id: number) => setEditingSoundId(id), []);
 
+  const [xrayOn, setXrayOn] = useState(false);
+  const activeKitPackId = useEngineStore((s) => s.activeKitPackId);
+  const loadKitPack = useEngineStore((s) => s.loadKitPack);
+  const [applyKitTempo, setApplyKitTempo] = useState(false);
+
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -1023,19 +1075,67 @@ export function Mixer({
 
   return (
     <div className="px-3 py-3">
-      {/* Master visualizer header — spectrum + oscilloscope */}
-      <div className="mb-3 flex flex-wrap items-center gap-4 rounded-lg border border-border bg-surface-2 px-3 py-2">
-        <div className="flex items-baseline gap-3">
-          <h2 className="text-[13px] font-bold tracking-tight text-foreground">Master</h2>
-          <span className="text-[10px] font-mono text-muted">
-            {tracks.length} ch · {openFX.size} FX
-          </span>
+      {/* Master visualizer header — spectrum + oscilloscope + kit packs */}
+      <div className="mb-3 rounded-lg border border-border bg-surface-2 px-3 py-2">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-baseline gap-3">
+            <h2 className="text-[13px] font-bold tracking-tight text-foreground">Master</h2>
+            <span className="text-[10px] font-mono text-muted">
+              {tracks.length} ch · {openFX.size} FX
+            </span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <SpectrumAnalyzer
+              getSpectrum={getMasterSpectrum}
+              getWaveform={getMasterWaveform}
+              xrayOn={xrayOn}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setXrayOn((v) => !v)}
+            className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+              xrayOn
+                ? "border-accent bg-accent/20 text-accent"
+                : "border-border bg-surface-3 text-muted hover:text-foreground"
+            }`}
+            title="Frequency Zone X-Ray — colour the spectrum by mixing zones (sub/bass/lo-mid/mid/presence/air)"
+          >
+            X-Ray
+          </button>
         </div>
-        <div className="min-w-0 flex-1">
-        <SpectrumAnalyzer
-          getSpectrum={getMasterSpectrum}
-          getWaveform={getMasterWaveform}
-        />
+        {/* Kit Packs row */}
+        <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
+          <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted">
+            Kit
+          </span>
+          {KIT_PACKS.map((pack) => {
+            const active = activeKitPackId === pack.id;
+            return (
+              <button
+                key={pack.id}
+                type="button"
+                onClick={() => loadKitPack(pack.id, applyKitTempo)}
+                className={`rounded-md border px-2 py-1 text-[10px] font-semibold transition-colors ${
+                  active
+                    ? "border-accent bg-accent/20 text-accent"
+                    : "border-border bg-surface-3 text-soft hover:text-foreground"
+                }`}
+                title={`${pack.vibe} · ${pack.bpm} BPM`}
+              >
+                {pack.name}
+              </button>
+            );
+          })}
+          <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-[10px] text-muted">
+            <input
+              type="checkbox"
+              checked={applyKitTempo}
+              onChange={(e) => setApplyKitTempo(e.target.checked)}
+              className="h-3 w-3 accent-[var(--accent)]"
+            />
+            <span>apply pack tempo</span>
+          </label>
         </div>
       </div>
 

@@ -465,8 +465,16 @@ function createOfflineMasterOutput(master: MasterBus, applyMasterProcessing: boo
     mid: master.eqOn ? master.eqMid : 0,
     high: master.eqOn ? master.eqHigh : 0,
   }).connect(compressor);
+  const widener = new Tone.StereoWidener({
+    width: master.widthOn ? master.width : 0.5,
+  }).connect(masterEq);
+  const tape = new Tone.Distortion({
+    distortion: master.tapeOn ? master.tapeAmount * 0.4 : 0,
+    wet: master.tapeOn ? 1 : 0,
+    oversample: "2x",
+  }).connect(widener);
 
-  return new Tone.Gain(master.volume).connect(masterEq);
+  return new Tone.Gain(master.volume).connect(tape);
 }
 
 async function renderOfflineAudio(
