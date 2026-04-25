@@ -32,7 +32,19 @@ export interface TrackEffects {
   sidechainSource: number | null;
   sidechainDepth: number;
   sidechainRelease: number;
+  // Tempo-synced auto-pan LFO. The LFO's output is summed with the manual
+  // pan value (which acts as the center), so left/right movement happens
+  // around wherever the user has the strip parked.
+  panLfoOn: boolean;
+  panLfoRate: LfoRate;
+  panLfoDepth: number; // 0..1 (full sweep = 1)
+  panLfoShape: LfoShape;
 }
+
+export type LfoRate = "1n" | "2n" | "4n" | "8n" | "16n" | "32n";
+export type LfoShape = "sine" | "triangle" | "square" | "sawtooth";
+export const LFO_RATES: readonly LfoRate[] = ["1n", "2n", "4n", "8n", "16n", "32n"];
+export const LFO_SHAPES: readonly LfoShape[] = ["sine", "triangle", "square", "sawtooth"];
 
 export interface MasterBus {
   volume: number;
@@ -242,6 +254,10 @@ export const DEFAULT_EFFECTS: TrackEffects = {
   sidechainSource: null,
   sidechainDepth: 0.7,
   sidechainRelease: 0.18,
+  panLfoOn: false,
+  panLfoRate: "4n",
+  panLfoDepth: 0.5,
+  panLfoShape: "sine",
 };
 
 const DEFAULT_MASTER: MasterBus = {

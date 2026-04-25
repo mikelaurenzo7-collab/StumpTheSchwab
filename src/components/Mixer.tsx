@@ -1,6 +1,14 @@
 "use client";
 
-import { useEngineStore, type TrackEffects, type FilterType } from "@/store/engine";
+import {
+  useEngineStore,
+  type TrackEffects,
+  type FilterType,
+  type LfoRate,
+  type LfoShape,
+  LFO_RATES,
+  LFO_SHAPES,
+} from "@/store/engine";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SpectrumAnalyzer } from "./SpectrumAnalyzer";
 
@@ -225,6 +233,46 @@ const TrackFXPanel = memo(function TrackFXPanel({
         </div>
       </div>
 
+      {/* Auto-pan LFO — tempo-synced. Oscillates around the manual pan
+          center, so users can park a track left and have it wobble around
+          there. */}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-1">
+          <FXToggle label="LFO" active={effects.panLfoOn} onClick={() => set("panLfoOn", !effects.panLfoOn)} />
+          <select
+            value={effects.panLfoShape}
+            onChange={(e) => set("panLfoShape", e.target.value as LfoShape)}
+            disabled={!effects.panLfoOn}
+            className="bg-surface-2 text-[9px] text-foreground rounded px-1 py-0.5 border-none outline-none disabled:opacity-40"
+          >
+            {LFO_SHAPES.map((s) => (
+              <option key={s} value={s}>{s.slice(0, 3)}</option>
+            ))}
+          </select>
+          <select
+            value={effects.panLfoRate}
+            onChange={(e) => set("panLfoRate", e.target.value as LfoRate)}
+            disabled={!effects.panLfoOn}
+            className="bg-surface-2 text-[9px] text-foreground rounded px-1 py-0.5 border-none outline-none disabled:opacity-40"
+          >
+            {LFO_RATES.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex gap-1">
+          <MiniSlider
+            label="Width"
+            value={effects.panLfoDepth}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={(v) => set("panLfoDepth", v)}
+            disabled={!effects.panLfoOn}
+          />
+        </div>
+      </div>
+
       {/* Sidechain — kick→bass pump. Pick a source track; this track ducks
           when the source fires. Classic house/EDM gluing trick. */}
       <div className="flex flex-col gap-1">
@@ -413,7 +461,8 @@ const ChannelStrip = memo(function ChannelStrip({
     effects.filterOn ||
     effects.delayOn ||
     effects.reverbOn ||
-    effects.sidechainOn;
+    effects.sidechainOn ||
+    effects.panLfoOn;
 
   // Brief flash on the track dot when this track is performance-triggered
   // (Q-I keys). The audio engine dispatches "sts-track-trigger" with the

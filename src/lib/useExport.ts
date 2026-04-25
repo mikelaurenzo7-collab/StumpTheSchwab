@@ -173,6 +173,19 @@ export function useExport() {
           duckGains.set(trackIdx, duckGain);
           const gain = new Tone.Gain(track.volume).connect(duckGain);
 
+          // Auto-pan LFO mirrors the live engine: oscillates around the
+          // user's pan center so the rendered file matches what they hear.
+          if (track.effects.panLfoOn) {
+            const lfo = new Tone.LFO({
+              frequency: track.effects.panLfoRate,
+              type: track.effects.panLfoShape,
+              min: -track.effects.panLfoDepth,
+              max: track.effects.panLfoDepth,
+            });
+            lfo.connect(panner.pan);
+            lfo.start(0);
+          }
+
           const drive = new Tone.Distortion({
             distortion: track.effects.driveOn ? track.effects.driveAmount : 0,
             wet: track.effects.driveOn ? 1 : 0,

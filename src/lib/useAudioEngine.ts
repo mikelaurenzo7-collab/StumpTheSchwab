@@ -200,6 +200,7 @@ export function useAudioEngine() {
   const sequenceRef = useRef<Tone.Sequence | null>(null);
   const initializedRef = useRef(false);
   const trackMetersRef = useRef<Tone.Meter[]>([]);
+  const panLfosRef = useRef<Tone.LFO[]>([]);
   const masterMeterRef = useRef<Tone.Meter | null>(null);
   const masterFFTRef = useRef<Tone.FFT | null>(null);
   const masterWaveformRef = useRef<Tone.Waveform | null>(null);
@@ -222,6 +223,7 @@ export function useAudioEngine() {
     panNodesRef.current = [];
     fxChainsRef.current = [];
     trackMetersRef.current = [];
+    panLfosRef.current = [];
 
     // Master meter
     const masterMeter = new Tone.Meter({ smoothing: 0.8 });
@@ -262,19 +264,44 @@ export function useAudioEngine() {
       }
       synth.connect(fx.drive);
 
+      // Per-track auto-pan LFO. Always connected to panner.pan; AudioParams
+      // sum input signals with the param's intrinsic value, so the LFO
+      // oscillates AROUND the user's manual pan setting. When the LFO is
+      // stopped, output is 0 and the manual pan remains effective.
+      const panLfo = new Tone.LFO({
+        frequency: track.effects.panLfoRate,
+        type: track.effects.panLfoShape,
+        min: -track.effects.panLfoDepth,
+        max: track.effects.panLfoDepth,
+      });
+      panLfo.connect(panner.pan);
+      if (track.effects.panLfoOn) panLfo.start();
+
       synthsRef.current.push(synth);
       gainNodesRef.current.push(gain);
       duckGainsRef.current.push(duckGain);
       panNodesRef.current.push(panner);
       fxChainsRef.current.push(fx);
+      panLfosRef.current.push(panLfo);
     });
   }, []);
 
-  // Sync BPM + swing
+  // Sync BPM + swing. LFO frequencies are tempo-synced via Tone.Time strings
+  // ("4n", "8n", etc) — they parse using the BPM at the moment of assignment,
+  // so we re-set them whenever BPM changes to keep modulation in time.
   useEffect(() => {
+    let prevBpm = useEngineStore.getState().bpm;
     const unsub = useEngineStore.subscribe((state) => {
       Tone.getTransport().bpm.value = state.bpm;
       Tone.getTransport().swing = state.swing;
+      if (state.bpm !== prevBpm) {
+        prevBpm = state.bpm;
+        state.tracks.forEach((track, i) => {
+          const lfo = panLfosRef.current[i];
+          if (!lfo) return;
+          lfo.frequency.value = track.effects.panLfoRate;
+        });
+      }
     });
     return unsub;
   }, []);
@@ -295,13 +322,24 @@ export function useAudioEngine() {
     return unsub;
   }, []);
 
-  // Sync per-track effects
+  // Sync per-track effects (incl. auto-pan LFO state)
   useEffect(() => {
     const unsub = useEngineStore.subscribe((state) => {
       state.tracks.forEach((track, i) => {
         const fx = fxChainsRef.current[i];
-        if (!fx) return;
-        applyTrackFX(fx, track.effects);
+        if (fx) applyTrackFX(fx, track.effects);
+
+        const lfo = panLfosRef.current[i];
+        if (!lfo) return;
+        lfo.min = -track.effects.panLfoDepth;
+        lfo.max = track.effects.panLfoDepth;
+        lfo.frequency.value = track.effects.panLfoRate;
+        lfo.type = track.effects.panLfoShape;
+        if (track.effects.panLfoOn && lfo.state !== "started") {
+          lfo.start();
+        } else if (!track.effects.panLfoOn && lfo.state === "started") {
+          lfo.stop();
+        }
       });
     });
     return unsub;
@@ -485,6 +523,10 @@ export function useAudioEngine() {
       gainNodesRef.current.forEach((g) => g.dispose());
       duckGainsRef.current.forEach((g) => g.dispose());
       panNodesRef.current.forEach((p) => p.dispose());
+      panLfosRef.current.forEach((l) => {
+        if (l.state === "started") l.stop();
+        l.dispose();
+      });
       trackMetersRef.current.forEach((m) => m.dispose());
       masterMeterRef.current?.dispose();
       masterFFTRef.current?.dispose();
