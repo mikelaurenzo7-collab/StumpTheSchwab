@@ -148,13 +148,13 @@ export default function DAW() {
               Fast moves
             </p>
             <div className="mt-3 grid gap-2 text-sm text-foreground/80">
-              <div className="rounded-2xl border border-white/6 bg-white/[0.04] p-3">
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.04] p-3">
                 <span className="font-bold text-white">Paint</span> steps by dragging across the grid.
               </div>
-              <div className="rounded-2xl border border-white/6 bg-white/[0.04] p-3">
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.04] p-3">
                 <span className="font-bold text-white">Shape</span> a hit by double-clicking a lit step.
               </div>
-              <div className="rounded-2xl border border-white/6 bg-white/[0.04] p-3">
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.04] p-3">
                 <span className="font-bold text-white">Mutate</span> patterns from the Generate button.
               </div>
             </div>

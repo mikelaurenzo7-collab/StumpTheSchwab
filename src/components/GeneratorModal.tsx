@@ -616,7 +616,7 @@ export function GeneratorModal() {
                       <div className="text-[10px] font-black uppercase tracking-[0.2em]">
                         {option.label}
                       </div>
-                      <div className="mt-1 text-[11px] text-inherit/80">{option.hint}</div>
+                      <div className="mt-1 text-[11px] opacity-80">{option.hint}</div>
                     </button>
                   ))}
                 </div>
