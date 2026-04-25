@@ -80,14 +80,22 @@ function FXToggle({
 }
 
 // ── Track FX Panel ────────────────────────────────────────────
+interface FXPanelTrackInfo {
+  id: number;
+  name: string;
+  color: string;
+}
+
 const TrackFXPanel = memo(function TrackFXPanel({
   trackId,
   effects,
   color,
+  allTracks,
 }: {
   trackId: number;
   effects: TrackEffects;
   color: string;
+  allTracks: FXPanelTrackInfo[];
 }) {
   const setTrackEffect = useEngineStore((s) => s.setTrackEffect);
 
@@ -215,6 +223,61 @@ const TrackFXPanel = memo(function TrackFXPanel({
           />
         </div>
       </div>
+
+      {/* Sidechain — kick→bass pump. Pick a source track; this track ducks
+          when the source fires. Classic house/EDM gluing trick. */}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-1">
+          <FXToggle label="SC" active={effects.sidechainOn} onClick={() => set("sidechainOn", !effects.sidechainOn)} />
+          <span className="text-[8px] uppercase tracking-wider text-muted">Source</span>
+        </div>
+        <div className="flex flex-wrap gap-0.5">
+          {allTracks
+            .filter((t) => t.id !== trackId)
+            .map((t) => {
+              const active = effects.sidechainSource === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() =>
+                    set("sidechainSource", active ? null : t.id)
+                  }
+                  disabled={!effects.sidechainOn}
+                  className={`px-1 py-0.5 rounded text-[8px] font-bold transition-colors ${
+                    active
+                      ? "text-white"
+                      : "bg-surface-2 text-muted hover:bg-surface-3"
+                  } ${!effects.sidechainOn ? "opacity-30 cursor-not-allowed" : ""}`}
+                  style={active ? { backgroundColor: t.color } : undefined}
+                  title={`Duck when ${t.name} fires`}
+                >
+                  {t.name.slice(0, 4)}
+                </button>
+              );
+            })}
+        </div>
+        <div className="flex gap-1">
+          <MiniSlider
+            label="Depth"
+            value={effects.sidechainDepth}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={(v) => set("sidechainDepth", v)}
+            disabled={!effects.sidechainOn || effects.sidechainSource === null}
+          />
+          <MiniSlider
+            label="Rel"
+            value={effects.sidechainRelease}
+            min={0.02}
+            max={0.5}
+            step={0.01}
+            onChange={(v) => set("sidechainRelease", v)}
+            unit="s"
+            disabled={!effects.sidechainOn || effects.sidechainSource === null}
+          />
+        </div>
+      </div>
     </div>
   );
 });
@@ -291,6 +354,12 @@ function panDisplay(pan: number): string {
 }
 
 // ── Channel Strip ──────────────────────────────────────────────
+const NOTE_LENGTH_PRESETS: { label: string; value: number; title: string }[] = [
+  { label: "·", value: 0.1, title: "Staccato (0.1× step)" },
+  { label: "‒", value: 0.5, title: "Half (0.5× step)" },
+  { label: "—", value: 1.0, title: "Legato / full step" },
+];
+
 const ChannelStrip = memo(function ChannelStrip({
   trackId,
   name,
@@ -303,6 +372,8 @@ const ChannelStrip = memo(function ChannelStrip({
   fxOpen,
   hasSample,
   sampleName,
+  noteLength,
+  allTracks,
   getLevel,
   onVolume,
   onPan,
@@ -311,6 +382,7 @@ const ChannelStrip = memo(function ChannelStrip({
   onToggleFX,
   onLoadSample,
   onClearSample,
+  onNoteLength,
 }: {
   trackId: number;
   name: string;
@@ -323,6 +395,8 @@ const ChannelStrip = memo(function ChannelStrip({
   fxOpen: boolean;
   hasSample: boolean;
   sampleName: string | null;
+  noteLength: number;
+  allTracks: FXPanelTrackInfo[];
   getLevel: () => number;
   onVolume: (id: number, vol: number) => void;
   onPan: (id: number, pan: number) => void;
@@ -331,8 +405,14 @@ const ChannelStrip = memo(function ChannelStrip({
   onToggleFX: (id: number) => void;
   onLoadSample: (id: number) => void;
   onClearSample: (id: number) => void;
+  onNoteLength: (id: number, length: number) => void;
 }) {
-  const hasFX = effects.driveOn || effects.filterOn || effects.delayOn || effects.reverbOn;
+  const hasFX =
+    effects.driveOn ||
+    effects.filterOn ||
+    effects.delayOn ||
+    effects.reverbOn ||
+    effects.sidechainOn;
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -368,6 +448,27 @@ const ChannelStrip = memo(function ChannelStrip({
               ✕
             </button>
           )}
+        </div>
+
+        {/* Note length — staccato / half / legato. Cycles with one click. */}
+        <div className="flex gap-0.5 w-full justify-center" title={`Note length: ${noteLength.toFixed(2)}× step`}>
+          {NOTE_LENGTH_PRESETS.map((p) => {
+            const active = Math.abs(noteLength - p.value) < 0.05;
+            return (
+              <button
+                key={p.value}
+                onClick={() => onNoteLength(trackId, p.value)}
+                className={`flex-1 h-3.5 rounded text-[10px] leading-none font-bold transition-colors ${
+                  active
+                    ? "bg-accent text-white"
+                    : "bg-surface-2 text-muted hover:bg-surface-3"
+                }`}
+                title={p.title}
+              >
+                {p.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Pan knob */}
@@ -449,7 +550,12 @@ const ChannelStrip = memo(function ChannelStrip({
 
       {/* Expandable FX panel */}
       {fxOpen && (
-        <TrackFXPanel trackId={trackId} effects={effects} color={color} />
+        <TrackFXPanel
+          trackId={trackId}
+          effects={effects}
+          color={color}
+          allTracks={allTracks}
+        />
       )}
     </div>
   );
@@ -619,6 +725,19 @@ export function Mixer({
   const toggleSolo = useEngineStore((s) => s.toggleSolo);
   const loadSample = useEngineStore((s) => s.loadSample);
   const clearSample = useEngineStore((s) => s.clearSample);
+  const setNoteLength = useEngineStore((s) => s.setNoteLength);
+
+  // Compact track info for the sidechain source picker — built once per track
+  // change (not per render of every channel strip).
+  const allTracksInfo = useMemo<FXPanelTrackInfo[]>(
+    () =>
+      tracks.map((t) => ({
+        id: t.id,
+        name: t.customSampleName ?? t.sound.name,
+        color: t.sound.color,
+      })),
+    [tracks]
+  );
 
   const [openFX, setOpenFX] = useState<Set<number>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -656,6 +775,11 @@ export function Mixer({
   const handleClearSample = useCallback(
     (id: number) => clearSample(id),
     [clearSample]
+  );
+
+  const handleNoteLength = useCallback(
+    (id: number, length: number) => setNoteLength(id, length),
+    [setNoteLength]
   );
 
   const handleFileChange = useCallback(
@@ -709,6 +833,8 @@ export function Mixer({
             fxOpen={openFX.has(track.id)}
             hasSample={track.customSampleUrl !== null}
             sampleName={track.customSampleName}
+            noteLength={track.noteLength}
+            allTracks={allTracksInfo}
             getLevel={trackMeterGetters[i]}
             onVolume={handleVolume}
             onPan={handlePan}
@@ -717,6 +843,7 @@ export function Mixer({
             onToggleFX={handleToggleFX}
             onLoadSample={handleLoadSample}
             onClearSample={handleClearSample}
+            onNoteLength={handleNoteLength}
           />
         ))}
 

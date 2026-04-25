@@ -24,6 +24,14 @@ export interface TrackEffects {
   reverbOn: boolean;
   reverbDecay: number;
   reverbWet: number;
+  // Sidechain ducking — Tone.js has no native sidechain input on its compressor,
+  // so we model the classic kick→bass pump as scheduled gain automation:
+  // whenever the source track fires a step, the target's duck gain dips to
+  // (1 - depth) and recovers linearly over `release` seconds.
+  sidechainOn: boolean;
+  sidechainSource: number | null;
+  sidechainDepth: number;
+  sidechainRelease: number;
 }
 
 export interface MasterBus {
@@ -50,6 +58,10 @@ export interface Track {
   effects: TrackEffects;
   customSampleUrl: string | null;
   customSampleName: string | null;
+  // Note length as fraction of one step. 1.0 = full step (legato bass/pads),
+  // 0.5 = half step (normal hits), 0.1 = staccato. Percussive synths decay
+  // quickly regardless, but this is essential for tight bass and held pads.
+  noteLength: number;
 }
 
 export interface Pattern {
@@ -165,6 +177,8 @@ export interface EngineState {
   loadSample: (trackId: number, url: string, name: string) => void;
   clearSample: (trackId: number) => void;
 
+  setNoteLength: (trackId: number, length: number) => void;
+
   saveSession: (name: string) => void;
   loadSession: (name: string) => boolean;
   deleteSession: (name: string) => void;
@@ -220,6 +234,10 @@ export const DEFAULT_EFFECTS: TrackEffects = {
   reverbOn: false,
   reverbDecay: 1.5,
   reverbWet: 0.2,
+  sidechainOn: false,
+  sidechainSource: null,
+  sidechainDepth: 0.7,
+  sidechainRelease: 0.18,
 };
 
 const DEFAULT_MASTER: MasterBus = {
@@ -261,6 +279,7 @@ function createTracks(totalSteps: number): Track[] {
     effects: { ...DEFAULT_EFFECTS },
     customSampleUrl: null,
     customSampleName: null,
+    noteLength: 1.0,
   }));
 }
 
@@ -282,6 +301,7 @@ interface SessionData {
     effects: TrackEffects;
     customSampleUrl?: string | null;
     customSampleName?: string | null;
+    noteLength?: number;
   }[];
   patterns?: { name: string; steps: number[][]; probabilities?: number[][] }[];
   currentPattern?: number;
@@ -307,6 +327,7 @@ function serializeSession(state: EngineState): SessionData {
       effects: t.effects,
       customSampleUrl: t.customSampleUrl,
       customSampleName: t.customSampleName,
+      noteLength: t.noteLength,
     })),
     patterns: state.patterns.map((p) => ({
       name: p.name,
@@ -850,6 +871,14 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
     }));
   },
 
+  setNoteLength: (trackId, length) => {
+    set((state) => ({
+      tracks: state.tracks.map((t) =>
+        t.id === trackId ? { ...t, noteLength: Math.max(0.05, Math.min(1, length)) } : t
+      ),
+    }));
+  },
+
   // ── Track clipboard ──────────────────────────────────────────
   copyTrackSteps: (trackId) => {
     const track = get().tracks[trackId];
@@ -928,9 +957,12 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
           pan: data.tracks[i]?.pan ?? t.pan,
           muted: data.tracks[i]?.muted ?? t.muted,
           solo: data.tracks[i]?.solo ?? t.solo,
-          effects: data.tracks[i]?.effects ?? t.effects,
+          // Merge defaults onto saved effects so older sessions pick up new
+          // fields (sidechain) without errors.
+          effects: { ...DEFAULT_EFFECTS, ...(data.tracks[i]?.effects ?? {}) },
           customSampleUrl: data.tracks[i]?.customSampleUrl ?? null,
           customSampleName: data.tracks[i]?.customSampleName ?? null,
+          noteLength: data.tracks[i]?.noteLength ?? 1.0,
         })),
         patterns: data.patterns
           ? data.patterns.map((p, i) => ({

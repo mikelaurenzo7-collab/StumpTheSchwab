@@ -49,7 +49,14 @@ export function createSynth(sound: TrackSound): SynthNode {
   }
 }
 
-export function triggerSynth(synth: SynthNode, sound: TrackSound, time: number, velocity: number, duration: string, noteOverride?: string) {
+export function triggerSynth(
+  synth: SynthNode,
+  sound: TrackSound,
+  time: number,
+  velocity: number,
+  duration: string | number,
+  noteOverride?: string,
+) {
   if (synth instanceof Tone.NoiseSynth) {
     synth.triggerAttackRelease(duration, time, velocity);
   } else if (synth instanceof Tone.Sampler) {
@@ -168,6 +175,7 @@ function applyMasterSettings(chain: MasterChain, master: MasterBus) {
 export function useAudioEngine() {
   const synthsRef = useRef<SynthNode[]>([]);
   const gainNodesRef = useRef<Tone.Gain[]>([]);
+  const duckGainsRef = useRef<Tone.Gain[]>([]);
   const panNodesRef = useRef<Tone.Panner[]>([]);
   const fxChainsRef = useRef<TrackFXChain[]>([]);
   const masterChainRef = useRef<MasterChain | null>(null);
@@ -190,6 +198,7 @@ export function useAudioEngine() {
     // Create synths + per-track FX chains + panner + gain nodes
     synthsRef.current = [];
     gainNodesRef.current = [];
+    duckGainsRef.current = [];
     panNodesRef.current = [];
     fxChainsRef.current = [];
     trackMetersRef.current = [];
@@ -200,12 +209,16 @@ export function useAudioEngine() {
     masterMeterRef.current = masterMeter;
 
     tracks.forEach((track) => {
-      // Signal chain: Synth → FX → Gain → Meter → Panner → Master
+      // Signal chain: Synth → FX → Gain → DuckGain → Meter → Panner → Master
+      // DuckGain sits AFTER the user volume so the sidechain ducks the whole
+      // signal (including wet effects). The meter reads post-duck so the UI
+      // reflects what's actually heard.
       const panner = new Tone.Panner(track.pan).connect(masterChain.gain);
-      const gain = new Tone.Gain(track.volume).connect(panner);
+      const duckGain = new Tone.Gain(1).connect(panner);
+      const gain = new Tone.Gain(track.volume).connect(duckGain);
 
       const meter = new Tone.Meter({ smoothing: 0.8 });
-      gain.connect(meter);
+      duckGain.connect(meter);
       trackMetersRef.current.push(meter);
 
       const fx = createTrackFX(gain);
@@ -221,6 +234,7 @@ export function useAudioEngine() {
 
       synthsRef.current.push(synth);
       gainNodesRef.current.push(gain);
+      duckGainsRef.current.push(duckGain);
       panNodesRef.current.push(panner);
       fxChainsRef.current.push(fx);
     });
@@ -330,8 +344,6 @@ export function useAudioEngine() {
         const { totalSteps, setCurrentStep } = startState;
         const stepIndices = Array.from({ length: totalSteps }, (_, i) => i);
 
-        const noteDuration = `${totalSteps}n` as Tone.Unit.Time;
-
         transport.bpm.value = startState.bpm;
         transport.swing = startState.swing;
 
@@ -366,6 +378,10 @@ export function useAudioEngine() {
             const currentTracks = currentState.tracks;
             const hasSolo = currentTracks.some((t: Track) => t.solo);
 
+            // Step duration in seconds; multiplied by per-track noteLength so
+            // each track can be staccato or held independent of the grid.
+            const stepDurationSeconds = (60 / currentState.bpm) * (4 / totalSteps);
+
             currentTracks.forEach((track: Track, trackIndex: number) => {
               const velocity = track.steps[stepIndex];
               if (!velocity) return;
@@ -379,8 +395,25 @@ export function useAudioEngine() {
               const synth = synthsRef.current[trackIndex];
               if (synth) {
                 const noteOverride = track.notes?.[stepIndex] || undefined;
-                triggerSynth(synth, track.sound, time, velocity, noteDuration as string, noteOverride);
+                const dur = stepDurationSeconds * (track.noteLength ?? 1.0);
+                triggerSynth(synth, track.sound, time, velocity, dur, noteOverride);
               }
+
+              // Sidechain ducking — any track listening to this one as its
+              // source dips its duck gain to (1 - depth) and ramps back over
+              // `release` seconds. cancelScheduledValues keeps repeated kicks
+              // from fighting their own previous envelopes.
+              currentTracks.forEach((target: Track, targetIdx: number) => {
+                if (!target.effects.sidechainOn) return;
+                if (target.effects.sidechainSource !== trackIndex) return;
+                const dg = duckGainsRef.current[targetIdx];
+                if (!dg) return;
+                const depth = Math.max(0, Math.min(1, target.effects.sidechainDepth));
+                const release = Math.max(0.01, target.effects.sidechainRelease);
+                dg.gain.cancelScheduledValues(time);
+                dg.gain.setValueAtTime(1 - depth, time);
+                dg.gain.linearRampToValueAtTime(1, time + release);
+              });
             });
 
             // Mark for chain advance at the end of the pattern
@@ -420,6 +453,7 @@ export function useAudioEngine() {
       sequenceRef.current?.dispose();
       synthsRef.current.forEach((s) => s.dispose());
       gainNodesRef.current.forEach((g) => g.dispose());
+      duckGainsRef.current.forEach((g) => g.dispose());
       panNodesRef.current.forEach((p) => p.dispose());
       trackMetersRef.current.forEach((m) => m.dispose());
       masterMeterRef.current?.dispose();

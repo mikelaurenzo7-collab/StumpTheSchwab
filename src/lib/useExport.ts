@@ -134,6 +134,8 @@ export function useExport() {
       const tail = 0.5;
       const totalDuration = loopDuration * loops + tail;
 
+      const stepDurationSeconds = (60 / bpm) * (4 / totalSteps);
+
       const buffer = await Tone.Offline(({ transport }) => {
         transport.bpm.value = bpm;
         transport.swing = swing;
@@ -152,14 +154,19 @@ export function useExport() {
         const masterGain = new Tone.Gain(master.volume).connect(compressor);
 
         const hasSolo = tracks.some((t: Track) => t.solo);
-        const noteDuration = `${totalSteps}n` as Tone.Unit.Time;
+
+        // Per-track duck gain nodes for sidechain — keyed by track index so
+        // each track's sequence callback can schedule envelopes on its targets.
+        const duckGains = new Map<number, Tone.Gain>();
 
         tracks.forEach((track: Track, trackIdx: number) => {
           const audible = hasSolo ? track.solo && !track.muted : !track.muted;
           if (!audible) return;
 
           const panner = new Tone.Panner(track.pan).connect(masterGain);
-          const gain = new Tone.Gain(track.volume).connect(panner);
+          const duckGain = new Tone.Gain(1).connect(panner);
+          duckGains.set(trackIdx, duckGain);
+          const gain = new Tone.Gain(track.volume).connect(duckGain);
 
           const drive = new Tone.Distortion({
             distortion: track.effects.driveOn ? track.effects.driveAmount : 0,
@@ -207,6 +214,8 @@ export function useExport() {
           const trackProbs = flatProbs[trackIdx];
           const stepIndices = Array.from({ length: sequenceLength }, (_, i) => i);
 
+          const noteDur = stepDurationSeconds * (track.noteLength ?? 1.0);
+
           const seq = new Tone.Sequence(
             (time, stepIndex) => {
               const velocity = trackSteps[stepIndex];
@@ -217,15 +226,28 @@ export function useExport() {
               // back into the track's note array for the per-step note.
               const noteOverride = track.notes[stepIndex % totalSteps] || undefined;
               if (synth instanceof Tone.NoiseSynth) {
-                synth.triggerAttackRelease(noteDuration as string, time, velocity);
+                synth.triggerAttackRelease(noteDur, time, velocity);
               } else if (synth instanceof Tone.Sampler) {
                 if (!synth.loaded) return;
                 const note = noteOverride || track.sound.note;
-                synth.triggerAttackRelease(note, noteDuration as string, time, velocity);
+                synth.triggerAttackRelease(note, noteDur, time, velocity);
               } else {
                 const note = noteOverride || track.sound.note;
-                (synth as Tone.Synth).triggerAttackRelease(note, noteDuration as string, time, velocity);
+                (synth as Tone.Synth).triggerAttackRelease(note, noteDur, time, velocity);
               }
+
+              // Sidechain — any track listening to THIS track ducks now.
+              tracks.forEach((target: Track, targetIdx: number) => {
+                if (!target.effects.sidechainOn) return;
+                if (target.effects.sidechainSource !== trackIdx) return;
+                const dg = duckGains.get(targetIdx);
+                if (!dg) return;
+                const depth = Math.max(0, Math.min(1, target.effects.sidechainDepth));
+                const release = Math.max(0.01, target.effects.sidechainRelease);
+                dg.gain.cancelScheduledValues(time);
+                dg.gain.setValueAtTime(1 - depth, time);
+                dg.gain.linearRampToValueAtTime(1, time + release);
+              });
             },
             stepIndices,
             "16n"

@@ -7,7 +7,7 @@ interface Snapshot {
   bpm: number;
   swing: number;
   totalSteps: number;
-  tracks: Pick<Track, "steps" | "notes" | "probabilities" | "volume" | "pan" | "muted" | "solo" | "effects">[];
+  tracks: Pick<Track, "steps" | "notes" | "probabilities" | "volume" | "pan" | "muted" | "solo" | "effects" | "noteLength">[];
   patterns: Pattern[];
   currentPattern: number;
   chain: number[];
@@ -38,6 +38,7 @@ function captureSnapshot(): Snapshot {
       muted: t.muted,
       solo: t.solo,
       effects: { ...t.effects },
+      noteLength: t.noteLength,
     })),
     patterns: s.patterns.map((p) => ({
       ...p,
@@ -72,6 +73,7 @@ function restoreSnapshot(snapshot: Snapshot) {
       muted: snapshot.tracks[i]?.muted ?? t.muted,
       solo: snapshot.tracks[i]?.solo ?? t.solo,
       effects: snapshot.tracks[i]?.effects ?? t.effects,
+      noteLength: snapshot.tracks[i]?.noteLength ?? t.noteLength,
     })),
   });
 }
