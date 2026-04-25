@@ -46,9 +46,10 @@ const StepCell = memo(function StepCell({
   const active = velocity > 0;
   const hasProb = active && probability < 1;
   const hasNudge = active && nudge !== 0;
-  const activeStateClass = active
-    ? "border-white/10 shadow-sm shadow-black/30"
-    : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]";
+  let activeStateClass = "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]";
+  if (active) {
+    activeStateClass = "border-white/10 shadow-sm shadow-black/30";
+  }
 
   return (
     <button
