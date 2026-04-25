@@ -68,7 +68,10 @@ export function SongChain() {
               Chain patterns A–H into a song.
             </p>
           </div>
-          <span className="rounded-full bg-white/[0.06] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-muted">
+          <span
+            aria-label="Song Mode is currently disabled"
+            className="rounded-full bg-white/[0.06] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-muted"
+          >
             Off
           </span>
         </div>
@@ -97,7 +100,7 @@ export function SongChain() {
             Song Mode On
           </button>
           <span className="text-[10px] font-mono text-accent-hover">
-            {chain.length} {chain.length === 1 ? "slot" : "slots"}
+            {chain.length} {chain.length === 1 ? "pattern" : "patterns"}
           </span>
         </div>
 
@@ -172,6 +175,8 @@ export function SongChain() {
                   onDrop={(e) => handleDrop(e, position)}
                   onDragEnd={handleDragEnd}
                   onClick={() => removeFromChain(position)}
+                  aria-current={isCurrent ? "step" : undefined}
+                  aria-label={`${position + 1}. ${patternName}${customName ? `, pattern ${PATTERN_LABELS[patternIdx]}` : ""}${isCurrent ? ", currently playing" : ""}${isDragging ? ", being dragged" : ""}. Drag to reorder, click to remove.`}
                   className={`group flex w-full items-center gap-3 rounded-2xl border px-3 py-2 text-left transition-all ${
                     isCurrent
                       ? "border-accent/50 bg-accent/20 shadow-sm shadow-accent/30"
