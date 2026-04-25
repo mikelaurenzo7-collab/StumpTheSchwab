@@ -108,14 +108,14 @@ const MAX_PROFILES = 6;
 const OPEN_DRUMS_THRESHOLD_DIVISOR = 4;
 const MIN_FILL_HITS = 3;
 const POCKET_KICK_THRESHOLD = 4;
-const STRAIGHT_SWING_THRESHOLD = 0.08;
+const LOW_SWING_THRESHOLD = 0.08;
 const HISTORY_TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
   hour: "2-digit",
   minute: "2-digit",
 });
 
 function createId() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();
   }
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -308,7 +308,7 @@ export function GeneratorModal() {
         target: "arrangement",
       });
     }
-    if (kickHits >= POCKET_KICK_THRESHOLD && swing < STRAIGHT_SWING_THRESHOLD) {
+    if (kickHits >= POCKET_KICK_THRESHOLD && swing < LOW_SWING_THRESHOLD) {
       moves.push({
         label: "Loosen the pocket",
         prompt:
@@ -367,27 +367,26 @@ export function GeneratorModal() {
   const handleSaveProfile = useCallback(() => {
     const prompt = (mode === "create" ? description : refineDraft).trim();
     if (!prompt) return;
-    const profile: CreativeProfile = {
-      id: createId(),
-      name: extractProfileName(prompt, `Profile ${profiles.length + 1}`),
-      prompt,
-      mode,
-      target,
-    };
     setProfiles((current) =>
       [
-        profile,
+        {
+          id: createId(),
+          name: extractProfileName(prompt, `Profile ${current.length + 1}`),
+          prompt,
+          mode,
+          target,
+        },
         ...current.filter(
           (item) =>
             !(
-              item.prompt === profile.prompt &&
-              item.mode === profile.mode &&
-              item.target === profile.target
+              item.prompt === prompt &&
+              item.mode === mode &&
+              item.target === target
             ),
         ),
       ].slice(0, MAX_PROFILES),
     );
-  }, [description, mode, profiles.length, refineDraft, target]);
+  }, [description, mode, refineDraft, target]);
 
   const handleLoadProfile = useCallback((profile: CreativeProfile) => {
     setMode(profile.mode);
@@ -703,6 +702,7 @@ export function GeneratorModal() {
                     ref={inputRef}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
+                    aria-describedby="generator-create-help"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                         e.preventDefault();
@@ -715,7 +715,7 @@ export function GeneratorModal() {
                     disabled={loading}
                     className="w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-foreground placeholder:text-muted/50 focus:border-accent focus:outline-none disabled:opacity-50"
                   />
-                  <div className="mt-1 mb-3 flex justify-between">
+                  <div id="generator-create-help" className="mt-1 mb-3 flex justify-between">
                     <span className="text-[10px] text-muted/70">
                       {description.length}/500 · Cmd/Ctrl+Enter to generate · target {targetLabel(target).toLowerCase()}
                     </span>
@@ -745,6 +745,7 @@ export function GeneratorModal() {
                     ref={refineInputRef}
                     value={refineDraft}
                     onChange={(e) => setRefineDraft(e.target.value)}
+                    aria-describedby="generator-refine-help"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                         e.preventDefault();
@@ -757,7 +758,7 @@ export function GeneratorModal() {
                     disabled={loading}
                     className="w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-foreground placeholder:text-muted/50 focus:border-accent focus:outline-none disabled:opacity-50"
                   />
-                  <div className="mt-1 mb-3 flex justify-between">
+                  <div id="generator-refine-help" className="mt-1 mb-3 flex justify-between">
                     <span className="text-[10px] text-muted/70">
                       {refineDraft.length}/500 · Cmd/Ctrl+Enter to mutate · target {targetLabel(target).toLowerCase()}
                     </span>
