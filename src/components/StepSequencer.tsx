@@ -428,7 +428,7 @@ export function StepSequencer() {
         </div>
       </div>
 
-      <div className="mb-4 grid gap-2 sm:grid-cols-3">
+      <section aria-label="Sequencer workflow tips" className="mb-4 grid gap-2 sm:grid-cols-3">
         <div className="panel-soft rounded-[1.25rem] px-4 py-3">
           <div className="text-[9px] font-black uppercase tracking-[0.22em] text-muted">Flow</div>
           <div className="mt-1 text-sm font-semibold text-white">Sketch fast, then sculpt details.</div>
@@ -441,7 +441,7 @@ export function StepSequencer() {
           <div className="text-[9px] font-black uppercase tracking-[0.22em] text-muted">Performance</div>
           <div className="mt-1 text-sm font-semibold text-white">Hotkeys keep the pocket moving.</div>
         </div>
-      </div>
+      </section>
 
       <div className="panel-soft inline-flex flex-col gap-2 rounded-[1.5rem] p-3">
         {/* Step numbers */}

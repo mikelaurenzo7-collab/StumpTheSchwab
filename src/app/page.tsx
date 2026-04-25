@@ -106,7 +106,7 @@ export default function DAW() {
                   <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted">
                     Mood board
                   </div>
-                  <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] font-semibold text-foreground/85">
+                  <div aria-hidden="true" className="mt-2 grid grid-cols-3 gap-2 text-[11px] font-semibold text-foreground/85">
                     <div className="rounded-2xl bg-white/[0.05] px-3 py-2 text-center">Neon</div>
                     <div className="rounded-2xl bg-white/[0.05] px-3 py-2 text-center">Punch</div>
                     <div className="rounded-2xl bg-white/[0.05] px-3 py-2 text-center">Depth</div>
