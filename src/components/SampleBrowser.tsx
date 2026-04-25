@@ -2,6 +2,7 @@
 
 import { useEngineStore, type Sample } from "@/store/engine";
 import { useState, useRef } from "react";
+import { RecorderModal } from "./RecorderModal";
 
 export function SampleBrowser() {
   const {
@@ -19,6 +20,7 @@ export function SampleBrowser() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTrack, setSelectedTrack] = useState<number | null>(null);
   const [showUpload, setShowUpload] = useState(false);
+  const [showRecorder, setShowRecorder] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -60,15 +62,24 @@ export function SampleBrowser() {
   };
 
   return (
+    <>
     <div className="flex flex-col gap-4 rounded-lg border border-white/10 bg-[#0a0f18]/80 p-4 backdrop-blur">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-white/90">Sample Browser</h3>
-        <button
-          onClick={() => setShowUpload(!showUpload)}
-          className="rounded bg-purple-500/20 px-3 py-1.5 text-xs text-purple-400 hover:bg-purple-500/30"
-        >
-          + Upload
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowRecorder(true)}
+            className="flex items-center gap-1 flex-row rounded bg-yellow-500/20 px-3 py-1.5 text-xs text-yellow-400 hover:bg-yellow-500/30"
+          >
+            ● Record
+          </button>
+          <button
+            onClick={() => setShowUpload(!showUpload)}
+            className="rounded bg-purple-500/20 px-3 py-1.5 text-xs text-purple-400 hover:bg-purple-500/30"
+          >
+            + Upload
+          </button>
+        </div>
       </div>
 
       {/* Upload Section */}
@@ -221,5 +232,7 @@ export function SampleBrowser() {
         </ul>
       </div>
     </div>
+      {showRecorder && <RecorderModal onClose={() => setShowRecorder(false)} />}
+    </>
   );
 }

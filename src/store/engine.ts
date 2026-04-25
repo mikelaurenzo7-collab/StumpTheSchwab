@@ -39,10 +39,21 @@ export interface TrackEffects {
   panLfoRate: LfoRate;
   panLfoDepth: number; // 0..1 (full sweep = 1)
   panLfoShape: LfoShape;
+  // Parametric Mod LFO — a free-routing modulator that can be wired to any
+  // destination on the track's signal path. Combined with the dedicated pan
+  // LFO above, this lets a single track host two independent modulators —
+  // e.g. slow filter sweep + fast tremolo, or pitch wobble + wide auto-pan.
+  modLfoOn: boolean;
+  modLfoRate: LfoRate;
+  modLfoDepth: number; // 0..1 (mapped to destination range internally)
+  modLfoShape: LfoShape;
+  modLfoTarget: ModLfoTarget;
 }
 
 export type LfoRate = "1n" | "2n" | "4n" | "8n" | "16n" | "32n";
 export type LfoShape = "sine" | "triangle" | "square" | "sawtooth";
+export type ModLfoTarget = "filterFreq" | "drive" | "delayFeedback" | "reverbWet" | "volume";
+export const MOD_LFO_TARGETS: readonly ModLfoTarget[] = ["filterFreq", "drive", "delayFeedback", "reverbWet", "volume"];
 export const LFO_RATES: readonly LfoRate[] = ["1n", "2n", "4n", "8n", "16n", "32n"];
 export const LFO_SHAPES: readonly LfoShape[] = ["sine", "triangle", "square", "sawtooth"];
 
@@ -316,6 +327,9 @@ export interface EngineState {
   loadSampleFromLibrary: (trackId: number, sampleId: string) => void;
   filterSamplesByCategory: (category: string) => Sample[];
   searchSamples: (query: string) => Sample[];
+
+  // ── AI Mix Assistant ──────────────────────────────────────
+  autoMix: () => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -375,6 +389,11 @@ export const DEFAULT_EFFECTS: TrackEffects = {
   panLfoRate: "4n",
   panLfoDepth: 0.5,
   panLfoShape: "sine",
+  modLfoOn: false,
+  modLfoRate: "4n",
+  modLfoDepth: 0.5,
+  modLfoShape: "sine",
+  modLfoTarget: "filterFreq",
 };
 
 const DEFAULT_MASTER: MasterBus = {
@@ -1629,4 +1648,75 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         s.category.toLowerCase().includes(lower)
     );
   },
+
+  // ── AI Mix Assistant ──────────────────────────────────────────
+  autoMix: () => {
+    pushHistory();
+    set((state) => {
+      // Basic AI heuristic auto-mixer
+      const kickIdx = state.tracks.findIndex(t => t.sound.name.toLowerCase().includes("kick") || t.customSampleName?.toLowerCase().includes("kick"));
+      
+      const newTracks = state.tracks.map((t, i) => {
+        const name = (t.customSampleName || t.sound.name).toLowerCase();
+        let vol = t.volume;
+        let pan = t.pan;
+        const fx = { ...t.effects };
+
+        if (name.includes("kick")) {
+          vol = 0.85;
+          pan = 0;
+        } else if (name.includes("bass") || name.includes("808")) {
+          vol = 0.8;
+          pan = 0;
+          // Auto sidechain to kick
+          if (kickIdx !== -1 && kickIdx !== i) {
+            fx.sidechainOn = true;
+            fx.sidechainSource = kickIdx;
+            fx.sidechainDepth = 0.7;
+          }
+        } else if (name.includes("snare") || name.includes("clap")) {
+          vol = 0.75;
+          pan = 0;
+          // Tiny bit of reverb usually
+          if (!fx.reverbOn) {
+            fx.reverbOn = true;
+            fx.reverbWet = 0.15;
+          }
+        } else if (name.includes("hat") || name.includes("cymbal")) {
+          vol = 0.6;
+          // Alternate panning for hats/shakers
+          pan = i % 2 === 0 ? -0.25 : 0.25;
+        } else if (name.includes("perc") || name.includes("tom")) {
+          vol = 0.65;
+          pan = i % 2 === 0 ? 0.3 : -0.3;
+        } else if (name.includes("synth") || name.includes("lead")) {
+          vol = 0.7;
+          pan = i % 2 === 0 ? -0.15 : 0.15;
+          if (!fx.delayOn) {
+            fx.delayOn = true;
+            fx.delayWet = 0.2;
+          }
+        }
+
+        return { ...t, volume: vol, pan, effects: fx };
+      });
+
+      return {
+        tracks: newTracks,
+        master: {
+          ...state.master,
+          volume: 0.85,
+          compressorOn: true,
+          compressorThreshold: -15,
+          compressorRatio: 2,
+          compressorAttack: 0.03, // 30ms for glue, let transients through
+          compressorRelease: 0.15,
+          eqOn: true,
+          eqLow: 2,   // Warm bump
+          eqMid: -1,  // Slight mud cut
+          eqHigh: 1.5 // Air
+        }
+      };
+    });
+  }
 }));

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import * as Tone from "tone";
-import { useEngineStore, type Track, type TrackEffects, type MasterBus } from "@/store/engine";
+import { useEngineStore, type Track, type TrackEffects, type MasterBus, type ModLfoTarget } from "@/store/engine";
 import type { TrackSound } from "@/lib/sounds";
 import { getStepDurationSeconds, getStepSubdivision } from "@/lib/stepTiming";
 
@@ -13,7 +13,8 @@ export type SynthNode =
   | Tone.Synth
   | Tone.AMSynth
   | Tone.FMSynth
-  | Tone.Sampler;
+  | Tone.Sampler
+  | Tone.UserMedia;
 
 interface TrackFXChain {
   drive: Tone.Distortion;
@@ -35,6 +36,11 @@ interface MasterChain {
 export function createSynth(sound: TrackSound): SynthNode {
   const opts = (sound.options ?? {}) as Record<string, unknown>;
   switch (sound.synth) {
+    case "mic": {
+      const mic = new Tone.UserMedia();
+      mic.open().catch(err => console.warn("Could not access microphone", err));
+      return mic;
+    }
     case "membrane":
       return new Tone.MembraneSynth(opts as ConstructorParameters<typeof Tone.MembraneSynth>[0]);
     case "metal":
@@ -51,6 +57,7 @@ export function createSynth(sound: TrackSound): SynthNode {
   }
 }
 
+
 export function triggerSynth(
   synth: SynthNode,
   sound: TrackSound,
@@ -59,7 +66,10 @@ export function triggerSynth(
   duration: string | number,
   noteOverride?: string,
 ) {
-  if (synth instanceof Tone.NoiseSynth) {
+  if (synth instanceof Tone.UserMedia) {
+    // Mic input is continuous, no trigger needed. (Could implement a gate or recording envelope later).
+    return;
+  } else if (synth instanceof Tone.NoiseSynth) {
     synth.triggerAttackRelease(duration, time, velocity);
   } else if (synth instanceof Tone.Sampler) {
     if (!synth.loaded) return;
@@ -137,6 +147,76 @@ function applyTrackFX(fx: TrackFXChain, effects: TrackEffects) {
   }
 }
 
+// Maps a Mod LFO target to the destination AudioParam plus a depth scaler.
+// Depth (0..1) is mapped into a sensible swing range per parameter so the
+// modulation feels musical rather than clipping or inaudible.
+function modLfoDestination(
+  target: ModLfoTarget,
+  fx: TrackFXChain,
+  gain: Tone.Gain,
+): { param: Tone.Param<"frequency"> | Tone.Param<"normalRange"> | Tone.Param<"gain"> | Tone.Signal | null; range: number } | null {
+  switch (target) {
+    case "filterFreq":
+      // ±3.5 kHz sweep at full depth. Filter base sits at user setting; LFO
+      // sums into the param so the cutoff dances around it.
+      return { param: fx.filter.frequency as unknown as Tone.Signal, range: 3500 };
+    case "drive":
+      // Modulate distortion wet (0..1). Param is a Signal in Tone.Distortion.
+      return { param: fx.drive.wet as unknown as Tone.Signal, range: 0.5 };
+    case "delayFeedback":
+      return { param: fx.delay.feedback as unknown as Tone.Signal, range: 0.35 };
+    case "reverbWet":
+      return { param: fx.reverbGain.gain as unknown as Tone.Signal, range: 0.5 };
+    case "volume":
+      return { param: gain.gain as unknown as Tone.Signal, range: 0.4 };
+    default:
+      return null;
+  }
+}
+
+function routeModLfo(
+  entry: { lfo: Tone.LFO; target: ModLfoTarget | null },
+  effects: TrackEffects,
+  fx: TrackFXChain,
+  gain: Tone.Gain,
+) {
+  // Always update rate/shape — cheap.
+  entry.lfo.frequency.value = effects.modLfoRate;
+  entry.lfo.type = effects.modLfoShape;
+
+  const wantTarget = effects.modLfoOn ? effects.modLfoTarget : null;
+
+  // If target changed (or turning off), tear down old connection.
+  if (entry.target !== wantTarget) {
+    if (entry.target) {
+      const prev = modLfoDestination(entry.target, fx, gain);
+      if (prev?.param) {
+        try { entry.lfo.disconnect(prev.param as unknown as Tone.InputNode); } catch {}
+      }
+    }
+    entry.target = wantTarget;
+    if (wantTarget) {
+      const next = modLfoDestination(wantTarget, fx, gain);
+      if (next?.param) entry.lfo.connect(next.param as unknown as Tone.InputNode);
+    }
+  }
+
+  // Update swing range for current target.
+  if (wantTarget) {
+    const dest = modLfoDestination(wantTarget, fx, gain);
+    if (dest) {
+      const range = dest.range * effects.modLfoDepth;
+      entry.lfo.min = -range;
+      entry.lfo.max = range;
+    }
+    if (entry.lfo.state !== "started") entry.lfo.start();
+  } else {
+    if (entry.lfo.state === "started") entry.lfo.stop();
+    entry.lfo.min = 0;
+    entry.lfo.max = 0;
+  }
+}
+
 function createMasterChain(): MasterChain {
   const master = useEngineStore.getState().master;
   const limiter = new Tone.Limiter(master.limiterThreshold).toDestination();
@@ -202,6 +282,7 @@ export function useAudioEngine() {
   const initializedRef = useRef(false);
   const trackMetersRef = useRef<Tone.Meter[]>([]);
   const panLfosRef = useRef<Tone.LFO[]>([]);
+  const modLfosRef = useRef<{ lfo: Tone.LFO; target: ModLfoTarget | null }[]>([]);
   const masterMeterRef = useRef<Tone.Meter | null>(null);
   const masterFFTRef = useRef<Tone.FFT | null>(null);
   const masterWaveformRef = useRef<Tone.Waveform | null>(null);
@@ -225,6 +306,7 @@ export function useAudioEngine() {
     fxChainsRef.current = [];
     trackMetersRef.current = [];
     panLfosRef.current = [];
+    modLfosRef.current = [];
 
     // Master meter
     const masterMeter = new Tone.Meter({ smoothing: 0.8 });
@@ -278,12 +360,24 @@ export function useAudioEngine() {
       panLfo.connect(panner.pan);
       if (track.effects.panLfoOn) panLfo.start();
 
+      // Parametric Mod LFO — created idle. routeModLfo() connects/disconnects
+      // it to the chosen destination AudioParam when target/depth/on changes.
+      const modLfo = new Tone.LFO({
+        frequency: track.effects.modLfoRate,
+        type: track.effects.modLfoShape,
+        min: 0,
+        max: 0,
+      });
+      const modEntry = { lfo: modLfo, target: null as ModLfoTarget | null };
+      routeModLfo(modEntry, track.effects, fx, gain);
+
       synthsRef.current.push(synth);
       gainNodesRef.current.push(gain);
       duckGainsRef.current.push(duckGain);
       panNodesRef.current.push(panner);
       fxChainsRef.current.push(fx);
       panLfosRef.current.push(panLfo);
+      modLfosRef.current.push(modEntry);
     });
   }, []);
 
@@ -299,8 +393,9 @@ export function useAudioEngine() {
         prevBpm = state.bpm;
         state.tracks.forEach((track, i) => {
           const lfo = panLfosRef.current[i];
-          if (!lfo) return;
-          lfo.frequency.value = track.effects.panLfoRate;
+          if (lfo) lfo.frequency.value = track.effects.panLfoRate;
+          const mod = modLfosRef.current[i];
+          if (mod) mod.lfo.frequency.value = track.effects.modLfoRate;
         });
       }
     });
@@ -340,6 +435,14 @@ export function useAudioEngine() {
           lfo.start();
         } else if (!track.effects.panLfoOn && lfo.state === "started") {
           lfo.stop();
+        }
+
+        // Mod LFO routing/depth/state
+        const modEntry = modLfosRef.current[i];
+        const fxChain = fxChainsRef.current[i];
+        const trackGain = gainNodesRef.current[i];
+        if (modEntry && fxChain && trackGain) {
+          routeModLfo(modEntry, track.effects, fxChain, trackGain);
         }
       });
     });
@@ -525,6 +628,10 @@ export function useAudioEngine() {
       panLfosRef.current.forEach((l) => {
         if (l.state === "started") l.stop();
         l.dispose();
+      });
+      modLfosRef.current.forEach((m) => {
+        if (m.lfo.state === "started") m.lfo.stop();
+        m.lfo.dispose();
       });
       trackMetersRef.current.forEach((m) => m.dispose());
       masterMeterRef.current?.dispose();

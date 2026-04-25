@@ -5,7 +5,7 @@
 export interface TrackSound {
   name: string;
   color: string;
-  synth: "membrane" | "metal" | "noise" | "synth" | "am" | "fm";
+  synth: "membrane" | "metal" | "noise" | "synth" | "am" | "fm" | "mic";
   note: string;
   melodic: boolean; // true = supports per-step pitch via piano roll
   noteRange?: [string, string]; // [low, high] for piano roll range
@@ -105,5 +105,13 @@ export const DEFAULT_KIT: TrackSound[] = [
     melodic: true,
     noteRange: ["C1", "C4"],
     options: { oscillator: { type: "triangle" }, envelope: { attack: 0.005, decay: 0.3, sustain: 0.4, release: 0.1 } },
+  },
+  {
+    name: "Mic / Live",
+    color: "#eab308",
+    synth: "mic",
+    note: "16n",
+    melodic: false,
+    options: {},
   },
 ];

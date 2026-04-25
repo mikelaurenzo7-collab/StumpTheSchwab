@@ -6,8 +6,10 @@ import {
   type FilterType,
   type LfoRate,
   type LfoShape,
+  type ModLfoTarget,
   LFO_RATES,
   LFO_SHAPES,
+  MOD_LFO_TARGETS,
 } from "@/store/engine";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SpectrumAnalyzer } from "./SpectrumAnalyzer";
@@ -273,6 +275,58 @@ const TrackFXPanel = memo(function TrackFXPanel({
         </div>
       </div>
 
+      {/* Parametric Mod LFO — routable to filter / drive / delay / reverb /
+          volume. Adds an evolving, modular feel to any patch. */}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-1">
+          <FXToggle label="MOD" active={effects.modLfoOn} onClick={() => set("modLfoOn", !effects.modLfoOn)} />
+          <select
+            value={effects.modLfoTarget}
+            onChange={(e) => set("modLfoTarget", e.target.value as ModLfoTarget)}
+            disabled={!effects.modLfoOn}
+            className="control-select rounded px-1 py-0.5 text-[9px] disabled:opacity-40"
+            title="Modulation destination"
+          >
+            {MOD_LFO_TARGETS.map((t) => (
+              <option key={t} value={t}>
+                {t === "filterFreq" ? "Filter" : t === "delayFeedback" ? "Dly Fb" : t === "reverbWet" ? "Verb" : t === "drive" ? "Drive" : "Vol"}
+              </option>
+            ))}
+          </select>
+          <select
+            value={effects.modLfoShape}
+            onChange={(e) => set("modLfoShape", e.target.value as LfoShape)}
+            disabled={!effects.modLfoOn}
+            className="control-select rounded px-1 py-0.5 text-[9px] disabled:opacity-40"
+          >
+            {LFO_SHAPES.map((s) => (
+              <option key={s} value={s}>{s.slice(0, 3)}</option>
+            ))}
+          </select>
+          <select
+            value={effects.modLfoRate}
+            onChange={(e) => set("modLfoRate", e.target.value as LfoRate)}
+            disabled={!effects.modLfoOn}
+            className="control-select rounded px-1 py-0.5 text-[9px] disabled:opacity-40"
+          >
+            {LFO_RATES.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex gap-1">
+          <MiniSlider
+            label="Depth"
+            value={effects.modLfoDepth}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={(v) => set("modLfoDepth", v)}
+            disabled={!effects.modLfoOn}
+          />
+        </div>
+      </div>
+
       {/* Sidechain — kick→bass pump. Pick a source track; this track ducks
           when the source fires. Classic house/EDM gluing trick. */}
       <div className="flex flex-col gap-1">
@@ -462,7 +516,8 @@ const ChannelStrip = memo(function ChannelStrip({
     effects.delayOn ||
     effects.reverbOn ||
     effects.sidechainOn ||
-    effects.panLfoOn;
+    effects.panLfoOn ||
+    effects.modLfoOn;
 
   // Brief flash on the track dot when this track is performance-triggered
   // (Q-I keys). The audio engine dispatches "sts-track-trigger" with the
@@ -637,22 +692,28 @@ const ChannelStrip = memo(function ChannelStrip({
 function MasterStrip({ getLevel }: { getLevel: () => number }) {
   const master = useEngineStore((s) => s.master);
   const setMaster = useEngineStore((s) => s.setMaster);
+  const autoMix = useEngineStore((s) => s.autoMix);
 
   const [expanded, setExpanded] = useState(false);
 
   return (
     <div className="ml-1 flex flex-col items-center gap-1.5 border-l border-white/[0.06] pl-3">
       <div className="panel-soft flex w-[5rem] flex-col items-center gap-2.5 rounded-[1.35rem] px-2.5 py-3">
-        {/* Master label */}
+        {/* Master label and Auto-Mix */}
         <div className="flex w-full flex-col items-center gap-1 rounded-[1rem] border border-white/[0.06] bg-black/15 px-2 py-2">
           <div className="h-2 w-2 rounded-full bg-accent" />
           <span className="w-full truncate text-center text-[10px] font-bold text-accent">
             MASTER
           </span>
         </div>
-
-        {/* Spacer to align with pan knob area */}
-        <div className="h-6" />
+        
+        <button
+          onClick={autoMix}
+          className="button-primary w-full rounded-lg px-1 py-1.5 text-[9px] font-bold uppercase tracking-wider"
+          title="AI Auto-Mix: Intelligently balance levels, panning, and master FX"
+        >
+          ✨ Auto-Mix
+        </button>
 
         {/* Master fader + Meter */}
         <div className="flex h-28 items-center gap-1 rounded-[1rem] border border-white/[0.06] bg-black/10 px-1.5 py-2">
