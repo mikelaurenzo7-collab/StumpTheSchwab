@@ -109,10 +109,6 @@ const OPEN_DRUMS_THRESHOLD_DIVISOR = 4;
 const MIN_FILL_HITS = 3;
 const POCKET_KICK_THRESHOLD = 4;
 const LOW_SWING_THRESHOLD = 0.08;
-const HISTORY_TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
-  hour: "2-digit",
-  minute: "2-digit",
-});
 
 function createId() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -140,6 +136,13 @@ function shortLabel(text: string, fallback: string) {
 function extractProfileName(prompt: string, fallback: string) {
   const firstPhrase = prompt.split(/[—,:.]/)[0] || prompt;
   return shortLabel(firstPhrase, fallback);
+}
+
+function formatHistoryTime(isoTimestamp: string) {
+  return new Date(isoTimestamp).toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function targetLabel(target: GenerateTarget) {
@@ -957,7 +960,7 @@ export function GeneratorModal() {
                               v{entry.version} · {entry.beat.name}
                             </div>
                             <div className="mt-1 text-[10px] text-muted/80">
-                              {entry.refined ? "Mutate" : "Generate"} · {targetLabel(entry.target)} · {HISTORY_TIME_FORMATTER.format(new Date(entry.createdAt))}
+                              {entry.refined ? "Mutate" : "Generate"} · {targetLabel(entry.target)} · {formatHistoryTime(entry.createdAt)}
                             </div>
                             <p className="mt-2 text-[11px] leading-relaxed text-muted/80">
                               {entry.prompt}
