@@ -165,7 +165,6 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
         <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Tempo</div>
         <div className="flex items-center gap-2">
-        <label className="text-[10px] font-black text-muted uppercase tracking-[0.2em]">BPM</label>
         <input
           type="number"
           min={30}
@@ -188,7 +187,6 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
         <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Groove</div>
         <div className="flex items-center gap-2">
-        <label className="text-[10px] font-black text-muted uppercase tracking-[0.2em]">Swing</label>
         <input
           type="range"
           min={0}
@@ -208,7 +206,6 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
         <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Resolution</div>
         <div className="flex items-center gap-2">
-        <label className="text-[10px] font-black text-muted uppercase tracking-[0.2em]">Steps</label>
         <select
           value={totalSteps}
           onChange={(e) => setTotalSteps(Number(e.target.value))}
@@ -229,7 +226,6 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
         <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Pattern memory</div>
         <div className="flex items-center gap-1.5">
-        <span className="text-[10px] font-black text-muted uppercase tracking-[0.2em]">Pattern</span>
         <div className="flex gap-0.5">
           {PATTERN_LABELS.map((label, i) => (
             <button
@@ -305,7 +301,6 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
         <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Instant recall</div>
         <div className="flex items-center gap-2">
-        <label className="text-[10px] font-black text-muted uppercase tracking-[0.2em]">Preset</label>
         <select
           value=""
           onChange={(e) => {
