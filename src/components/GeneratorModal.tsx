@@ -41,7 +41,7 @@ interface HistoryEntry {
   target: GenerateTarget;
   refined: boolean;
   beat: GeneratedBeat;
-  createdAt: string;
+  createdAt: string; // ISO timestamp for stable local persistence / replay ordering.
 }
 
 interface CreativeProfile {
@@ -105,8 +105,19 @@ const HISTORY_STORAGE_KEY = "sts_generator_history_v1";
 const PROFILE_STORAGE_KEY = "sts_generator_profiles_v1";
 const MAX_HISTORY = 10;
 const MAX_PROFILES = 6;
+const OPEN_DRUMS_THRESHOLD_DIVISOR = 4;
+const MIN_FILL_HITS = 3;
+const POCKET_KICK_THRESHOLD = 4;
+const STRAIGHT_SWING_THRESHOLD = 0.08;
+const HISTORY_TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  hour: "2-digit",
+  minute: "2-digit",
+});
 
 function createId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
@@ -124,6 +135,11 @@ function shortLabel(text: string, fallback: string) {
   const cleaned = text.trim().replace(/\s+/g, " ");
   if (!cleaned) return fallback;
   return cleaned.length > 24 ? `${cleaned.slice(0, 24)}…` : cleaned;
+}
+
+function extractProfileName(prompt: string, fallback: string) {
+  const firstPhrase = prompt.split(/[—,:.]/)[0] || prompt;
+  return shortLabel(firstPhrase, fallback);
 }
 
 function targetLabel(target: GenerateTarget) {
@@ -268,7 +284,7 @@ export function GeneratorModal() {
         target: "bass",
       });
     }
-    if (hatHits < Math.ceil(totalSteps / 4)) {
+    if (hatHits < Math.ceil(totalSteps / OPEN_DRUMS_THRESHOLD_DIVISOR)) {
       moves.push({
         label: "Open the drums",
         prompt:
@@ -276,7 +292,7 @@ export function GeneratorModal() {
         target: "drums",
       });
     }
-    if (melodicHits < 3) {
+    if (melodicHits < MIN_FILL_HITS) {
       moves.push({
         label: "Add a fill",
         prompt:
@@ -292,7 +308,7 @@ export function GeneratorModal() {
         target: "arrangement",
       });
     }
-    if (kickHits >= 4 && swing < 0.08) {
+    if (kickHits >= POCKET_KICK_THRESHOLD && swing < STRAIGHT_SWING_THRESHOLD) {
       moves.push({
         label: "Loosen the pocket",
         prompt:
@@ -353,7 +369,7 @@ export function GeneratorModal() {
     if (!prompt) return;
     const profile: CreativeProfile = {
       id: createId(),
-      name: shortLabel(prompt.split(/[—,:.]/)[0] || prompt, `Profile ${profiles.length + 1}`),
+      name: extractProfileName(prompt, `Profile ${profiles.length + 1}`),
       prompt,
       mode,
       target,
@@ -506,7 +522,7 @@ export function GeneratorModal() {
 
   if (!open) return null;
 
-  const activePrompt = mode === "create" ? description : refineDraft;
+  const currentPromptText = mode === "create" ? description : refineDraft;
   const latestHistoryEntry = history[0] ?? null;
 
   return (
@@ -623,7 +639,7 @@ export function GeneratorModal() {
                   </div>
                   <button
                     onClick={handleSaveProfile}
-                    disabled={loading || activePrompt.trim().length === 0}
+                    disabled={loading || currentPromptText.trim().length === 0}
                     className="rounded-full bg-white/[0.06] px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-muted hover:bg-white/[0.12] hover:text-foreground disabled:opacity-30"
                   >
                     Save current
@@ -793,7 +809,7 @@ export function GeneratorModal() {
                         target,
                       })
                     }
-                    disabled={loading || activePrompt.trim().length === 0}
+                    disabled={loading || currentPromptText.trim().length === 0}
                     className={`rounded-full px-5 py-2 text-xs font-black uppercase tracking-[0.18em] transition-colors ${
                       loading
                         ? "cursor-wait bg-accent/40 text-white/60"
@@ -940,7 +956,7 @@ export function GeneratorModal() {
                               v{entry.version} · {entry.beat.name}
                             </div>
                             <div className="mt-1 text-[10px] text-muted/80">
-                              {entry.refined ? "Mutate" : "Generate"} · {targetLabel(entry.target)} · {new Date(entry.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              {entry.refined ? "Mutate" : "Generate"} · {targetLabel(entry.target)} · {HISTORY_TIME_FORMATTER.format(new Date(entry.createdAt))}
                             </div>
                             <p className="mt-2 text-[11px] leading-relaxed text-muted/80">
                               {entry.prompt}
