@@ -57,8 +57,6 @@ const StepCell = memo(function StepCell({
         if (e.button !== 0) return;
         if (e.detail > 1) {
           paintState.mode = null;
-          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-          onOpenDetail(rect);
           return;
         }
         if (e.ctrlKey || e.metaKey) {
@@ -196,8 +194,9 @@ const TrackRow = memo(function TrackRow({
         onClick={() => melodic && onTogglePianoRoll(trackId)}
         title={melodic ? `${pianoRollOpen ? "Close" : "Open"} piano roll` : ""}
       >
+        {/* Track color rail anchors the row and separates instruments at scan speed. */}
         <div
-          className={`w-3 h-8 rounded-full shrink-0 ${
+          className={`w-1.5 h-8 rounded-full shrink-0 ${
             pianoRollOpen ? "ring-2 ring-accent ring-offset-1 ring-offset-background" : ""
           }`}
           style={{ backgroundColor: color }}

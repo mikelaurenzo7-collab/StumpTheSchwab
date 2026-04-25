@@ -78,7 +78,7 @@ export default function DAW() {
                   </span>
                 </div>
                 <h1 className="max-w-3xl text-2xl font-black tracking-[-0.04em] text-white sm:text-4xl">
-                  Build, mutate, arrange, and bounce grooves before the idea cools off.
+                  Capture, mutate, arrange, and bounce polished grooves in real time.
                 </h1>
               </div>
               <div className="hidden rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-right sm:block">

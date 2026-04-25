@@ -22,12 +22,12 @@ const SUGGESTIONS = [
 const REFINE_CHIPS = [
   "Mutate: make it darker",
   "Simplify: more sparse",
-  "Punchier kick",
+  "Punch: stronger kick",
   "Fill: last-bar turnaround",
-  "Add hi-hat rolls",
-  "Swing it more",
+  "Fill: add hi-hat rolls",
+  "Humanize: swing it more",
   "Expand: brighter B-section",
-  "Strip it down",
+  "Simplify: strip it down",
 ];
 
 // Build a GeneratedBeat from the live engine state so refinements operate on
