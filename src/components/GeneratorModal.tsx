@@ -41,7 +41,7 @@ interface HistoryEntry {
   target: GenerateTarget;
   refined: boolean;
   beat: GeneratedBeat;
-  createdAt: string; // ISO timestamp for stable local persistence / replay ordering.
+  createdAt: string; // ISO timestamp for stable local persistence / playback ordering.
 }
 
 interface CreativeProfile {
@@ -108,7 +108,7 @@ const MAX_PROFILES = 6;
 const OPEN_DRUMS_THRESHOLD_DIVISOR = 4;
 const MIN_FILL_HITS = 3;
 const POCKET_KICK_THRESHOLD = 4;
-const LOW_SWING_THRESHOLD = 0.08;
+const MAX_STRAIGHT_POCKET_SWING = 0.08;
 
 function createId() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -311,7 +311,7 @@ export function GeneratorModal() {
         target: "arrangement",
       });
     }
-    if (kickHits >= POCKET_KICK_THRESHOLD && swing < LOW_SWING_THRESHOLD) {
+    if (kickHits >= POCKET_KICK_THRESHOLD && swing < MAX_STRAIGHT_POCKET_SWING) {
       moves.push({
         label: "Loosen the pocket",
         prompt:
@@ -718,8 +718,8 @@ export function GeneratorModal() {
                     disabled={loading}
                     className="w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-foreground placeholder:text-muted/50 focus:border-accent focus:outline-none disabled:opacity-50"
                   />
-                  <div id="generator-create-help" className="mt-1 mb-3 flex justify-between">
-                    <span className="text-[10px] text-muted/70">
+                  <div className="mt-1 mb-3 flex justify-between">
+                    <span id="generator-create-help" className="text-[10px] text-muted/70">
                       {description.length}/500 · Cmd/Ctrl+Enter to generate · target {targetLabel(target).toLowerCase()}
                     </span>
                   </div>
@@ -761,8 +761,8 @@ export function GeneratorModal() {
                     disabled={loading}
                     className="w-full resize-none rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-foreground placeholder:text-muted/50 focus:border-accent focus:outline-none disabled:opacity-50"
                   />
-                  <div id="generator-refine-help" className="mt-1 mb-3 flex justify-between">
-                    <span className="text-[10px] text-muted/70">
+                  <div className="mt-1 mb-3 flex justify-between">
+                    <span id="generator-refine-help" className="text-[10px] text-muted/70">
                       {refineDraft.length}/500 · Cmd/Ctrl+Enter to mutate · target {targetLabel(target).toLowerCase()}
                     </span>
                   </div>
