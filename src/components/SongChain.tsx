@@ -74,7 +74,7 @@ export function SongChain() {
         </div>
         <button
           onClick={handleToggle}
-          className="mt-4 w-full rounded-2xl bg-white text-background px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all hover:scale-[1.01] hover:bg-accent-hover hover:text-white"
+          className="mt-4 w-full rounded-2xl bg-white px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-background transition-all hover:scale-[1.01] hover:bg-accent-hover hover:text-white"
           title="Enable Song Mode to chain patterns into an arrangement"
         >
           Enable Song Mode
