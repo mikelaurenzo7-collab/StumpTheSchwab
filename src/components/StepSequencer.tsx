@@ -227,7 +227,7 @@ const TrackRow = memo(function TrackRow({
         ))}
       </div>
 
-      {/* Track actions */}
+      {/* Core groove actions stay visible so editing is discoverable without hover. */}
       <div
         className="ml-2 flex items-center gap-1 relative"
       >
