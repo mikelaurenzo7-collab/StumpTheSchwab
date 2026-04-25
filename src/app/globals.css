@@ -6,7 +6,6 @@
   --surface: #11101a;
   --surface-2: #1a1827;
   --surface-3: #2b2640;
-  --surface-4: #120f20;
   --border: #353047;
   --accent: #9b5cff;
   --accent-hover: #c084fc;
@@ -31,7 +30,6 @@
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-3);
-  --color-surface-4: var(--surface-4);
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
@@ -232,7 +230,7 @@ select:focus-visible,
 textarea:focus-visible {
   outline: none;
   border-color: var(--ring-strong);
-  box-shadow: 0 0 0 3px rgba(192, 132, 252, 0.14);
+  box-shadow: 0 0 0 3px rgba(192, 132, 252, 0.24);
 }
 
 /* Scrollbar styling */

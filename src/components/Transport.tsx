@@ -163,7 +163,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
 
       {/* BPM */}
       <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
-        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Tempo</div>
+        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">BPM</div>
         <div className="flex items-center gap-2">
         <input
           type="number"
@@ -185,7 +185,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
 
       {/* Swing */}
       <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
-        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Groove</div>
+        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Swing</div>
         <div className="flex items-center gap-2">
         <input
           type="range"
@@ -204,7 +204,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
 
       {/* Steps */}
       <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
-        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Resolution</div>
+        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Steps</div>
         <div className="flex items-center gap-2">
         <select
           value={totalSteps}
@@ -224,7 +224,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
 
       {/* Pattern Selector */}
       <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
-        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Pattern memory</div>
+        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Pattern bank</div>
         <div className="flex items-center gap-1.5">
         <div className="flex gap-0.5">
           {PATTERN_LABELS.map((label, i) => (
@@ -299,7 +299,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
 
       {/* Preset Loader */}
       <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-2">
-        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Instant recall</div>
+        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted">Preset</div>
         <div className="flex items-center gap-2">
         <select
           value=""
