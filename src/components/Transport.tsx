@@ -7,6 +7,7 @@ import { PRESETS } from "@/lib/presets";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SessionManager } from "@/components/SessionManager";
 import { useExport } from "@/lib/useExport";
+import { useMidiExport } from "@/lib/useMidiExport";
 
 export function Transport({ onInit }: { onInit: () => Promise<void> }) {
   const bpm = useEngineStore((s) => s.bpm);
@@ -40,6 +41,8 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
   const renameInputRef = useRef<HTMLInputElement>(null);
   const [tapTimes, setTapTimes] = useState<number[]>([]);
   const tapResetRef = useRef<number | null>(null);
+  const [exportFormat, setExportFormat] = useState<"wav" | "midi">("wav");
+  const { exportMidi, exporting: exportingMidi } = useMidiExport();
   const [exportLoops, setExportLoops] = useState(2);
   const { exportWAV, exporting } = useExport();
   const canUndo = useHistoryStore((s) => s.past.length > 0);
@@ -341,27 +344,48 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
       {/* Export */}
       <div className="flex items-center gap-1">
         <select
-          value={exportLoops}
-          onChange={(e) => setExportLoops(Number(e.target.value))}
-          className="bg-surface-2 border border-border rounded px-1.5 py-1 text-[10px] font-mono text-muted focus:outline-none focus:border-accent w-14"
-          title="Number of loops to export"
+          value={exportFormat}
+          onChange={(e) => setExportFormat(e.target.value as "wav" | "midi")}
+          className="bg-surface-2 border border-border rounded px-1.5 py-1 text-[10px] font-mono text-muted focus:outline-none focus:border-accent"
+          title="Export format"
         >
-          <option value={1}>1x</option>
-          <option value={2}>2x</option>
-          <option value={4}>4x</option>
-          <option value={8}>8x</option>
+          <option value="wav">WAV</option>
+          <option value="midi">MIDI</option>
         </select>
+        {exportFormat === "wav" && (
+          <select
+            value={exportLoops}
+            onChange={(e) => setExportLoops(Number(e.target.value))}
+            className="bg-surface-2 border border-border rounded px-1.5 py-1 text-[10px] font-mono text-muted focus:outline-none focus:border-accent w-14"
+            title="Number of loops to export (WAV only)"
+          >
+            <option value={1}>1x</option>
+            <option value={2}>2x</option>
+            <option value={4}>4x</option>
+            <option value={8}>8x</option>
+          </select>
+        )}
         <button
-          onClick={() => exportWAV(exportLoops)}
-          disabled={exporting}
+          onClick={() => {
+            if (exportFormat === "midi") {
+              exportMidi();
+            } else {
+              exportWAV(exportLoops);
+            }
+          }}
+          disabled={exporting || exportingMidi}
           className={`px-3 py-1.5 rounded text-xs uppercase tracking-wider transition-colors font-bold ${
-            exporting
+            exporting || exportingMidi
               ? "bg-accent/50 text-white/50 cursor-wait"
               : "bg-accent hover:bg-accent-hover text-white"
           }`}
-          title="Export pattern as WAV"
+          title={
+            exportFormat === "midi"
+              ? "Export pattern as a Standard MIDI File (.mid) — drag into any DAW"
+              : "Export pattern as 16-bit PCM WAV"
+          }
         >
-          {exporting ? "Bouncing..." : "Export"}
+          {exporting ? "Bouncing..." : exportingMidi ? "Writing..." : "Export"}
         </button>
       </div>
 

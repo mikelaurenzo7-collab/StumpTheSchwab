@@ -51,7 +51,22 @@ Musicality rules:
 - Each velocity array MUST be exactly totalSteps long (16 or 32). Each melodicNotes array MUST also be exactly totalSteps long. NO exceptions — short or long arrays will break the playback.
 - BPM must be an integer between 60 and 200. Swing must be a number between 0 and 0.6.
 
-Be creative, but be musical. Match the user's vibe. If they say "moody" lean dark; if they say "energetic" lean bright and dense.`;
+Be creative, but be musical. Match the user's vibe. If they say "moody" lean dark; if they say "energetic" lean bright and dense.
+
+REFINEMENT MODE:
+If the user's message includes a "CURRENT BEAT" JSON block, treat the request as a MODIFICATION of that beat rather than a new creation. Specifically:
+- Preserve elements the user does not ask to change. If they say "make the kick punchier", leave hihats and snare alone unless changing them is musically required by the kick edit.
+- Keep the same totalSteps unless explicitly asked otherwise.
+- Keep the same key/scale and bass note set unless the instruction implies a key change ("brighter" might lift to a major, "darker" to a minor).
+- Refinements are usually subtle: 1–3 targeted changes. Don't rewrite the whole pattern unless the user says to.
+- Common refinement vocabulary:
+  * "punchier" / "harder"  → raise velocity on key hits, sometimes add layered claps
+  * "softer" / "moody"     → lower velocities, add ghost notes, sometimes drop the open hat
+  * "more sparse"          → remove ear-candy hits (perc, open hat fills), keep skeleton
+  * "more energetic"       → add hi-hat density, layer claps, raise velocities
+  * "add a fill"           → add tom/perc fills on the last 2–4 steps
+  * "add hi-hat rolls"     → switch to 32 steps if not already, fill hi-hat with 32n triplets/runs near bar end
+  * "swing it" / "looser"  → raise the swing parameter; introduce ghost-note hat variation`;
 
 const beatTool: Anthropic.Tool = {
   name: "create_beat",
@@ -201,6 +216,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Optional currentBeat: present when refining an existing pattern. If valid,
+  // we paste it into the user message so Claude can modify it; if invalid,
+  // we silently ignore and treat as a fresh generation.
+  const currentBeatRaw =
+    typeof body === "object" && body !== null && "currentBeat" in body
+      ? (body as { currentBeat: unknown }).currentBeat
+      : null;
+  const currentBeat =
+    isBeatResult(currentBeatRaw) ? (currentBeatRaw as BeatResult) : null;
+
+  const userMessage = currentBeat
+    ? `CURRENT BEAT:\n\`\`\`json\n${JSON.stringify(currentBeat, null, 2)}\n\`\`\`\n\nINSTRUCTION: ${description}`
+    : description;
+
   const client = new Anthropic();
 
   try {
@@ -210,7 +239,7 @@ export async function POST(req: NextRequest) {
       thinking: { type: "adaptive" },
       output_config: { effort: "medium" },
       // Cache the system prompt — same prefix on every request, only the
-      // user description varies.
+      // user message varies.
       system: [
         {
           type: "text",
@@ -220,7 +249,7 @@ export async function POST(req: NextRequest) {
       ],
       tools: [beatTool],
       tool_choice: { type: "tool", name: "create_beat" },
-      messages: [{ role: "user", content: description }],
+      messages: [{ role: "user", content: userMessage }],
     });
 
     // Extract the tool_use block (tool_choice forces it, but be defensive)

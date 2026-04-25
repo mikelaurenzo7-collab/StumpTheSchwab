@@ -15,6 +15,8 @@ export interface TrackEffects {
   filterType: FilterType;
   filterFreq: number;
   filterQ: number;
+  driveOn: boolean;
+  driveAmount: number;
   delayOn: boolean;
   delayTime: number;
   delayFeedback: number;
@@ -204,6 +206,8 @@ export const DEFAULT_EFFECTS: TrackEffects = {
   filterType: "lowpass",
   filterFreq: 20000,
   filterQ: 1,
+  driveOn: false,
+  driveAmount: 0.3,
   delayOn: false,
   delayTime: 0.25,
   delayFeedback: 0.3,

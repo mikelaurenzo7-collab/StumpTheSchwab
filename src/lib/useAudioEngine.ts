@@ -14,6 +14,7 @@ export type SynthNode =
   | Tone.FMSynth;
 
 interface TrackFXChain {
+  drive: Tone.Distortion;
   filter: Tone.Filter;
   delay: Tone.FeedbackDelay;
   reverb: Tone.Reverb;
@@ -57,7 +58,11 @@ export function triggerSynth(synth: SynthNode, sound: TrackSound, time: number, 
 }
 
 function createTrackFX(destination: Tone.InputNode): TrackFXChain {
+  // Signal: synth → drive → filter → (dry / delay / reverb sends) → destination
+  // Drive shapes harmonics BEFORE the filter so the filter can tame any harshness.
+  const drive = new Tone.Distortion({ distortion: 0, wet: 1 });
   const filter = new Tone.Filter({ frequency: 20000, type: "lowpass", Q: 1 });
+  drive.connect(filter);
 
   const delay = new Tone.FeedbackDelay({ delayTime: 0.25, feedback: 0.3, wet: 1 });
   const delayGain = new Tone.Gain(0);
@@ -77,10 +82,21 @@ function createTrackFX(destination: Tone.InputNode): TrackFXChain {
   delayGain.connect(destination as unknown as Tone.ToneAudioNode);
   reverbGain.connect(destination as unknown as Tone.ToneAudioNode);
 
-  return { filter, delay, reverb, delayGain, reverbGain, dryGain };
+  return { drive, filter, delay, reverb, delayGain, reverbGain, dryGain };
 }
 
 function applyTrackFX(fx: TrackFXChain, effects: TrackEffects) {
+  // Drive — Tone.Distortion's `distortion` is 0..1; combined with oversampling
+  // it gives a clean tape-saturation feel at low values and a meaty crunch high.
+  if (effects.driveOn) {
+    fx.drive.distortion = effects.driveAmount;
+    fx.drive.wet.value = 1;
+    fx.drive.oversample = "2x";
+  } else {
+    fx.drive.distortion = 0;
+    fx.drive.wet.value = 0;
+  }
+
   if (effects.filterOn) {
     fx.filter.frequency.value = effects.filterFreq;
     fx.filter.type = effects.filterType;
@@ -191,7 +207,7 @@ export function useAudioEngine() {
       applyTrackFX(fx, track.effects);
 
       const synth = createSynth(track.sound);
-      synth.connect(fx.filter);
+      synth.connect(fx.drive);
 
       synthsRef.current.push(synth);
       gainNodesRef.current.push(gain);
@@ -361,6 +377,7 @@ export function useAudioEngine() {
       trackMetersRef.current.forEach((m) => m.dispose());
       masterMeterRef.current?.dispose();
       fxChainsRef.current.forEach((fx) => {
+        fx.drive.dispose();
         fx.filter.dispose();
         fx.delay.dispose();
         fx.reverb.dispose();

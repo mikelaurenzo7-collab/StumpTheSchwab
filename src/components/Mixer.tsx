@@ -103,6 +103,22 @@ const TrackFXPanel = memo(function TrackFXPanel({
       {/* Color bar */}
       <div className="h-0.5 w-full rounded" style={{ backgroundColor: color }} />
 
+      {/* Drive — analog-style saturation. Pre-filter so EQ can tame the harmonics. */}
+      <div className="flex flex-col gap-1">
+        <FXToggle label="DRV" active={effects.driveOn} onClick={() => set("driveOn", !effects.driveOn)} />
+        <div className="flex gap-1">
+          <MiniSlider
+            label="Amount"
+            value={effects.driveAmount}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={(v) => set("driveAmount", v)}
+            disabled={!effects.driveOn}
+          />
+        </div>
+      </div>
+
       {/* Filter */}
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-1">
@@ -308,7 +324,7 @@ const ChannelStrip = memo(function ChannelStrip({
   onSolo: (id: number) => void;
   onToggleFX: (id: number) => void;
 }) {
-  const hasFX = effects.filterOn || effects.delayOn || effects.reverbOn;
+  const hasFX = effects.driveOn || effects.filterOn || effects.delayOn || effects.reverbOn;
 
   return (
     <div className="flex flex-col items-center gap-1">

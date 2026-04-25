@@ -1,8 +1,14 @@
 "use client";
 
 import { useEngineStore, nextVelocity, nextProbability } from "@/store/engine";
-import { useCallback, memo, useState } from "react";
+import { useCallback, memo, useEffect, useRef, useState } from "react";
 import { EuclideanPopover } from "@/components/EuclideanPopover";
+
+// Paint mode lives in a module-level ref-style holder so onMouseEnter on a
+// memoized cell can read it without re-render churn. Only one drag is active
+// at a time, app-wide.
+type PaintMode = "paint" | "erase" | null;
+const paintState: { mode: PaintMode } = { mode: null };
 
 const velLabel = (v: number) =>
   v >= 1 ? "Full" : v >= 0.75 ? "High" : v >= 0.5 ? "Med" : "Soft";
@@ -16,7 +22,8 @@ const StepCell = memo(function StepCell({
   probability,
   isCurrent,
   color,
-  onClick,
+  onPaint,
+  onErase,
   onRightClick,
   onCtrlClick,
   beatStart,
@@ -25,7 +32,8 @@ const StepCell = memo(function StepCell({
   probability: number;
   isCurrent: boolean;
   color: string;
-  onClick: () => void;
+  onPaint: () => void;
+  onErase: () => void;
   onRightClick: () => void;
   onCtrlClick: () => void;
   beatStart: boolean;
@@ -35,11 +43,28 @@ const StepCell = memo(function StepCell({
 
   return (
     <button
-      onClick={(e) => {
+      onMouseDown={(e) => {
+        // Right-click handled by onContextMenu. Middle-click ignored.
+        if (e.button !== 0) return;
         if (e.ctrlKey || e.metaKey) {
+          // Ctrl/Cmd starts probability cycling — don't enter paint mode.
           onCtrlClick();
+          return;
+        }
+        // Drag-paint: an active step starts erase mode, an inactive step starts paint.
+        if (active) {
+          paintState.mode = "erase";
+          onErase();
         } else {
-          onClick();
+          paintState.mode = "paint";
+          onPaint();
+        }
+      }}
+      onMouseEnter={() => {
+        if (paintState.mode === "paint" && !active) {
+          onPaint();
+        } else if (paintState.mode === "erase" && active) {
+          onErase();
         }
       }}
       onContextMenu={(e) => {
@@ -48,11 +73,11 @@ const StepCell = memo(function StepCell({
       }}
       title={
         active
-          ? `${velLabel(velocity)} (${Math.round(velocity * 100)}%)${hasProb ? ` — ${probLabel(probability)} chance` : ""} — right-click: velocity, ctrl-click: probability`
-          : "ctrl-click: add with probability"
+          ? `${velLabel(velocity)} (${Math.round(velocity * 100)}%)${hasProb ? ` — ${probLabel(probability)} chance` : ""} — drag to erase · right-click: velocity · ctrl-click: probability`
+          : "Click or drag to paint · ctrl-click: add with probability"
       }
       className={`
-        relative w-8 h-8 rounded-sm transition-all duration-75 border overflow-hidden
+        relative w-8 h-8 rounded-sm transition-all duration-75 border overflow-hidden select-none
         ${beatStart ? "ml-1" : ""}
         ${
           active
@@ -98,7 +123,8 @@ const TrackRow = memo(function TrackRow({
   currentStep,
   canPaste,
   euclideanOpen,
-  onToggleStep,
+  onPaintStep,
+  onEraseStep,
   onCycleVelocity,
   onCtrlClick,
   onClearTrack,
@@ -119,7 +145,8 @@ const TrackRow = memo(function TrackRow({
   currentStep: number;
   canPaste: boolean;
   euclideanOpen: boolean;
-  onToggleStep: (trackId: number, step: number) => void;
+  onPaintStep: (trackId: number, step: number) => void;
+  onEraseStep: (trackId: number, step: number) => void;
   onCycleVelocity: (trackId: number, step: number) => void;
   onCtrlClick: (trackId: number, step: number) => void;
   onClearTrack: (trackId: number) => void;
@@ -162,7 +189,8 @@ const TrackRow = memo(function TrackRow({
             isCurrent={currentStep === stepIdx}
             color={color}
             beatStart={stepIdx > 0 && stepIdx % 4 === 0}
-            onClick={() => onToggleStep(trackId, stepIdx)}
+            onPaint={() => onPaintStep(trackId, stepIdx)}
+            onErase={() => onEraseStep(trackId, stepIdx)}
             onRightClick={() => onCycleVelocity(trackId, stepIdx)}
             onCtrlClick={() => onCtrlClick(trackId, stepIdx)}
           />
@@ -238,6 +266,21 @@ export function StepSequencer() {
   const toggleStep = useEngineStore((s) => s.toggleStep);
   const setStepVelocity = useEngineStore((s) => s.setStepVelocity);
   const setStepProbability = useEngineStore((s) => s.setStepProbability);
+  const dragSeenRef = useRef<Set<string>>(new Set());
+
+  // Clear paint mode whenever the mouse is released anywhere on the page.
+  useEffect(() => {
+    const end = () => {
+      paintState.mode = null;
+      dragSeenRef.current.clear();
+    };
+    window.addEventListener("mouseup", end);
+    window.addEventListener("mouseleave", end);
+    return () => {
+      window.removeEventListener("mouseup", end);
+      window.removeEventListener("mouseleave", end);
+    };
+  }, []);
   const clearTrack = useEngineStore((s) => s.clearTrack);
   const pianoRollTrack = useEngineStore((s) => s.pianoRollTrack);
   const setPianoRollTrack = useEngineStore((s) => s.setPianoRollTrack);
@@ -248,8 +291,30 @@ export function StepSequencer() {
 
   const [euclideanTrack, setEuclideanTrack] = useState<number | null>(null);
 
-  const handleToggle = useCallback(
-    (trackId: number, step: number) => toggleStep(trackId, step),
+  // Paint = ensure the step is on (if it's already on, leave its velocity alone).
+  // Dedup via dragSeenRef so dragging across the same cell repeatedly doesn't
+  // pile history checkpoints or fight the user's intent.
+  const handlePaintStep = useCallback(
+    (trackId: number, step: number) => {
+      const key = `${trackId}:${step}`;
+      if (dragSeenRef.current.has(key)) return;
+      dragSeenRef.current.add(key);
+      const t = useEngineStore.getState().tracks[trackId];
+      if (!t || t.steps[step] > 0) return;
+      toggleStep(trackId, step);
+    },
+    [toggleStep]
+  );
+
+  const handleEraseStep = useCallback(
+    (trackId: number, step: number) => {
+      const key = `${trackId}:${step}`;
+      if (dragSeenRef.current.has(key)) return;
+      dragSeenRef.current.add(key);
+      const t = useEngineStore.getState().tracks[trackId];
+      if (!t || t.steps[step] === 0) return;
+      toggleStep(trackId, step);
+    },
     [toggleStep]
   );
 
@@ -346,7 +411,8 @@ export function StepSequencer() {
             currentStep={currentStep}
             canPaste={canPaste}
             euclideanOpen={euclideanTrack === track.id}
-            onToggleStep={handleToggle}
+            onPaintStep={handlePaintStep}
+            onEraseStep={handleEraseStep}
             onCycleVelocity={handleCycleVelocity}
             onCtrlClick={handleCtrlClick}
             onClearTrack={handleClear}

@@ -160,11 +160,18 @@ export function useExport() {
           const panner = new Tone.Panner(track.pan).connect(masterGain);
           const gain = new Tone.Gain(track.volume).connect(panner);
 
+          const drive = new Tone.Distortion({
+            distortion: track.effects.driveOn ? track.effects.driveAmount : 0,
+            wet: track.effects.driveOn ? 1 : 0,
+            oversample: "2x",
+          });
+
           const filter = new Tone.Filter({
             frequency: track.effects.filterOn ? track.effects.filterFreq : 20000,
             type: track.effects.filterOn ? track.effects.filterType : "lowpass",
             Q: track.effects.filterOn ? track.effects.filterQ : 1,
           });
+          drive.connect(filter);
 
           const dryGain = new Tone.Gain(1).connect(gain);
           filter.connect(dryGain);
@@ -188,7 +195,7 @@ export function useExport() {
           }
 
           const synth = createOfflineSynth(track.sound);
-          synth.connect(filter);
+          synth.connect(drive);
 
           const trackSteps = flatSteps[trackIdx];
           const trackProbs = flatProbs[trackIdx];
