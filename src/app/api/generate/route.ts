@@ -271,8 +271,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const beat = toolUse.input as BeatResult;
+    beat.bpm = Math.max(60, Math.min(200, Math.round(beat.bpm)));
+    beat.swing = Math.max(0, Math.min(0.6, beat.swing));
+    const trackKeys = ["kick", "snare", "hihat", "openhat", "clap", "tom", "perc", "bass"] as const;
+    for (const key of trackKeys) {
+      const arr = beat.tracks[key];
+      if (arr) {
+        beat.tracks[key] = Array.from({ length: beat.totalSteps }, (_, i) =>
+          Math.max(0, Math.min(1, typeof arr[i] === "number" ? arr[i] : 0))
+        );
+      }
+    }
+    const melodicKeys = ["tom", "perc", "bass"] as const;
+    for (const key of melodicKeys) {
+      const arr = beat.melodicNotes[key];
+      beat.melodicNotes[key] = Array.from({ length: beat.totalSteps }, (_, i) =>
+        typeof arr?.[i] === "string" ? arr[i] : ""
+      );
+    }
+
     return NextResponse.json({
-      beat: toolUse.input,
+      beat,
       usage: {
         input_tokens: response.usage.input_tokens,
         output_tokens: response.usage.output_tokens,

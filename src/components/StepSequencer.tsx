@@ -1,8 +1,9 @@
 "use client";
 
-import { useEngineStore, nextVelocity, nextProbability } from "@/store/engine";
+import { useEngineStore, nextProbability } from "@/store/engine";
 import { useCallback, memo, useEffect, useRef, useState } from "react";
 import { EuclideanPopover } from "@/components/EuclideanPopover";
+import { StepDetailPopover } from "@/components/StepDetailPopover";
 
 // Paint mode lives in a module-level ref-style holder so onMouseEnter on a
 // memoized cell can read it without re-render churn. Only one drag is active
@@ -20,6 +21,7 @@ const probLabel = (p: number) =>
 const StepCell = memo(function StepCell({
   velocity,
   probability,
+  nudge,
   isCurrent,
   color,
   onPaint,
@@ -30,28 +32,27 @@ const StepCell = memo(function StepCell({
 }: {
   velocity: number;
   probability: number;
+  nudge: number;
   isCurrent: boolean;
   color: string;
   onPaint: () => void;
   onErase: () => void;
-  onRightClick: () => void;
+  onRightClick: (rect: DOMRect) => void;
   onCtrlClick: () => void;
   beatStart: boolean;
 }) {
   const active = velocity > 0;
   const hasProb = active && probability < 1;
+  const hasNudge = active && nudge !== 0;
 
   return (
     <button
       onMouseDown={(e) => {
-        // Right-click handled by onContextMenu. Middle-click ignored.
         if (e.button !== 0) return;
         if (e.ctrlKey || e.metaKey) {
-          // Ctrl/Cmd starts probability cycling — don't enter paint mode.
           onCtrlClick();
           return;
         }
-        // Drag-paint: an active step starts erase mode, an inactive step starts paint.
         if (active) {
           paintState.mode = "erase";
           onErase();
@@ -69,12 +70,13 @@ const StepCell = memo(function StepCell({
       }}
       onContextMenu={(e) => {
         e.preventDefault();
-        onRightClick();
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        onRightClick(rect);
       }}
       title={
         active
-          ? `${velLabel(velocity)} (${Math.round(velocity * 100)}%)${hasProb ? ` — ${probLabel(probability)} chance` : ""} — drag to erase · right-click: velocity · ctrl-click: probability`
-          : "Click or drag to paint · ctrl-click: add with probability"
+          ? `${velLabel(velocity)} (${Math.round(velocity * 100)}%)${hasProb ? ` — ${probLabel(probability)} chance` : ""}${hasNudge ? ` — nudge ${nudge > 0 ? "+" : ""}${Math.round(nudge * 100)}%` : ""} — right-click: edit step`
+          : "Click or drag to paint · right-click: edit step"
       }
       className={`
         relative w-8 h-8 rounded-sm transition-all duration-75 border overflow-hidden select-none
@@ -107,6 +109,14 @@ const StepCell = memo(function StepCell({
           {Math.round(probability * 100)}
         </span>
       )}
+      {hasNudge && (
+        <span
+          className="absolute top-0 right-0.5 text-[7px] font-mono leading-none text-yellow-400/80 font-bold"
+          style={{ textShadow: "0 0 3px rgba(0,0,0,0.8)" }}
+        >
+          {nudge > 0 ? ">" : "<"}
+        </span>
+      )}
     </button>
   );
 });
@@ -118,6 +128,7 @@ const TrackRow = memo(function TrackRow({
   color,
   steps,
   probabilities,
+  nudgeArr,
   melodic,
   pianoRollOpen,
   currentStep,
@@ -125,7 +136,7 @@ const TrackRow = memo(function TrackRow({
   euclideanOpen,
   onPaintStep,
   onEraseStep,
-  onCycleVelocity,
+  onRightClickStep,
   onCtrlClick,
   onClearTrack,
   onTogglePianoRoll,
@@ -140,6 +151,7 @@ const TrackRow = memo(function TrackRow({
   color: string;
   steps: number[];
   probabilities: number[];
+  nudgeArr: number[];
   melodic: boolean;
   pianoRollOpen: boolean;
   currentStep: number;
@@ -147,7 +159,7 @@ const TrackRow = memo(function TrackRow({
   euclideanOpen: boolean;
   onPaintStep: (trackId: number, step: number) => void;
   onEraseStep: (trackId: number, step: number) => void;
-  onCycleVelocity: (trackId: number, step: number) => void;
+  onRightClickStep: (trackId: number, step: number, rect: DOMRect) => void;
   onCtrlClick: (trackId: number, step: number) => void;
   onClearTrack: (trackId: number) => void;
   onTogglePianoRoll: (trackId: number) => void;
@@ -186,12 +198,13 @@ const TrackRow = memo(function TrackRow({
             key={stepIdx}
             velocity={velocity}
             probability={probabilities[stepIdx] ?? 1.0}
+            nudge={nudgeArr[stepIdx] ?? 0}
             isCurrent={currentStep === stepIdx}
             color={color}
             beatStart={stepIdx > 0 && stepIdx % 4 === 0}
             onPaint={() => onPaintStep(trackId, stepIdx)}
             onErase={() => onEraseStep(trackId, stepIdx)}
-            onRightClick={() => onCycleVelocity(trackId, stepIdx)}
+            onRightClick={(rect: DOMRect) => onRightClickStep(trackId, stepIdx, rect)}
             onCtrlClick={() => onCtrlClick(trackId, stepIdx)}
           />
         ))}
@@ -264,7 +277,6 @@ export function StepSequencer() {
   const tracks = useEngineStore((s) => s.tracks);
   const currentStep = useEngineStore((s) => s.currentStep);
   const toggleStep = useEngineStore((s) => s.toggleStep);
-  const setStepVelocity = useEngineStore((s) => s.setStepVelocity);
   const setStepProbability = useEngineStore((s) => s.setStepProbability);
   const dragSeenRef = useRef<Set<string>>(new Set());
 
@@ -290,10 +302,12 @@ export function StepSequencer() {
   const canPaste = useEngineStore((s) => s.trackClipboard !== null);
 
   const [euclideanTrack, setEuclideanTrack] = useState<number | null>(null);
+  const [detailStep, setDetailStep] = useState<{
+    trackId: number;
+    step: number;
+    rect: DOMRect;
+  } | null>(null);
 
-  // Paint = ensure the step is on (if it's already on, leave its velocity alone).
-  // Dedup via dragSeenRef so dragging across the same cell repeatedly doesn't
-  // pile history checkpoints or fight the user's intent.
   const handlePaintStep = useCallback(
     (trackId: number, step: number) => {
       const key = `${trackId}:${step}`;
@@ -318,17 +332,15 @@ export function StepSequencer() {
     [toggleStep]
   );
 
-  const handleCycleVelocity = useCallback(
-    (trackId: number, step: number) => {
+  const handleRightClickStep = useCallback(
+    (trackId: number, step: number, rect: DOMRect) => {
       const track = useEngineStore.getState().tracks[trackId];
-      const current = track.steps[step];
-      if (current > 0) {
-        setStepVelocity(trackId, step, nextVelocity(current));
-      } else {
-        setStepVelocity(trackId, step, 0.25);
+      if (track.steps[step] <= 0) {
+        toggleStep(trackId, step);
       }
+      setDetailStep({ trackId, step, rect });
     },
-    [setStepVelocity]
+    [toggleStep]
   );
 
   const handleCtrlClick = useCallback(
@@ -378,7 +390,15 @@ export function StepSequencer() {
   const handleCloseEuclidean = useCallback(() => setEuclideanTrack(null), []);
 
   return (
-    <div className="flex-1 overflow-auto p-4">
+    <div className="flex-1 overflow-auto p-4 relative">
+      {detailStep && (
+        <StepDetailPopover
+          trackId={detailStep.trackId}
+          step={detailStep.step}
+          anchorRect={detailStep.rect}
+          onClose={() => setDetailStep(null)}
+        />
+      )}
       <div className="inline-flex flex-col gap-1">
         {/* Step numbers */}
         <div className="flex items-center gap-0.5">
@@ -406,6 +426,7 @@ export function StepSequencer() {
             color={track.sound.color}
             steps={track.steps}
             probabilities={track.probabilities}
+            nudgeArr={track.nudge}
             melodic={track.sound.melodic}
             pianoRollOpen={pianoRollTrack === track.id}
             currentStep={currentStep}
@@ -413,7 +434,7 @@ export function StepSequencer() {
             euclideanOpen={euclideanTrack === track.id}
             onPaintStep={handlePaintStep}
             onEraseStep={handleEraseStep}
-            onCycleVelocity={handleCycleVelocity}
+            onRightClickStep={handleRightClickStep}
             onCtrlClick={handleCtrlClick}
             onClearTrack={handleClear}
             onTogglePianoRoll={handleTogglePianoRoll}

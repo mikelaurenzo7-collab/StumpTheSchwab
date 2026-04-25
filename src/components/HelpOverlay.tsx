@@ -27,8 +27,8 @@ const SHORTCUTS: ShortcutGroup[] = [
   {
     title: "Step editing",
     items: [
-      { keys: ["Click"], label: "Toggle step on/off" },
-      { keys: ["Right-click"], label: "Cycle step velocity" },
+      { keys: ["Click"], label: "Toggle step on/off (drag to paint)" },
+      { keys: ["Right-click"], label: "Open step detail (velocity, probability, nudge)" },
       { keys: ["Ctrl/⌘ + Click"], label: "Cycle step probability" },
     ],
   },

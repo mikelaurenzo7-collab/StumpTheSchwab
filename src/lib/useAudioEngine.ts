@@ -464,13 +464,11 @@ export function useAudioEngine() {
               if (synth) {
                 const noteOverride = track.notes?.[stepIndex] || undefined;
                 const dur = stepDurationSeconds * (track.noteLength ?? 1.0);
-                triggerSynth(synth, track.sound, time, velocity, dur, noteOverride);
+                const nudgeOffset = (track.nudge?.[stepIndex] ?? 0) * stepDurationSeconds;
+                triggerSynth(synth, track.sound, time + nudgeOffset, velocity, dur, noteOverride);
               }
 
-              // Sidechain ducking — any track listening to this one as its
-              // source dips its duck gain to (1 - depth) and ramps back over
-              // `release` seconds. cancelScheduledValues keeps repeated kicks
-              // from fighting their own previous envelopes.
+              const triggerTime = time + ((track.nudge?.[stepIndex] ?? 0) * stepDurationSeconds);
               currentTracks.forEach((target: Track, targetIdx: number) => {
                 if (!target.effects.sidechainOn) return;
                 if (target.effects.sidechainSource !== trackIndex) return;
@@ -478,9 +476,9 @@ export function useAudioEngine() {
                 if (!dg) return;
                 const depth = Math.max(0, Math.min(1, target.effects.sidechainDepth));
                 const release = Math.max(0.01, target.effects.sidechainRelease);
-                dg.gain.cancelScheduledValues(time);
-                dg.gain.setValueAtTime(1 - depth, time);
-                dg.gain.linearRampToValueAtTime(1, time + release);
+                dg.gain.cancelScheduledValues(triggerTime);
+                dg.gain.setValueAtTime(1 - depth, triggerTime);
+                dg.gain.linearRampToValueAtTime(1, triggerTime + release);
               });
             });
 

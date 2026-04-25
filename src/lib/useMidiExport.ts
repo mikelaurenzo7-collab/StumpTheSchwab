@@ -194,8 +194,9 @@ export function buildMidiFile(state: ReturnType<typeof useEngineStore.getState>)
         midiNote = DRUM_GM_NOTE[track.sound.name] ?? 60;
       }
 
-      const onTick = Math.round(step * ticksPerStep);
-      const offTick = Math.round((step + 1) * ticksPerStep);
+      const nudgeOffset = (track.nudge[step % totalSteps] ?? 0) * ticksPerStep;
+      const onTick = Math.max(0, Math.round(step * ticksPerStep + nudgeOffset));
+      const offTick = Math.max(onTick + 1, Math.round((step + 1) * ticksPerStep + nudgeOffset));
       const vel = Math.max(1, Math.min(127, Math.round(velocity * 127)));
 
       events.push({ tick: onTick, type: "on", channel, note: midiNote, velocity: vel });

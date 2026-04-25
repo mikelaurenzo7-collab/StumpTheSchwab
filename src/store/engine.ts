@@ -78,6 +78,10 @@ export interface Track {
   // 0.5 = half step (normal hits), 0.1 = staccato. Percussive synths decay
   // quickly regardless, but this is essential for tight bass and held pads.
   noteLength: number;
+  // Per-step micro-timing offset. -0.5 = half a step early (ahead of beat),
+  // +0.5 = half a step late (behind the beat). This is the secret to groove —
+  // slightly pushing or pulling individual hits creates human-feeling rhythms.
+  nudge: number[];
 }
 
 export interface Pattern {
@@ -141,7 +145,7 @@ export interface EngineState {
   chain: number[];
   songMode: boolean;
   chainPosition: number;
-  trackClipboard: { steps: number[]; notes: string[]; probabilities: number[] } | null;
+  trackClipboard: { steps: number[]; notes: string[]; probabilities: number[]; nudge: number[] } | null;
 
   setBpm: (bpm: number) => void;
   setSwing: (swing: number) => void;
@@ -194,6 +198,7 @@ export interface EngineState {
   clearSample: (trackId: number) => void;
 
   setNoteLength: (trackId: number, length: number) => void;
+  setStepNudge: (trackId: number, step: number, nudge: number) => void;
 
   saveSession: (name: string) => void;
   loadSession: (name: string) => boolean;
@@ -304,6 +309,7 @@ function createTracks(totalSteps: number): Track[] {
     customSampleUrl: null,
     customSampleName: null,
     noteLength: 1.0,
+    nudge: Array(totalSteps).fill(0),
   }));
 }
 
@@ -326,6 +332,7 @@ interface SessionData {
     customSampleUrl?: string | null;
     customSampleName?: string | null;
     noteLength?: number;
+    nudge?: number[];
   }[];
   patterns?: { name: string; steps: number[][]; probabilities?: number[][] }[];
   currentPattern?: number;
@@ -352,6 +359,7 @@ function serializeSession(state: EngineState): SessionData {
       customSampleUrl: t.customSampleUrl,
       customSampleName: t.customSampleName,
       noteLength: t.noteLength,
+      nudge: t.nudge,
     })),
     patterns: state.patterns.map((p) => ({
       name: p.name,
@@ -435,6 +443,9 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
               probabilities: t.steps[step] > 0
                 ? t.probabilities.map((p, i) => (i === step ? 1.0 : p))
                 : t.probabilities,
+              nudge: t.steps[step] > 0
+                ? t.nudge.map((n, i) => (i === step ? 0 : n))
+                : t.nudge,
             }
           : t
       ),
@@ -484,6 +495,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
               steps: t.steps.map(() => 0),
               notes: t.notes.map(() => ""),
               probabilities: t.probabilities.map(() => 1.0),
+              nudge: t.nudge.map(() => 0),
             }
           : t
       ),
@@ -498,6 +510,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         steps: t.steps.map(() => 0),
         notes: t.notes.map(() => ""),
         probabilities: t.probabilities.map(() => 1.0),
+        nudge: t.nudge.map(() => 0),
       })),
     }));
   },
@@ -511,6 +524,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         steps: Array(totalSteps).fill(0).map((_, i) => t.steps[i] ?? 0),
         notes: Array(totalSteps).fill("").map((_, i) => t.notes[i] ?? ""),
         probabilities: Array(totalSteps).fill(1.0).map((_, i) => t.probabilities[i] ?? 1.0),
+        nudge: Array(totalSteps).fill(0).map((_, i) => t.nudge[i] ?? 0),
       })),
       patterns: state.patterns.map((p) => ({
         ...p,
@@ -540,6 +554,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
             steps: t.steps.map((s, i) => (i === step ? 0 : s)),
             notes: t.notes.map((n, i) => (i === step ? "" : n)),
             probabilities: t.probabilities.map((p, i) => (i === step ? 1.0 : p)),
+            nudge: t.nudge.map((n, i) => (i === step ? 0 : n)),
           };
         }
 
@@ -819,6 +834,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
           steps: stepsPadded,
           notes: notesPadded,
           probabilities: Array(total).fill(1.0),
+          nudge: Array(total).fill(0),
         };
       });
 
@@ -903,6 +919,17 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
     }));
   },
 
+  setStepNudge: (trackId, step, nudge) => {
+    pushHistory();
+    set((state) => ({
+      tracks: state.tracks.map((t) =>
+        t.id === trackId
+          ? { ...t, nudge: t.nudge.map((n, i) => (i === step ? Math.max(-0.5, Math.min(0.5, nudge)) : n)) }
+          : t
+      ),
+    }));
+  },
+
   // ── Track clipboard ──────────────────────────────────────────
   copyTrackSteps: (trackId) => {
     const track = get().tracks[trackId];
@@ -912,6 +939,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         steps: [...track.steps],
         notes: [...track.notes],
         probabilities: [...track.probabilities],
+        nudge: [...track.nudge],
       },
     });
   },
@@ -929,6 +957,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
           steps: Array(total).fill(0).map((_, i) => clip.steps[i] ?? 0),
           notes: Array(total).fill("").map((_, i) => clip.notes[i] ?? ""),
           probabilities: Array(total).fill(1.0).map((_, i) => clip.probabilities[i] ?? 1.0),
+          nudge: Array(total).fill(0).map((_, i) => clip.nudge[i] ?? 0),
         };
       }),
     }));
@@ -987,6 +1016,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
           customSampleUrl: data.tracks[i]?.customSampleUrl ?? null,
           customSampleName: data.tracks[i]?.customSampleName ?? null,
           noteLength: data.tracks[i]?.noteLength ?? 1.0,
+          nudge: data.tracks[i]?.nudge ?? Array(data.totalSteps).fill(0),
         })),
         patterns: data.patterns
           ? data.patterns.map((p, i) => ({

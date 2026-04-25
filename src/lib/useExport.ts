@@ -240,21 +240,20 @@ export function useExport() {
               if (!velocity) return;
               const probability = trackProbs[stepIndex] ?? 1.0;
               if (probability < 1.0 && Math.random() > probability) return;
-              // Notes are stored per-track (not per-pattern), so we modulo
-              // back into the track's note array for the per-step note.
               const noteOverride = track.notes[stepIndex % totalSteps] || undefined;
+              const nudgeOffset = (track.nudge[stepIndex % totalSteps] ?? 0) * stepDurationSeconds;
+              const trigTime = time + nudgeOffset;
               if (synth instanceof Tone.NoiseSynth) {
-                synth.triggerAttackRelease(noteDur, time, velocity);
+                synth.triggerAttackRelease(noteDur, trigTime, velocity);
               } else if (synth instanceof Tone.Sampler) {
                 if (!synth.loaded) return;
                 const note = noteOverride || track.sound.note;
-                synth.triggerAttackRelease(note, noteDur, time, velocity);
+                synth.triggerAttackRelease(note, noteDur, trigTime, velocity);
               } else {
                 const note = noteOverride || track.sound.note;
-                (synth as Tone.Synth).triggerAttackRelease(note, noteDur, time, velocity);
+                (synth as Tone.Synth).triggerAttackRelease(note, noteDur, trigTime, velocity);
               }
 
-              // Sidechain — any track listening to THIS track ducks now.
               tracks.forEach((target: Track, targetIdx: number) => {
                 if (!target.effects.sidechainOn) return;
                 if (target.effects.sidechainSource !== trackIdx) return;
@@ -262,9 +261,9 @@ export function useExport() {
                 if (!dg) return;
                 const depth = Math.max(0, Math.min(1, target.effects.sidechainDepth));
                 const release = Math.max(0.01, target.effects.sidechainRelease);
-                dg.gain.cancelScheduledValues(time);
-                dg.gain.setValueAtTime(1 - depth, time);
-                dg.gain.linearRampToValueAtTime(1, time + release);
+                dg.gain.cancelScheduledValues(trigTime);
+                dg.gain.setValueAtTime(1 - depth, trigTime);
+                dg.gain.linearRampToValueAtTime(1, trigTime + release);
               });
             },
             stepIndices,

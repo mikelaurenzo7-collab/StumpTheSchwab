@@ -9,7 +9,7 @@ import { SessionManager } from "@/components/SessionManager";
 import { useExport } from "@/lib/useExport";
 import { useMidiExport } from "@/lib/useMidiExport";
 
-export function Transport({ onInit }: { onInit: () => Promise<void> }) {
+export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; lastSaved?: Date | null }) {
   const bpm = useEngineStore((s) => s.bpm);
   const swing = useEngineStore((s) => s.swing);
   const playbackState = useEngineStore((s) => s.playbackState);
@@ -417,6 +417,12 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
       >
         ?
       </button>
+
+      {lastSaved && (
+        <span className="text-[10px] text-muted/60 font-mono" title="Auto-saved">
+          saved {lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+        </span>
+      )}
     </div>
   );
 }
