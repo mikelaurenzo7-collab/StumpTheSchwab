@@ -8,6 +8,7 @@ A web-based music production platform built to make it easier to produce higher 
 - **Built-in Sound Kit** — Kick, Snare, Hi-Hat, Open Hat, Clap, Tom, Perc, Bass (all synthesized, no samples needed)
 - **Transport Controls** — Play, pause, stop, BPM (30-300), swing
 - **Mixer** — Per-track volume faders, mute, solo
+- **Idea Lab Generator** — Prompt history, scoped mutations, surprise prompts, creative profiles, and A/B groove compare
 - **Real-time** — Sequencer responds to changes instantly during playback
 
 ## Quick Start
