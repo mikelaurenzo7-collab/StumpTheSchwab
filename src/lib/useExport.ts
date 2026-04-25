@@ -92,12 +92,46 @@ export function useExport() {
 
     try {
       const state = useEngineStore.getState();
-      const { bpm, swing, totalSteps, tracks, master } = state;
+      const { bpm, swing, totalSteps, tracks, master, songMode, chain, currentPattern, patterns } = state;
+
+      // Build flattened step/probability arrays per track.
+      // In song mode with a non-empty chain, concatenate each pattern in order.
+      // Otherwise, use the current track state (single pattern).
+      const inSongMode = songMode && chain.length > 0;
+      const sequenceLength = inSongMode ? totalSteps * chain.length : totalSteps;
+
+      const flatSteps: number[][] = tracks.map((t, i) => {
+        if (!inSongMode) return [...t.steps];
+        const out: number[] = [];
+        for (const patternIdx of chain) {
+          const src =
+            patternIdx === currentPattern
+              ? t.steps
+              : patterns[patternIdx]?.steps[i] ?? Array(totalSteps).fill(0);
+          for (let s = 0; s < totalSteps; s++) out.push(src[s] ?? 0);
+        }
+        return out;
+      });
+
+      const flatProbs: number[][] = tracks.map((t, i) => {
+        if (!inSongMode) return [...t.probabilities];
+        const out: number[] = [];
+        for (const patternIdx of chain) {
+          const src =
+            patternIdx === currentPattern
+              ? t.probabilities
+              : patterns[patternIdx]?.probabilities[i] ?? Array(totalSteps).fill(1);
+          for (let s = 0; s < totalSteps; s++) out.push(src[s] ?? 1);
+        }
+        return out;
+      });
 
       const beatsPerStep = 4 / totalSteps;
       const secondsPerBeat = 60 / bpm;
-      const loopDuration = totalSteps * beatsPerStep * secondsPerBeat;
-      const totalDuration = loopDuration * loops;
+      const loopDuration = sequenceLength * beatsPerStep * secondsPerBeat;
+      // Add a small tail so reverb/delay decays aren't cut off
+      const tail = 0.5;
+      const totalDuration = loopDuration * loops + tail;
 
       const buffer = await Tone.Offline(({ transport }) => {
         transport.bpm.value = bpm;
@@ -119,7 +153,7 @@ export function useExport() {
         const hasSolo = tracks.some((t: Track) => t.solo);
         const noteDuration = `${totalSteps}n` as Tone.Unit.Time;
 
-        tracks.forEach((track: Track) => {
+        tracks.forEach((track: Track, trackIdx: number) => {
           const audible = hasSolo ? track.solo && !track.muted : !track.muted;
           if (!audible) return;
 
@@ -156,15 +190,19 @@ export function useExport() {
           const synth = createOfflineSynth(track.sound);
           synth.connect(filter);
 
-          const stepIndices = Array.from({ length: totalSteps }, (_, i) => i);
+          const trackSteps = flatSteps[trackIdx];
+          const trackProbs = flatProbs[trackIdx];
+          const stepIndices = Array.from({ length: sequenceLength }, (_, i) => i);
 
           const seq = new Tone.Sequence(
             (time, stepIndex) => {
-              const velocity = track.steps[stepIndex];
+              const velocity = trackSteps[stepIndex];
               if (!velocity) return;
-              const probability = track.probabilities?.[stepIndex] ?? 1.0;
+              const probability = trackProbs[stepIndex] ?? 1.0;
               if (probability < 1.0 && Math.random() > probability) return;
-              const noteOverride = track.notes[stepIndex] || undefined;
+              // Notes are stored per-track (not per-pattern), so we modulo
+              // back into the track's note array for the per-step note.
+              const noteOverride = track.notes[stepIndex % totalSteps] || undefined;
               if (synth instanceof Tone.NoiseSynth) {
                 synth.triggerAttackRelease(noteDuration as string, time, velocity);
               } else {
@@ -187,7 +225,8 @@ export function useExport() {
       const url = URL.createObjectURL(wav);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `sts-${bpm}bpm-${totalSteps}steps${loops > 1 ? `-${loops}x` : ""}.wav`;
+      const songLabel = inSongMode ? `-song-${chain.length}p` : "";
+      a.download = `sts-${bpm}bpm-${totalSteps}steps${songLabel}${loops > 1 ? `-${loops}x` : ""}.wav`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

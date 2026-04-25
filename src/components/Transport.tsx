@@ -17,6 +17,7 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
   const pause = useEngineStore((s) => s.pause);
   const stop = useEngineStore((s) => s.stop);
   const clearAll = useEngineStore((s) => s.clearAll);
+  const humanize = useEngineStore((s) => s.humanize);
   const totalSteps = useEngineStore((s) => s.totalSteps);
   const setTotalSteps = useEngineStore((s) => s.setTotalSteps);
   const currentPattern = useEngineStore((s) => s.currentPattern);
@@ -258,6 +259,15 @@ export function Transport({ onInit }: { onInit: () => Promise<void> }) {
 
       {/* Sessions */}
       <SessionManager />
+
+      {/* Humanize */}
+      <button
+        onClick={() => humanize(null, 0.15)}
+        className="px-3 py-1.5 rounded bg-surface-2 hover:bg-accent-dim/30 text-muted hover:text-accent text-xs uppercase tracking-wider transition-colors"
+        title="Humanize all tracks — randomize velocities slightly for a more natural feel"
+      >
+        Humanize
+      </button>
 
       {/* Clear */}
       <button

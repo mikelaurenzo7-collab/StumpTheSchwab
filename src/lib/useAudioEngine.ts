@@ -250,6 +250,8 @@ export function useAudioEngine() {
   // Playback control
   useEffect(() => {
     let prevPlaybackState = useEngineStore.getState().playbackState;
+    let needsChainAdvance = false;
+
     const unsub = useEngineStore.subscribe((state) => {
       const playbackState = state.playbackState;
       if (playbackState === prevPlaybackState) return;
@@ -261,19 +263,44 @@ export function useAudioEngine() {
           sequenceRef.current.dispose();
         }
 
-        const { totalSteps, setCurrentStep } = useEngineStore.getState();
+        const startState = useEngineStore.getState();
+        const { totalSteps, setCurrentStep } = startState;
         const stepIndices = Array.from({ length: totalSteps }, (_, i) => i);
 
         const noteDuration = `${totalSteps}n` as Tone.Unit.Time;
 
-        transport.bpm.value = useEngineStore.getState().bpm;
-        transport.swing = useEngineStore.getState().swing;
+        transport.bpm.value = startState.bpm;
+        transport.swing = startState.swing;
+
+        // If song mode is on with a chain, jump to the first pattern in the chain
+        if (startState.songMode && startState.chain.length > 0) {
+          const firstPattern = startState.chain[0];
+          if (firstPattern !== startState.currentPattern) {
+            startState.switchPatternSilent(firstPattern);
+          }
+          startState.setChainPosition(0);
+        }
+        needsChainAdvance = false;
 
         sequenceRef.current = new Tone.Sequence(
           (time, stepIndex) => {
+            // Advance chain at the start of a new loop iteration
+            if (needsChainAdvance && stepIndex === 0) {
+              const { songMode, chain, chainPosition, switchPatternSilent, setChainPosition } =
+                useEngineStore.getState();
+              if (songMode && chain.length > 0) {
+                const nextPos = (chainPosition + 1) % chain.length;
+                const nextPattern = chain[nextPos];
+                switchPatternSilent(nextPattern);
+                setChainPosition(nextPos);
+              }
+              needsChainAdvance = false;
+            }
+
             setCurrentStep(stepIndex);
 
-            const currentTracks = useEngineStore.getState().tracks;
+            const currentState = useEngineStore.getState();
+            const currentTracks = currentState.tracks;
             const hasSolo = currentTracks.some((t: Track) => t.solo);
 
             currentTracks.forEach((track: Track, trackIndex: number) => {
@@ -292,6 +319,15 @@ export function useAudioEngine() {
                 triggerSynth(synth, track.sound, time, velocity, noteDuration as string, noteOverride);
               }
             });
+
+            // Mark for chain advance at the end of the pattern
+            if (
+              currentState.songMode &&
+              currentState.chain.length > 0 &&
+              stepIndex === totalSteps - 1
+            ) {
+              needsChainAdvance = true;
+            }
           },
           stepIndices,
           "16n"
@@ -303,6 +339,8 @@ export function useAudioEngine() {
         transport.pause();
       } else {
         transport.stop();
+        needsChainAdvance = false;
+        useEngineStore.getState().setChainPosition(0);
         if (sequenceRef.current) {
           sequenceRef.current.stop();
           sequenceRef.current.dispose();

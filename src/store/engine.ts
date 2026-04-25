@@ -73,6 +73,11 @@ export interface EngineState {
 
   pianoRollTrack: number | null;
 
+  chain: number[];
+  songMode: boolean;
+  chainPosition: number;
+  trackClipboard: { steps: number[]; notes: string[]; probabilities: number[] } | null;
+
   setBpm: (bpm: number) => void;
   setSwing: (swing: number) => void;
   play: () => void;
@@ -103,6 +108,18 @@ export interface EngineState {
 
   setTrackEffect: <K extends keyof TrackEffects>(trackId: number, key: K, value: TrackEffects[K]) => void;
   setMaster: <K extends keyof MasterBus>(key: K, value: MasterBus[K]) => void;
+
+  setSongMode: (on: boolean) => void;
+  addToChain: (patternIndex: number) => void;
+  removeFromChain: (position: number) => void;
+  clearChain: () => void;
+  setChainPosition: (pos: number) => void;
+  switchPatternSilent: (index: number) => void;
+
+  copyTrackSteps: (trackId: number) => void;
+  pasteTrackSteps: (trackId: number) => void;
+
+  humanize: (trackId: number | null, amount: number) => void;
 
   saveSession: (name: string) => void;
   loadSession: (name: string) => boolean;
@@ -186,6 +203,8 @@ interface SessionData {
   }[];
   patterns?: { name: string; steps: number[][]; probabilities?: number[][] }[];
   currentPattern?: number;
+  chain?: number[];
+  songMode?: boolean;
   master: MasterBus;
 }
 
@@ -210,6 +229,8 @@ function serializeSession(state: EngineState): SessionData {
       steps: p.steps,
       probabilities: p.probabilities,
     })),
+    chain: state.chain,
+    songMode: state.songMode,
     master: state.master,
   };
 }
@@ -257,6 +278,11 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
     createEmptyPattern(label, DEFAULT_KIT.length, INITIAL_STEPS)
   ),
   currentPattern: 0,
+
+  chain: [],
+  songMode: false,
+  chainPosition: 0,
+  trackClipboard: null,
 
   setBpm: (bpm) => set({ bpm: Math.max(30, Math.min(300, bpm)) }),
   setSwing: (swing) => set({ swing: Math.max(0, Math.min(1, swing)) }),
@@ -559,6 +585,100 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
       master: { ...state.master, [key]: value },
     })),
 
+  // ── Song mode / chain ────────────────────────────────────────
+  setSongMode: (on) => {
+    pushHistory();
+    set({ songMode: on, chainPosition: 0 });
+  },
+
+  addToChain: (patternIndex) => {
+    if (patternIndex < 0 || patternIndex >= MAX_PATTERNS) return;
+    pushHistory();
+    set((state) => ({ chain: [...state.chain, patternIndex] }));
+  },
+
+  removeFromChain: (position) => {
+    pushHistory();
+    set((state) => ({
+      chain: state.chain.filter((_, i) => i !== position),
+      chainPosition: Math.max(0, Math.min(state.chainPosition, state.chain.length - 2)),
+    }));
+  },
+
+  clearChain: () => {
+    pushHistory();
+    set({ chain: [], chainPosition: 0 });
+  },
+
+  setChainPosition: (pos) => set({ chainPosition: pos }),
+
+  switchPatternSilent: (index) => {
+    set((state) => {
+      if (index === state.currentPattern || index < 0 || index >= MAX_PATTERNS) return state;
+      const snapshot = snapshotPattern(state.tracks);
+      const updatedPatterns = state.patterns.map((p, i) =>
+        i === state.currentPattern
+          ? { ...p, steps: snapshot.steps, probabilities: snapshot.probabilities }
+          : p
+      );
+      const target = updatedPatterns[index];
+      return {
+        patterns: updatedPatterns,
+        currentPattern: index,
+        tracks: applyPatternToTracks(state.tracks, target, state.totalSteps),
+      };
+    });
+  },
+
+  // ── Track clipboard ──────────────────────────────────────────
+  copyTrackSteps: (trackId) => {
+    const track = get().tracks[trackId];
+    if (!track) return;
+    set({
+      trackClipboard: {
+        steps: [...track.steps],
+        notes: [...track.notes],
+        probabilities: [...track.probabilities],
+      },
+    });
+  },
+
+  pasteTrackSteps: (trackId) => {
+    const clip = get().trackClipboard;
+    if (!clip) return;
+    pushHistory();
+    set((state) => ({
+      tracks: state.tracks.map((t) => {
+        if (t.id !== trackId) return t;
+        const total = state.totalSteps;
+        return {
+          ...t,
+          steps: Array(total).fill(0).map((_, i) => clip.steps[i] ?? 0),
+          notes: Array(total).fill("").map((_, i) => clip.notes[i] ?? ""),
+          probabilities: Array(total).fill(1.0).map((_, i) => clip.probabilities[i] ?? 1.0),
+        };
+      }),
+    }));
+  },
+
+  // ── Humanize ─────────────────────────────────────────────────
+  humanize: (trackId, amount) => {
+    pushHistory();
+    set((state) => ({
+      tracks: state.tracks.map((t) => {
+        if (trackId !== null && t.id !== trackId) return t;
+        return {
+          ...t,
+          steps: t.steps.map((v) => {
+            if (v <= 0) return 0;
+            const variation = (Math.random() - 0.5) * 2 * amount;
+            return Math.max(0.1, Math.min(1.0, v + variation));
+          }),
+        };
+      }),
+    }));
+  },
+
   saveSession: (name) => {
     try {
       const data = serializeSession(get());
@@ -598,6 +718,9 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
                 Array.from({ length: state.tracks.length }, () => Array(data.totalSteps).fill(1.0)),
             }))
           : state.patterns,
+        chain: data.chain ?? [],
+        songMode: data.songMode ?? false,
+        chainPosition: 0,
         master: data.master,
       }));
       return true;

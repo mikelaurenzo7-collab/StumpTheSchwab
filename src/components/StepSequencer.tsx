@@ -95,11 +95,15 @@ const TrackRow = memo(function TrackRow({
   melodic,
   pianoRollOpen,
   currentStep,
+  canPaste,
   onToggleStep,
   onCycleVelocity,
   onCtrlClick,
   onClearTrack,
   onTogglePianoRoll,
+  onCopyTrack,
+  onPasteTrack,
+  onHumanizeTrack,
 }: {
   trackId: number;
   name: string;
@@ -109,11 +113,15 @@ const TrackRow = memo(function TrackRow({
   melodic: boolean;
   pianoRollOpen: boolean;
   currentStep: number;
+  canPaste: boolean;
   onToggleStep: (trackId: number, step: number) => void;
   onCycleVelocity: (trackId: number, step: number) => void;
   onCtrlClick: (trackId: number, step: number) => void;
   onClearTrack: (trackId: number) => void;
   onTogglePianoRoll: (trackId: number) => void;
+  onCopyTrack: (trackId: number) => void;
+  onPasteTrack: (trackId: number) => void;
+  onHumanizeTrack: (trackId: number) => void;
 }) {
   return (
     <div className="flex items-center gap-0.5 group">
@@ -154,14 +162,38 @@ const TrackRow = memo(function TrackRow({
         ))}
       </div>
 
-      {/* Clear track */}
-      <button
-        onClick={() => onClearTrack(trackId)}
-        className="ml-2 text-xs text-muted/0 group-hover:text-muted hover:text-danger transition-colors"
-        title={`Clear ${name}`}
-      >
-        ✕
-      </button>
+      {/* Track actions — visible on hover */}
+      <div className="ml-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={() => onCopyTrack(trackId)}
+          className="w-5 h-5 rounded text-[9px] font-bold bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground transition-colors"
+          title={`Copy ${name} pattern`}
+        >
+          C
+        </button>
+        <button
+          onClick={() => onPasteTrack(trackId)}
+          disabled={!canPaste}
+          className="w-5 h-5 rounded text-[9px] font-bold bg-surface-2 text-muted hover:bg-accent-dim/30 hover:text-accent disabled:opacity-25 disabled:hover:bg-surface-2 disabled:hover:text-muted transition-colors"
+          title={canPaste ? `Paste into ${name}` : "Copy a track first"}
+        >
+          P
+        </button>
+        <button
+          onClick={() => onHumanizeTrack(trackId)}
+          className="w-5 h-5 rounded text-[9px] font-bold bg-surface-2 text-muted hover:bg-accent-dim/30 hover:text-accent transition-colors"
+          title={`Humanize ${name} — slight velocity randomization`}
+        >
+          ~
+        </button>
+        <button
+          onClick={() => onClearTrack(trackId)}
+          className="w-5 h-5 rounded text-[9px] font-bold bg-surface-2 text-muted hover:bg-danger/20 hover:text-danger transition-colors"
+          title={`Clear ${name}`}
+        >
+          ✕
+        </button>
+      </div>
     </div>
   );
 });
@@ -176,6 +208,10 @@ export function StepSequencer() {
   const clearTrack = useEngineStore((s) => s.clearTrack);
   const pianoRollTrack = useEngineStore((s) => s.pianoRollTrack);
   const setPianoRollTrack = useEngineStore((s) => s.setPianoRollTrack);
+  const copyTrackSteps = useEngineStore((s) => s.copyTrackSteps);
+  const pasteTrackSteps = useEngineStore((s) => s.pasteTrackSteps);
+  const humanize = useEngineStore((s) => s.humanize);
+  const canPaste = useEngineStore((s) => s.trackClipboard !== null);
 
   const handleToggle = useCallback(
     (trackId: number, step: number) => toggleStep(trackId, step),
@@ -219,6 +255,21 @@ export function StepSequencer() {
     [pianoRollTrack, setPianoRollTrack]
   );
 
+  const handleCopyTrack = useCallback(
+    (trackId: number) => copyTrackSteps(trackId),
+    [copyTrackSteps]
+  );
+
+  const handlePasteTrack = useCallback(
+    (trackId: number) => pasteTrackSteps(trackId),
+    [pasteTrackSteps]
+  );
+
+  const handleHumanizeTrack = useCallback(
+    (trackId: number) => humanize(trackId, 0.15),
+    [humanize]
+  );
+
   return (
     <div className="flex-1 overflow-auto p-4">
       <div className="inline-flex flex-col gap-1">
@@ -251,11 +302,15 @@ export function StepSequencer() {
             melodic={track.sound.melodic}
             pianoRollOpen={pianoRollTrack === track.id}
             currentStep={currentStep}
+            canPaste={canPaste}
             onToggleStep={handleToggle}
             onCycleVelocity={handleCycleVelocity}
             onCtrlClick={handleCtrlClick}
             onClearTrack={handleClear}
             onTogglePianoRoll={handleTogglePianoRoll}
+            onCopyTrack={handleCopyTrack}
+            onPasteTrack={handlePasteTrack}
+            onHumanizeTrack={handleHumanizeTrack}
           />
         ))}
       </div>

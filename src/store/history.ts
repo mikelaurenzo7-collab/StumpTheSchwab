@@ -10,6 +10,8 @@ interface Snapshot {
   tracks: Pick<Track, "steps" | "notes" | "probabilities" | "volume" | "pan" | "muted" | "solo" | "effects">[];
   patterns: Pattern[];
   currentPattern: number;
+  chain: number[];
+  songMode: boolean;
   master: MasterBus;
 }
 
@@ -43,6 +45,8 @@ function captureSnapshot(): Snapshot {
       probabilities: p.probabilities.map((row) => [...row]),
     })),
     currentPattern: s.currentPattern,
+    chain: [...s.chain],
+    songMode: s.songMode,
     master: { ...s.master },
   };
 }
@@ -55,6 +59,8 @@ function restoreSnapshot(snapshot: Snapshot) {
     totalSteps: snapshot.totalSteps,
     currentPattern: snapshot.currentPattern,
     patterns: snapshot.patterns,
+    chain: snapshot.chain,
+    songMode: snapshot.songMode,
     master: snapshot.master,
     tracks: state.tracks.map((t, i) => ({
       ...t,
