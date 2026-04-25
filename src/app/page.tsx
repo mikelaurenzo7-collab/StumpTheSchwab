@@ -18,8 +18,9 @@ export default function DAW() {
     getMasterMeter,
     getMasterSpectrum,
     getMasterWaveform,
+    triggerTrack,
   } = useAudioEngine();
-  useKeyboardShortcuts(initAudio);
+  useKeyboardShortcuts(initAudio, triggerTrack);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">

@@ -51,6 +51,13 @@ const SHORTCUTS: ShortcutGroup[] = [
     ],
   },
   {
+    title: "Performance",
+    items: [
+      { keys: ["Q", "W", "E", "R"], label: "Trigger tracks 1–4" },
+      { keys: ["T", "Y", "U", "I"], label: "Trigger tracks 5–8" },
+    ],
+  },
+  {
     title: "Global",
     items: [
       { keys: ["G"], label: "Generate beat with Claude" },

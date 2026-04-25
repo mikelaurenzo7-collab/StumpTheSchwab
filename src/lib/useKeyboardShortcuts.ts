@@ -5,7 +5,23 @@ import { useEngineStore, MAX_PATTERNS } from "@/store/engine";
 import { useHistoryStore } from "@/store/history";
 import { useUiStore } from "@/store/ui";
 
-export function useKeyboardShortcuts(onInit: () => Promise<void>) {
+// Top-row keys map left-to-right onto the 8 tracks. Producers can jam over
+// patterns the same way you'd play an MPC pad row.
+const PERFORMANCE_KEYS: Record<string, number> = {
+  KeyQ: 0,
+  KeyW: 1,
+  KeyE: 2,
+  KeyR: 3,
+  KeyT: 4,
+  KeyY: 5,
+  KeyU: 6,
+  KeyI: 7,
+};
+
+export function useKeyboardShortcuts(
+  onInit: () => Promise<void>,
+  triggerTrack: (index: number, velocity?: number) => void,
+) {
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
       // Don't capture shortcuts when typing in inputs
@@ -34,6 +50,21 @@ export function useKeyboardShortcuts(onInit: () => Promise<void>) {
       }
 
       const state = useEngineStore.getState();
+
+      // Performance keys (Q W E R T Y U I) — fire tracks 1..8.
+      // Block when a key is held so trills are explicit re-presses.
+      if (
+        !e.repeat &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey &&
+        e.code in PERFORMANCE_KEYS
+      ) {
+        e.preventDefault();
+        await onInit();
+        triggerTrack(PERFORMANCE_KEYS[e.code], 1.0);
+        return;
+      }
 
       switch (e.code) {
         // Space: Play/Pause
@@ -126,5 +157,5 @@ export function useKeyboardShortcuts(onInit: () => Promise<void>) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onInit]);
+  }, [onInit, triggerTrack]);
 }

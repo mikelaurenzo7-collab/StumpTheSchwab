@@ -415,13 +415,33 @@ const ChannelStrip = memo(function ChannelStrip({
     effects.reverbOn ||
     effects.sidechainOn;
 
+  // Brief flash on the track dot when this track is performance-triggered
+  // (Q-I keys). The audio engine dispatches "sts-track-trigger" with the
+  // track index; flash fades via CSS transition.
+  const [flashing, setFlashing] = useState(false);
+  useEffect(() => {
+    const onTrigger = (e: Event) => {
+      const ev = e as CustomEvent<{ index: number }>;
+      if (ev.detail?.index !== trackId) return;
+      setFlashing(true);
+      window.setTimeout(() => setFlashing(false), 120);
+    };
+    window.addEventListener("sts-track-trigger", onTrigger);
+    return () => window.removeEventListener("sts-track-trigger", onTrigger);
+  }, [trackId]);
+
   return (
     <div className="flex flex-col items-center gap-1">
       <div className="flex flex-col items-center gap-2 w-16">
         {/* Track color dot + name */}
         <div
-          className="w-2 h-2 rounded-full"
-          style={{ backgroundColor: color }}
+          className="rounded-full transition-all duration-100"
+          style={{
+            width: flashing ? "10px" : "8px",
+            height: flashing ? "10px" : "8px",
+            backgroundColor: color,
+            boxShadow: flashing ? `0 0 12px 2px ${color}` : "none",
+          }}
         />
         <span className="text-[10px] text-muted truncate w-full text-center">
           {hasSample ? sampleName ?? "Sample" : name}

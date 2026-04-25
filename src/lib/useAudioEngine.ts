@@ -512,11 +512,49 @@ export function useAudioEngine() {
     return masterWaveformRef.current?.getValue() ?? null;
   }, []);
 
+  // Live trigger — used by performance keys (Q-I) to play any track on demand,
+  // independent of the step sequencer. Honors the track's noteLength and
+  // fires sidechain envelopes the same way the sequence does, so manual
+  // kicks pump bass even outside the running pattern.
+  const triggerTrack = useCallback((index: number, velocity = 1.0) => {
+    if (!initializedRef.current) return;
+    const state = useEngineStore.getState();
+    const track = state.tracks[index];
+    if (!track) return;
+    const synth = synthsRef.current[index];
+    if (!synth) return;
+
+    const stepDur = (60 / state.bpm) * (4 / state.totalSteps);
+    const dur = stepDur * (track.noteLength ?? 1.0);
+    const now = Tone.now();
+    triggerSynth(synth, track.sound, now, velocity, dur);
+
+    state.tracks.forEach((target, targetIdx) => {
+      if (!target.effects.sidechainOn) return;
+      if (target.effects.sidechainSource !== index) return;
+      const dg = duckGainsRef.current[targetIdx];
+      if (!dg) return;
+      const depth = Math.max(0, Math.min(1, target.effects.sidechainDepth));
+      const release = Math.max(0.01, target.effects.sidechainRelease);
+      dg.gain.cancelScheduledValues(now);
+      dg.gain.setValueAtTime(1 - depth, now);
+      dg.gain.linearRampToValueAtTime(1, now + release);
+    });
+
+    // Visual flash on the channel strip — listeners attach in Mixer.
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("sts-track-trigger", { detail: { index } }),
+      );
+    }
+  }, []);
+
   return {
     initAudio,
     getTrackMeter,
     getMasterMeter,
     getMasterSpectrum,
     getMasterWaveform,
+    triggerTrack,
   };
 }
