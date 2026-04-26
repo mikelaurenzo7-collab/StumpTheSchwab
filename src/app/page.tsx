@@ -267,7 +267,10 @@ export default function DAW() {
 
 function QuickStartPanel() {
   return (
-    <div className="panel rounded-lg border-accent/35 p-3 shadow-accent-soft">
+    <section
+      aria-label="Start here: make a beat in 3 moves"
+      className="panel rounded-lg border-accent/35 p-3 shadow-accent-soft"
+    >
       <SectionHeader eyebrow="Start here" title="Make a beat in 3 moves" />
       <ol className="mt-2 space-y-2 text-[12px] text-soft">
         <li className="flex gap-2">
@@ -297,7 +300,7 @@ function QuickStartPanel() {
           Help
         </button>
       </div>
-    </div>
+    </section>
   );
 }
 
