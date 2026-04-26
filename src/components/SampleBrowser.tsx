@@ -5,6 +5,7 @@ import { useState, useRef, useCallback } from "react";
 import { RecorderModal } from "./RecorderModal";
 import { analyzeReference, type ReferenceDescriptor } from "@/lib/refAnalyzer";
 import type { RefMatchResult } from "@/app/api/ref-match/route";
+import { applyMixPatches, type MixPatch } from "@/lib/patchValidation";
 
 export function SampleBrowser() {
   const {
@@ -36,7 +37,7 @@ export function SampleBrowser() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
-    setTrackVolume, setTrackPan, setTrackEffect, setMaster, setBpm, setSwing, loadKitPack,
+    setBpm, setSwing, loadKitPack,
   } = useEngineStore();
 
   const displaySamples =
@@ -144,23 +145,12 @@ export function SampleBrowser() {
 
   const applyRefPatches = useCallback(() => {
     if (!refResult) return;
-    for (const p of refResult.mix_patches) {
-      if (p.type === "trackVolume" && p.trackId != null)  setTrackVolume(p.trackId, Number(p.value));
-      else if (p.type === "trackPan"  && p.trackId != null) setTrackPan(p.trackId, Number(p.value));
-      else if (p.type === "trackEffect" && p.trackId != null) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (p.enable) setTrackEffect(p.trackId, p.enable as any, true);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setTrackEffect(p.trackId, p.key as any, p.value);
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      else if (p.type === "master") setMaster(p.key as any, p.value);
-    }
+    applyMixPatches(refResult.mix_patches as MixPatch[]);
     if (refResult.bpm)   setBpm(refResult.bpm);
     if (refResult.swing != null) setSwing(refResult.swing);
     if (refResult.kit_suggestion) loadKitPack(refResult.kit_suggestion, false);
     setAppliedRef(true);
-  }, [refResult, setTrackVolume, setTrackPan, setTrackEffect, setMaster, setBpm, setSwing, loadKitPack]);
+  }, [refResult, setBpm, setSwing, loadKitPack]);
 
   return (
     <>

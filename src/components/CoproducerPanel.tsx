@@ -15,6 +15,11 @@ import {
   loadMemory,
   type LearningCategory,
 } from "@/lib/projectMemory";
+import {
+  applyMixPatch,
+  applyMixPatches,
+  type MixPatch,
+} from "@/lib/patchValidation";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -26,15 +31,6 @@ interface ChatMessage {
 
 interface ActionChip {
   label: string;
-}
-
-interface MixPatch {
-  type: "trackVolume" | "trackPan" | "trackEffect" | "master";
-  trackId?: number;
-  key: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  value: any;
-  enable?: string;
 }
 
 // ── Project state serializer ──────────────────────────────────────────────────
@@ -83,11 +79,7 @@ function useProjectState(): () => string {
 // ── Tool dispatcher ───────────────────────────────────────────────────────────
 
 function useToolDispatcher() {
-  const applyGeneratedBeat  = useEngineStore((s) => s.applyGeneratedBeat);
-  const setTrackVolume       = useEngineStore((s) => s.setTrackVolume);
-  const setTrackPan          = useEngineStore((s) => s.setTrackPan);
-  const setTrackEffect       = useEngineStore((s) => s.setTrackEffect);
-  const setMaster            = useEngineStore((s) => s.setMaster);
+  const applyGeneratedBeat   = useEngineStore((s) => s.applyGeneratedBeat);
   const setTrackSynthType    = useEngineStore((s) => s.setTrackSynthType);
   const setTrackSoundOptions = useEngineStore((s) => s.setTrackSoundOptions);
   const setBpm               = useEngineStore((s) => s.setBpm);
@@ -107,24 +99,8 @@ function useToolDispatcher() {
 
         case "apply_mix_patches": {
           const patches = Array.isArray(input.patches) ? (input.patches as MixPatch[]) : [];
-          for (const p of patches) {
-            if (p.type === "trackVolume" && p.trackId != null) {
-              setTrackVolume(p.trackId, Number(p.value));
-            } else if (p.type === "trackPan" && p.trackId != null) {
-              setTrackPan(p.trackId, Number(p.value));
-            } else if (p.type === "trackEffect" && p.trackId != null) {
-              if (p.enable) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                setTrackEffect(p.trackId, p.enable as any, true);
-              }
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              setTrackEffect(p.trackId, p.key as any, p.value);
-            } else if (p.type === "master") {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              setMaster(p.key as any, p.value);
-            }
-          }
-          return { label: `Mix: ${patches.length} patch${patches.length !== 1 ? "es" : ""}` };
+          const applied = applyMixPatches(patches);
+          return { label: `Mix: ${applied} patch${applied !== 1 ? "es" : ""}` };
         }
 
         case "design_sound": {
@@ -155,8 +131,7 @@ function useToolDispatcher() {
         case "set_master_fx": {
           const key = typeof input.key === "string" ? input.key : "";
           if (key) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            setMaster(key as any, input.value as any);
+            applyMixPatch({ type: "master", key, value: input.value });
           }
           return { label: `Master: ${key}` };
         }
@@ -181,9 +156,8 @@ function useToolDispatcher() {
           return { label: name };
       }
     },
-    [applyGeneratedBeat, setTrackVolume, setTrackPan, setTrackEffect, setMaster,
-     setTrackSynthType, setTrackSoundOptions, setBpm, setSwing, setSongMode,
-     setTotalSteps, loadKitPack],
+    [applyGeneratedBeat, setTrackSynthType, setTrackSoundOptions, setBpm,
+     setSwing, setSongMode, setTotalSteps, loadKitPack],
   );
 }
 

@@ -2,36 +2,8 @@
 
 import { memo, useCallback, useState } from "react";
 import { useEngineStore } from "@/store/engine";
-import type { MixSuggestion, MixPatch } from "@/app/api/mix-doctor/route";
-
-// ── Patch dispatcher ─────────────────────────────────────────────────────────
-// Routes each MixPatch to the correct Zustand action so every AI-applied
-// change is undoable and persisted via the existing engine infrastructure.
-function usePatchDispatcher() {
-  const setTrackVolume  = useEngineStore((s) => s.setTrackVolume);
-  const setTrackPan     = useEngineStore((s) => s.setTrackPan);
-  const setTrackEffect  = useEngineStore((s) => s.setTrackEffect);
-  const setMaster       = useEngineStore((s) => s.setMaster);
-
-  return useCallback((patch: MixPatch) => {
-    if (patch.type === "trackVolume" && patch.trackId != null) {
-      setTrackVolume(patch.trackId, Number(patch.value));
-    } else if (patch.type === "trackPan" && patch.trackId != null) {
-      setTrackPan(patch.trackId, Number(patch.value));
-    } else if (patch.type === "trackEffect" && patch.trackId != null) {
-      // If there's an enable key (e.g. "filterOn"), flip it on first.
-      if (patch.enable) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setTrackEffect(patch.trackId, patch.enable as any, true);
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setTrackEffect(patch.trackId, patch.key as any, patch.value as any);
-    } else if (patch.type === "master") {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setMaster(patch.key as any, patch.value as any);
-    }
-  }, [setTrackVolume, setTrackPan, setTrackEffect, setMaster]);
-}
+import type { MixSuggestion } from "@/app/api/mix-doctor/route";
+import { applyMixPatch, type MixPatch } from "@/lib/patchValidation";
 
 // ── Snapshot builder ─────────────────────────────────────────────────────────
 // Collects the current mix state into the compact JSON that the route expects.
@@ -157,7 +129,7 @@ export const MixDoctorPanel = memo(function MixDoctorPanel({
   const [applied, setApplied]             = useState<Set<number>>(new Set());
   const [error, setError]                 = useState<string | null>(null);
 
-  const applyPatch = usePatchDispatcher();
+  const applyPatch = useCallback((p: MixPatch) => { applyMixPatch(p); }, []);
 
   const runAnalysis = useCallback(async () => {
     setLoading(true);
