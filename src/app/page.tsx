@@ -39,7 +39,7 @@ const BACKGROUND_DIP = -0.08;
 const MIN_TRACK_LEVEL = 0.18;
 const FRACTURE_SCENE_THRESHOLD = 55;
 const FRACTURE_SCENE_INTERVAL = 5;
-const REGENERATE_PLACEHOLDER_MESSAGE = "A newly generated world, ready to be sculpted into the hook.";
+const REGENERATE_DIRECTIVE_MESSAGE = "A newly generated world, ready to be sculpted into the hook.";
 const initialTracks: Track[] = [
   { id: "pulse", name: "Pulse Engine", voice: "kick", hue: 270, level: 0.92, pitch: 46, pattern: [true, false, false, false, true, false, false, true, true, false, false, false, true, false, true, false] },
   { id: "glass", name: "Glass Impact", voice: "snare", hue: 318, level: 0.76, pitch: 188, pattern: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, true] },
@@ -277,7 +277,7 @@ export default function Home() {
   const regenerate = () => {
     const names = ["Nebula Breaks", "Quantum Bounce", "Chrome Ritual", "Zero-G Garage", "Solar Drill", "Dream Collider"];
     setScene(names[Math.floor(Math.random() * names.length)]);
-    setDirective(REGENERATE_PLACEHOLDER_MESSAGE);
+    setDirective(REGENERATE_DIRECTIVE_MESSAGE);
     setTracks((current) => current.map((track) => ({ ...track, pattern: makePattern(track, density, macros.gravity) })));
   };
 
