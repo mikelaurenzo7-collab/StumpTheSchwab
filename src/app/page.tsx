@@ -39,7 +39,7 @@ const BACKGROUND_DIP = -0.08;
 const MIN_TRACK_LEVEL = 0.18;
 const FRACTURE_SCENE_THRESHOLD = 55;
 const FRACTURE_SCENE_INTERVAL = 5;
-const GENERATED_DIRECTIVE = "A newly generated world, ready to be sculpted into the hook.";
+const REGENERATE_PLACEHOLDER_MESSAGE = "A newly generated world, ready to be sculpted into the hook.";
 const initialTracks: Track[] = [
   { id: "pulse", name: "Pulse Engine", voice: "kick", hue: 270, level: 0.92, pitch: 46, pattern: [true, false, false, false, true, false, false, true, true, false, false, false, true, false, true, false] },
   { id: "glass", name: "Glass Impact", voice: "snare", hue: 318, level: 0.76, pitch: 188, pattern: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, true] },
@@ -48,6 +48,7 @@ const initialTracks: Track[] = [
   { id: "keys", name: "Neon Keys", voice: "pluck", hue: 42, level: 0.64, pitch: 330, pattern: [false, true, false, false, false, true, false, true, false, false, true, false, false, true, false, false] },
   { id: "aura", name: "Aura Pad", voice: "pad", hue: 226, level: 0.52, pitch: 110, pattern: [true, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false] },
 ];
+const initialTrackLevels = new Map(initialTracks.map((track) => [track.id, track.level]));
 
 const scale = [0, 2, 3, 5, 7, 10, 12, 14];
 
@@ -276,7 +277,7 @@ export default function Home() {
   const regenerate = () => {
     const names = ["Nebula Breaks", "Quantum Bounce", "Chrome Ritual", "Zero-G Garage", "Solar Drill", "Dream Collider"];
     setScene(names[Math.floor(Math.random() * names.length)]);
-    setDirective(GENERATED_DIRECTIVE);
+    setDirective(REGENERATE_PLACEHOLDER_MESSAGE);
     setTracks((current) => current.map((track) => ({ ...track, pattern: makePattern(track, density, macros.gravity) })));
   };
 
@@ -287,7 +288,7 @@ export default function Home() {
     setDensity(preset.density);
     setMacros(preset.macros);
     setTracks((current) => current.map((track, trackIndex) => {
-      const baseline = initialTracks.find((initialTrack) => initialTrack.id === track.id)?.level ?? track.level;
+      const baseline = initialTrackLevels.get(track.id) ?? track.level;
 
       return {
         ...track,
