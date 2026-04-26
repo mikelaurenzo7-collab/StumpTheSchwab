@@ -46,7 +46,9 @@ const BACKGROUND_DIP = -0.08;
 const MIN_AUDIBLE_TRACK_LEVEL = 0.18;
 const FRACTURE_SCENE_THRESHOLD = 55;
 const FRACTURE_SCENE_INTERVAL = 5;
-const REGENERATE_DIRECTIVE_MESSAGE = "A newly generated world, ready to be sculpted into the hook.";
+const FALLBACK_DIRECTIVE = "Design a session that feels alive before the first plugin loads.";
+const REGENERATE_DIRECTIVE = "A newly generated world, ready to be sculpted into the hook.";
+const DEFAULT_SPOTLIGHT = { name: "Pulse Engine", voice: "kick" as const, score: 0 };
 const initialTracks: Track[] = [
   { id: "pulse", name: "Pulse Engine", voice: "kick", hue: 270, level: 0.92, pitch: 46, pattern: [true, false, false, false, true, false, false, true, true, false, false, false, true, false, true, false] },
   { id: "glass", name: "Glass Impact", voice: "snare", hue: 318, level: 0.76, pitch: 188, pattern: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, true] },
@@ -93,7 +95,7 @@ const scenePresets: ScenePreset[] = [
     emphasis: ["pluck", "pad", "snare"],
   },
 ];
-const DEFAULT_DIRECTIVE = scenePresets[0]?.promise ?? "Design a session that feels alive before the first plugin loads.";
+const DEFAULT_DIRECTIVE = scenePresets[0]?.promise ?? FALLBACK_DIRECTIVE;
 const performanceMoves: PerformanceMove[] = [
   {
     id: "lift",
@@ -163,7 +165,7 @@ function getMoveLevelDelta(voice: Track["voice"], move: PerformanceMove["id"]) {
     return voice === "kick" || voice === "bass" ? 0.1 : -0.03;
   }
 
-  return voice === "hat" || voice === "snare" || voice === "pluck" ? 0.05 : -0.01;
+  return voice === "hat" || voice === "snare" || voice === "pluck" ? 0.05 : -0.01; // glitch
 }
 
 function getMoveDensityDelta(move: PerformanceMove["id"]) {
@@ -404,7 +406,7 @@ export default function Home() {
   const regenerate = () => {
     const names = ["Nebula Breaks", "Quantum Bounce", "Chrome Ritual", "Zero-G Garage", "Solar Drill", "Dream Collider"];
     setScene(names[Math.floor(Math.random() * names.length)]);
-    setDirective(REGENERATE_DIRECTIVE_MESSAGE);
+    setDirective(REGENERATE_DIRECTIVE);
     setTracks((current) => current.map((track) => ({ ...track, pattern: makePattern(track, density, macros.gravity) })));
   };
 
@@ -462,7 +464,7 @@ export default function Home() {
     return tracks.reduce((leader, track) => {
       const score = track.pattern.filter(Boolean).length * track.level;
       return score > leader.score ? { name: track.name, voice: track.voice, score } : leader;
-    }, { name: tracks[0]?.name ?? initialTracks[0].name, voice: tracks[0]?.voice ?? initialTracks[0].voice, score: 0 });
+    }, { name: tracks[0]?.name ?? DEFAULT_SPOTLIGHT.name, voice: tracks[0]?.voice ?? DEFAULT_SPOTLIGHT.voice, score: 0 });
   }, [tracks]);
 
   return (
