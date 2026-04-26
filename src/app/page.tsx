@@ -94,6 +94,8 @@ export default function DAW() {
     setRecoveryBanner(false);
   }, [clearAutosave]);
 
+  const activeTab = TABS.find((t) => t.id === sidebarTab) ?? TABS[0];
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
       {recoveryBanner && (
@@ -130,95 +132,154 @@ export default function DAW() {
         <div className={`sts-aurora-line pointer-events-none absolute inset-x-0 -bottom-px ${playbackState === "playing" ? "is-playing" : ""}`} />
       </header>
 
-      <main className="grid min-h-0 flex-1 grid-cols-1 gap-1.5 p-1.5 xl:grid-cols-[minmax(0,1fr)_18rem]">
-        <section className="panel flex min-h-0 flex-col overflow-hidden rounded-xl">
-          <StepSequencer />
-          <PianoRoll />
-        </section>
-
-        <aside className="flex min-h-0 flex-col gap-1.5 overflow-y-auto">
-          <div className="sts-tabbar">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setSidebarTab(tab.id)}
-                className={`sts-tab ${sidebarTab === tab.id ? "is-active" : ""}`}
-                aria-pressed={sidebarTab === tab.id}
-                title={tab.label}
-              >
-                <TabIcon name={tab.icon} />
-                <span>{tab.label}</span>
-              </button>
-            ))}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {/* ── Vertical activity rail ───────────────────────── */}
+        <nav
+          aria-label="Workspace"
+          className="sts-rail hidden md:flex"
+        >
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setSidebarTab(tab.id)}
+              className={`sts-rail-btn ${sidebarTab === tab.id ? "is-active" : ""}`}
+              aria-pressed={sidebarTab === tab.id}
+              aria-label={tab.label}
+              title={tab.label}
+            >
+              <RailIcon name={tab.icon} />
+              <span className="sts-rail-label">{tab.label}</span>
+            </button>
+          ))}
+          <div className="mt-auto">
+            <div className="sts-rail-divider" />
+            <button
+              type="button"
+              onClick={() => useUiStore.getState().setHelpOpen(true)}
+              className="sts-rail-btn"
+              aria-label="Help"
+              title="Help & shortcuts"
+            >
+              <RailIcon name="help" />
+              <span className="sts-rail-label">Help</span>
+            </button>
           </div>
+        </nav>
 
-          {sidebarTab === "matrix" && (
-            <div className="panel rounded-xl p-3">
-              <SectionHeader eyebrow="Launch" title="Pattern matrix" />
-              <PatternMatrix />
-            </div>
-          )}
+        {/* ── Center canvas + right panel ──────────────────── */}
+        <main className="grid min-h-0 flex-1 grid-cols-1 gap-1.5 p-1.5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <section className="panel flex min-h-0 flex-col overflow-hidden rounded-xl">
+            <StepSequencer />
+            <PianoRoll />
+          </section>
 
-          {sidebarTab === "arrange" && (
-            <>
-              <QuickStartPanel />
-              <div className="panel rounded-xl p-2">
-                <SectionHeader eyebrow="Arrange" title="Song chain" />
-                <SongChain />
+          <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl panel">
+            {/* Mobile/tab strip — only when rail is hidden */}
+            <div className="md:hidden border-b border-border p-1.5">
+              <div className="sts-tabbar">
+                {TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setSidebarTab(tab.id)}
+                    className={`sts-tab ${sidebarTab === tab.id ? "is-active" : ""}`}
+                    aria-pressed={sidebarTab === tab.id}
+                    title={tab.label}
+                  >
+                    <TabIcon name={tab.icon} />
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
               </div>
-            </>
-          )}
-
-          {sidebarTab === "groove" && <GroovePanel />}
-          {sidebarTab === "automation" && <AutomationEditor />}
-
-          {sidebarTab === "fill" && (
-            <div className="panel rounded-xl p-3">
-              <SectionHeader eyebrow="Smart" title="Fill engine" />
-              <FillEnginePanel />
             </div>
-          )}
 
-          {sidebarTab === "mix" && (
-            <div className="panel rounded-xl p-3">
-              <SectionHeader eyebrow="AI" title="AutoMix" />
-              <AutoMixPanel />
-            </div>
-          )}
-
-          {sidebarTab === "arrange-ai" && (
-            <div className="panel rounded-xl p-3">
-              <SectionHeader eyebrow="Smart" title="Arrangement AI" />
-              <ArrangementPanel />
-            </div>
-          )}
-
-          {sidebarTab === "performance" && <PerformanceMode />}
-          {sidebarTab === "samples" && <SampleBrowser />}
-          {sidebarTab === "ai" && (
-            <div className="flex min-h-0 flex-1 flex-col gap-1.5">
-              <button
-                onClick={() => setCoverOpen(true)}
-                className="group flex items-center justify-between rounded-xl border border-aurora bg-surface-2/70 px-3 py-2.5 text-left text-[11px] shadow-accent-soft transition-transform hover:-translate-y-0.5"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-aurora text-white shadow-[0_4px_12px_rgba(168,85,247,0.35)]">
-                    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
-                      <path d="M8 2v8m0 0 3-3m-3 3L5 7M3 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </span>
-                  <div>
-                    <div className="font-bold text-foreground">Cover a Song</div>
-                    <div className="text-[10px] text-muted">Drop in audio → remix-ready arrangement</div>
-                  </div>
+            {/* Right panel header — shows active workspace */}
+            <div className="hidden md:flex shrink-0 items-center justify-between gap-2 border-b border-border bg-surface-2/60 px-3 py-2 backdrop-blur">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-aurora text-white shadow-[0_4px_12px_rgba(168,85,247,0.30)]">
+                  <RailIcon name={activeTab.icon} small />
+                </span>
+                <div className="min-w-0 leading-tight">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted truncate">Workspace</div>
+                  <div className="text-[12px] font-bold tracking-tight text-foreground truncate">{activeTab.label}</div>
                 </div>
-                <span className="text-[14px] text-accent transition-transform group-hover:translate-x-0.5">›</span>
-              </button>
-              <CoproducerPanel />
+              </div>
+              <span className="rounded-full border border-border bg-surface-3 px-2 py-0.5 font-mono text-[9px] tracking-wider text-muted">
+                {String(TABS.findIndex((t) => t.id === activeTab.id) + 1).padStart(2, "0")} / {String(TABS.length).padStart(2, "0")}
+              </span>
             </div>
-          )}
-        </aside>
-      </main>
+
+            {/* Scrollable panel body */}
+            <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto p-1.5">
+              {sidebarTab === "matrix" && (
+                <div className="panel rounded-xl p-3">
+                  <SectionHeader eyebrow="Launch" title="Pattern matrix" />
+                  <PatternMatrix />
+                </div>
+              )}
+
+              {sidebarTab === "arrange" && (
+                <>
+                  <QuickStartPanel />
+                  <div className="panel rounded-xl p-2">
+                    <SectionHeader eyebrow="Arrange" title="Song chain" />
+                    <SongChain />
+                  </div>
+                </>
+              )}
+
+              {sidebarTab === "groove" && <GroovePanel />}
+              {sidebarTab === "automation" && <AutomationEditor />}
+
+              {sidebarTab === "fill" && (
+                <div className="panel rounded-xl p-3">
+                  <SectionHeader eyebrow="Smart" title="Fill engine" />
+                  <FillEnginePanel />
+                </div>
+              )}
+
+              {sidebarTab === "mix" && (
+                <div className="panel rounded-xl p-3">
+                  <SectionHeader eyebrow="AI" title="AutoMix" />
+                  <AutoMixPanel />
+                </div>
+              )}
+
+              {sidebarTab === "arrange-ai" && (
+                <div className="panel rounded-xl p-3">
+                  <SectionHeader eyebrow="Smart" title="Arrangement AI" />
+                  <ArrangementPanel />
+                </div>
+              )}
+
+              {sidebarTab === "performance" && <PerformanceMode />}
+              {sidebarTab === "samples" && <SampleBrowser />}
+              {sidebarTab === "ai" && (
+                <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+                  <button
+                    onClick={() => setCoverOpen(true)}
+                    className="group flex items-center justify-between rounded-xl border border-aurora bg-surface-2/70 px-3 py-2.5 text-left text-[11px] shadow-accent-soft transition-transform hover:-translate-y-0.5"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-aurora text-white shadow-[0_4px_12px_rgba(168,85,247,0.35)]">
+                        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
+                          <path d="M8 2v8m0 0 3-3m-3 3L5 7M3 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </span>
+                      <div>
+                        <div className="font-bold text-foreground">Cover a Song</div>
+                        <div className="text-[10px] text-muted">Drop in audio → remix-ready arrangement</div>
+                      </div>
+                    </div>
+                    <span className="text-[14px] text-accent transition-transform group-hover:translate-x-0.5">›</span>
+                  </button>
+                  <CoproducerPanel />
+                </div>
+              )}
+            </div>
+          </aside>
+        </main>
+      </div>
 
       <footer className={`relative border-t border-border bg-surface/90 backdrop-blur-md ${playbackState === "playing" && mixerOpen ? "sts-master-hot" : ""}`}>
         <button
@@ -362,8 +423,18 @@ function MixerEqGlyph({ isPlaying }: { isPlaying?: boolean }) {
 }
 
 function TabIcon({ name }: { name: string }) {
+  return <Icon name={name} size={12} />;
+}
+
+function RailIcon({ name, small = false }: { name: string; small?: boolean }) {
+  return <Icon name={name} size={small ? 12 : 18} className="sts-rail-icon" />;
+}
+
+function Icon({ name, size, className }: { name: string; size: number; className?: string }) {
   const common = {
-    className: "sts-tab-icon",
+    className: className ?? "sts-tab-icon",
+    width: size,
+    height: size,
     viewBox: "0 0 16 16",
     fill: "none" as const,
     stroke: "currentColor",
@@ -456,6 +527,14 @@ function TabIcon({ name }: { name: string }) {
           <path d="M8 2l1.4 3.2L12.6 6 9.8 7.6 8 11l-1.8-3.4L3.4 6l3.2-.8z" fill="currentColor" stroke="none" />
           <circle cx="13" cy="12" r="1.2" fill="currentColor" />
           <circle cx="3.5" cy="12.5" r="0.8" fill="currentColor" />
+        </svg>
+      );
+    case "help":
+      return (
+        <svg {...common}>
+          <circle cx="8" cy="8" r="5.5" />
+          <path d="M6.3 6.2c.2-.9 1-1.5 1.9-1.5 1 0 1.8.7 1.8 1.7 0 .8-.5 1.2-1.1 1.6-.5.3-.9.6-.9 1.3" />
+          <circle cx="8" cy="11.5" r="0.6" fill="currentColor" />
         </svg>
       );
     default:

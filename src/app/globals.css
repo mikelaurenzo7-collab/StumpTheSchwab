@@ -466,6 +466,110 @@ input[type="checkbox"] { accent-color: var(--accent); }
 }
 .sts-tab .sts-tab-icon { width: 12px; height: 12px; opacity: 0.9; }
 
+/* ─── Vertical activity rail (DAW-style) ────────────────────── */
+.sts-rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  width: 60px;
+  flex-shrink: 0;
+  padding: 8px 6px;
+  border-right: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0) 30%),
+    var(--surface);
+  box-shadow:
+    inset -1px 0 0 rgba(255,255,255,0.02),
+    8px 0 24px rgba(0,0,0,0.35);
+  z-index: 2;
+}
+.sts-rail::before {
+  /* Whisper of color along the inner edge */
+  content: "";
+  position: absolute;
+  inset: 0 -1px 0 auto;
+  width: 1px;
+  background: linear-gradient(180deg,
+    transparent 0%,
+    rgba(168, 85, 247, 0.32) 30%,
+    rgba(236, 72, 153, 0.28) 70%,
+    transparent 100%);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.sts-rail-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 48px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  transition:
+    color 150ms ease,
+    background-color 180ms ease,
+    transform 140ms ease,
+    box-shadow 220ms ease;
+}
+.sts-rail-btn:hover {
+  color: var(--foreground);
+  background: var(--surface-3);
+}
+.sts-rail-btn .sts-rail-icon {
+  width: 18px;
+  height: 18px;
+  transition: transform 180ms ease;
+}
+.sts-rail-btn:hover .sts-rail-icon { transform: translateY(-1px); }
+.sts-rail-btn .sts-rail-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.sts-rail-btn.is-active {
+  color: #fff;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0) 60%),
+    var(--surface-3);
+  border-color: rgba(168, 85, 247, 0.28);
+  box-shadow:
+    0 0 0 1px rgba(168, 85, 247, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 8px 22px rgba(168, 85, 247, 0.18);
+}
+.sts-rail-btn.is-active::before {
+  /* Left-edge aurora indicator — the classic "active tool" cue */
+  content: "";
+  position: absolute;
+  left: -7px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--aurora);
+  background-size: 100% 200%;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.55);
+  animation: sts-aurora-spin 6s linear infinite;
+}
+.sts-rail-btn.is-active .sts-rail-icon {
+  filter: drop-shadow(0 0 6px rgba(236, 72, 153, 0.45));
+}
+
+/* Decorative spacer bar inside the rail */
+.sts-rail-divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
+}
+
 /* Section header rule */
 .sts-section-rule {
   display: inline-block;
