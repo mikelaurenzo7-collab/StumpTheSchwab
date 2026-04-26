@@ -28,6 +28,13 @@ type ScenePreset = {
   emphasis: Track["voice"][];
 };
 
+type PerformanceMove = {
+  id: "lift" | "strip" | "pressure" | "glitch";
+  label: string;
+  summary: string;
+  directive: string;
+};
+
 type AudioWindow = Window &
   typeof globalThis & {
     webkitAudioContext?: typeof AudioContext;
@@ -87,6 +94,32 @@ const scenePresets: ScenePreset[] = [
   },
 ];
 const DEFAULT_DIRECTIVE = scenePresets[0]?.promise ?? "Design a session that feels alive before the first plugin loads.";
+const performanceMoves: PerformanceMove[] = [
+  {
+    id: "lift",
+    label: "Lift the chorus",
+    summary: "Open the hats, widen the bloom, and push melodic motion forward.",
+    directive: "Build the chorus until the room feels brighter than the drop.",
+  },
+  {
+    id: "strip",
+    label: "Strip to the drums",
+    summary: "Pull melodic weight out and leave only the brutal essentials.",
+    directive: "Reduce the scene to pure pulse before the next reveal.",
+  },
+  {
+    id: "pressure",
+    label: "Add sub pressure",
+    summary: "Drive gravity into the floor with heavier low-end intent.",
+    directive: "Make the low end feel inevitable and physically unavoidable.",
+  },
+  {
+    id: "glitch",
+    label: "Release glitch rain",
+    summary: "Scatter the hats and snares into a more fractured skyline.",
+    directive: "Introduce a controlled rupture without losing the groove.",
+  },
+];
 
 function makePattern(track: Track, density: number, gravity: number) {
   return Array.from({ length: STEPS }, (_, step) => {
@@ -115,6 +148,54 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
+function shapeTrackForMove(track: Track, move: PerformanceMove["id"], activeStep: number, trackIndex: number) {
+  if (move === "lift") {
+    return {
+      level: clamp(track.level + (track.voice === "pluck" || track.voice === "pad" || track.voice === "hat" ? 0.08 : -0.02), MIN_TRACK_LEVEL, 1),
+      pattern: track.pattern.map((active, index) => {
+        if (track.voice === "hat") return index % 2 === 0 || active;
+        if (track.voice === "pluck" || track.voice === "pad") return active || index % 4 === 2;
+        return active;
+      }),
+    };
+  }
+
+  if (move === "strip") {
+    return {
+      level: clamp(track.level + (track.voice === "kick" || track.voice === "snare" ? 0.06 : track.voice === "bass" ? -0.02 : -0.18), MIN_TRACK_LEVEL, 1),
+      pattern: track.pattern.map((active, index) => {
+        if (track.voice === "kick") return index % 4 === 0;
+        if (track.voice === "snare") return index === 4 || index === 12;
+        if (track.voice === "hat") return index % 4 === 2;
+        if (track.voice === "bass") return active && index % 4 === 0;
+        return index === 0 && active;
+      }),
+    };
+  }
+
+  if (move === "pressure") {
+    return {
+      level: clamp(track.level + (track.voice === "kick" || track.voice === "bass" ? 0.1 : -0.03), MIN_TRACK_LEVEL, 1),
+      pattern: track.pattern.map((active, index) => {
+        if (track.voice === "bass") return index % 4 === 0 || index % 8 === 3 || index % 8 === 6;
+        if (track.voice === "kick") return index % 4 === 0 || index === 7 || index === 15;
+        if (track.voice === "snare") return index === 4 || index === 12;
+        return active;
+      }),
+    };
+  }
+
+  return {
+    level: clamp(track.level + (track.voice === "hat" || track.voice === "snare" || track.voice === "pluck" ? 0.05 : -0.01), MIN_TRACK_LEVEL, 1),
+    pattern: track.pattern.map((active, index) => {
+      if (index === activeStep) return true;
+      if (track.voice === "hat" && index % 2 === 1) return true;
+      if ((index + trackIndex) % 3 === 0) return !active;
+      return active;
+    }),
+  };
+}
+
 export default function Home() {
   const [tracks, setTracks] = useState(initialTracks);
   const [playing, setPlaying] = useState(false);
@@ -123,6 +204,7 @@ export default function Home() {
   const [density, setDensity] = useState(62);
   const [scene, setScene] = useState("Nebula Breaks");
   const [directive, setDirective] = useState(DEFAULT_DIRECTIVE);
+  const [lastMove, setLastMove] = useState<PerformanceMove["label"]>("Founder reset");
   const [macros, setMacros] = useState<Macro>({ bloom: 72, gravity: 44, shimmer: 63, fracture: 28 });
   const audioRef = useRef<AudioContext | null>(null);
   const delayRef = useRef<DelayNode | null>(null);
@@ -310,9 +392,32 @@ export default function Home() {
     })));
   };
 
+  const applyMove = (move: PerformanceMove) => {
+    setLastMove(move.label);
+    setDirective(move.directive);
+    setDensity((current) => clamp(current + (move.id === "strip" ? -18 : move.id === "lift" ? 10 : move.id === "pressure" ? 8 : 6), 12, 96));
+    setMacros((current) => ({
+      bloom: clamp(current.bloom + (move.id === "lift" ? 12 : move.id === "strip" ? -8 : move.id === "pressure" ? 4 : -4), 0, 100),
+      gravity: clamp(current.gravity + (move.id === "lift" ? -6 : move.id === "strip" ? 4 : move.id === "pressure" ? 18 : 8), 0, 100),
+      shimmer: clamp(current.shimmer + (move.id === "lift" ? 16 : move.id === "strip" ? -20 : move.id === "pressure" ? -8 : 10), 0, 100),
+      fracture: clamp(current.fracture + (move.id === "lift" ? 4 : move.id === "strip" ? -12 : move.id === "pressure" ? 6 : 24), 0, 100),
+    }));
+    setTracks((current) => current.map((track, trackIndex) => {
+      const shaped = shapeTrackForMove(track, move.id, step, trackIndex);
+      return { ...track, ...shaped };
+    }));
+  };
+
   const energy = useMemo(() => {
     const active = tracks.reduce((sum, track) => sum + track.pattern.filter(Boolean).length * track.level, 0);
     return Math.round((active / (tracks.length * STEPS)) * 100);
+  }, [tracks]);
+
+  const spotlight = useMemo(() => {
+    return tracks.reduce((leader, track) => {
+      const score = track.pattern.filter(Boolean).length * track.level;
+      return score > leader.score ? { name: track.name, voice: track.voice, score } : leader;
+    }, { name: tracks[0]?.name ?? "Pulse Engine", voice: tracks[0]?.voice ?? "kick", score: 0 });
   }, [tracks]);
 
   return (
@@ -370,6 +475,37 @@ export default function Home() {
               <small>{preset.promise}</small>
             </button>
           ))}
+        </div>
+      </section>
+
+      <section className="performance-deck" aria-label="Director performance moves">
+        <div className="section-heading">
+          <p>Director moves</p>
+          <h2>Push the session deeper in one move.</h2>
+        </div>
+        <div className="move-grid">
+          {performanceMoves.map((move) => (
+            <button className="move-card" key={move.id} onClick={() => applyMove(move)}>
+              <span>{move.label}</span>
+              <strong>{move.directive}</strong>
+              <small>{move.summary}</small>
+            </button>
+          ))}
+        </div>
+        <div className="move-status" aria-label="Current performance status">
+          <div>
+            <span>Last move</span>
+            <strong>{lastMove}</strong>
+          </div>
+          <div>
+            <span>Spotlight track</span>
+            <strong>{spotlight.name}</strong>
+            <small>{spotlight.voice}</small>
+          </div>
+          <div>
+            <span>Macro pressure</span>
+            <strong>{Math.round((macros.bloom + macros.gravity + macros.shimmer + macros.fracture) / 4)}%</strong>
+          </div>
         </div>
       </section>
 

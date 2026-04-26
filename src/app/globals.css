@@ -60,6 +60,7 @@ button { cursor: pointer; }
 .hero-panel,
 .command-strip,
 .vision-deck,
+.performance-deck,
 .sequencer-card,
 .synth-card {
   border: 1px solid var(--line);
@@ -194,6 +195,68 @@ input[type="range"] {
   box-shadow: 0 18px 46px rgba(139,92,246,0.18);
 }
 
+.performance-deck {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: clamp(1rem, 2vw, 1.5rem);
+  border-radius: 1.6rem;
+}
+.move-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
+  gap: 0.8rem;
+}
+.move-card {
+  display: grid;
+  gap: 0.6rem;
+  min-height: 12rem;
+  padding: 1rem;
+  text-align: left;
+  color: var(--foreground);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 1.2rem;
+  background: linear-gradient(165deg, rgba(34,211,238,0.14), rgba(139,92,246,0.08), rgba(255,255,255,0.04));
+}
+.move-card span, .move-status span {
+  color: var(--cyan);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.move-card strong {
+  font-size: 1.15rem;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+.move-card small, .move-status small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+.move-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,0.24);
+  box-shadow: 0 18px 46px rgba(34,211,238,0.12);
+}
+.move-status {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+.move-status > div {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.95rem 1rem;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.05);
+}
+.move-status strong {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
 .studio-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(22rem, 0.38fr);
@@ -275,7 +338,7 @@ input[type="range"] {
 
 @media (max-width: 1050px) {
   .hero-panel, .brand-block { align-items: flex-start; flex-direction: column; }
-  .command-strip, .studio-grid { grid-template-columns: 1fr; }
+  .command-strip, .move-status, .studio-grid { grid-template-columns: 1fr; }
   .step-numbers { display: none; }
   .track-row { grid-template-columns: 1fr; }
 }
