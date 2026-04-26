@@ -95,20 +95,20 @@ export default function DAW() {
       )}
 
       {/* ─── Top bar: brand + transport ──────────────────────── */}
-      <header className="flex items-center gap-4 border-b border-border bg-surface px-4 py-2.5">
-        <div className="flex items-center gap-2.5">
+      <header className="flex items-center gap-3 border-b border-border bg-surface px-3 py-1.5">
+        <div className="flex items-center gap-2">
           <BrandMark />
           <div className="leading-tight">
-            <div className="text-[13px] font-bold tracking-tight text-foreground">
+            <div className="text-[12px] font-bold tracking-tight text-foreground">
               StumpTheSchwab
             </div>
-            <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted">
+            <div className="text-[9px] font-medium uppercase tracking-[0.18em] text-muted">
               Studio
             </div>
           </div>
         </div>
 
-        <div className="mx-3 h-7 w-px bg-border" />
+        <div className="mx-2 h-6 w-px bg-border" />
 
         <div className="min-w-0 flex-1">
           <Transport onInit={initAudio} lastSaved={lastSaved} />
@@ -116,22 +116,22 @@ export default function DAW() {
       </header>
 
       {/* ─── Main: sequencer + sidebar ───────────────────────── */}
-      <main className="grid min-h-0 flex-1 grid-cols-1 gap-2 p-2 xl:grid-cols-[minmax(0,1fr)_19rem]">
+      <main className="grid min-h-0 flex-1 grid-cols-1 gap-1.5 p-1.5 xl:grid-cols-[minmax(0,1fr)_18rem]">
         <section className="panel flex min-h-0 flex-col overflow-hidden rounded-lg">
           <StepSequencer />
           <PianoRoll />
         </section>
 
-        <aside className="flex min-h-0 flex-col gap-2 overflow-y-auto">
+        <aside className="flex min-h-0 flex-col gap-1.5 overflow-y-auto">
           {/* Tab strip */}
-          <div className="flex gap-0.5 rounded-lg border border-border bg-surface p-1">
+          <div className="flex gap-0.5 rounded-md border border-border bg-surface p-0.5">
             {TABS.map((tab) => {
               const active = sidebarTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setSidebarTab(tab.id)}
-                  className={`flex-1 rounded-md px-2 py-1.5 text-[11px] font-semibold tracking-wide transition-colors ${
+                  className={`flex-1 rounded px-1.5 py-1 text-[10px] font-semibold tracking-wide transition-colors ${
                     active
                       ? "bg-accent text-[#1a1408]"
                       : "text-muted hover:bg-surface-3 hover:text-foreground"
@@ -148,29 +148,9 @@ export default function DAW() {
             <>
               <QuickStartPanel />
 
-              <div className="panel rounded-lg p-3">
+              <div className="panel rounded-md p-2">
                 <SectionHeader eyebrow="Arrange" title="Song chain" />
                 <SongChain />
-              </div>
-
-              <div className="panel-soft rounded-lg p-3">
-                <SectionHeader eyebrow="Tips" title="Workflow" />
-                <ul className="mt-2 space-y-1.5 text-[12px] text-soft">
-                  <li className="flex gap-2">
-                    <span className="text-accent">▸</span>
-                    <span>Drag across the grid to paint steps.</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="text-accent">▸</span>
-                    <span>Double-click a lit step to shape its hit.</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="text-accent">▸</span>
-                    <span>
-                      Click <strong className="text-foreground">Generate</strong> when you want a starting beat.
-                    </span>
-                  </li>
-                </ul>
               </div>
             </>
           )}
@@ -180,10 +160,10 @@ export default function DAW() {
           {sidebarTab === "performance" && <PerformanceMode />}
           {sidebarTab === "samples" && <SampleBrowser />}
           {sidebarTab === "ai" && (
-            <div className="flex min-h-0 flex-1 flex-col gap-2">
+            <div className="flex min-h-0 flex-1 flex-col gap-1.5">
               <button
                 onClick={() => setCoverOpen(true)}
-                className="flex items-center justify-between rounded-lg border border-accent/30 bg-accent/5 px-3 py-2.5 text-left text-[11px] hover:bg-accent/10"
+                className="flex items-center justify-between rounded-md border border-accent/30 bg-accent/5 px-2.5 py-2 text-left text-[11px] hover:bg-accent/10"
               >
                 <div>
                   <div className="font-semibold text-accent">📥 Cover a Song</div>
@@ -201,22 +181,22 @@ export default function DAW() {
       <footer className="border-t border-border bg-surface">
         <button
           onClick={() => setMixerOpen((open) => !open)}
-          className="flex w-full items-center justify-between px-4 py-2 text-left transition-colors hover:bg-surface-2"
+          className="flex w-full items-center justify-between px-3 py-1 text-left transition-colors hover:bg-surface-2"
           aria-expanded={mixerOpen}
           aria-controls="studio-mixer"
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <span
-              className={`text-[11px] transition-transform ${
+              className={`text-[10px] transition-transform ${
                 mixerOpen ? "rotate-90" : ""
               }`}
             >
               ▸
             </span>
-            <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">
+            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted">
               Mixer
             </span>
-            <span className="text-[12px] text-soft">
+            <span className="text-[11px] text-soft">
               {mixerOpen ? "Channel strips, FX, master" : "Click to open mix view"}
             </span>
           </div>
@@ -271,33 +251,33 @@ function QuickStartPanel() {
   return (
     <section
       aria-labelledby={headingId}
-      className="panel rounded-lg border-accent/35 p-3 shadow-accent-soft"
+      className="panel rounded-md border-accent/35 p-2 shadow-accent-soft"
     >
       <SectionHeader id={headingId} eyebrow="Start here" title="Make a beat in 3 moves" />
-      <ol className="mt-2 space-y-2 text-[12px] text-soft">
-        <li className="flex gap-2">
+      <ol className="mt-1.5 space-y-1 text-[11px] text-soft">
+        <li className="flex gap-1.5">
           <span className="text-accent">1</span>
-          <span>Click <strong className="text-foreground">Generate</strong> for an instant idea, or paint the grid yourself.</span>
+          <span><strong className="text-foreground">Generate</strong> for an instant idea, or paint the grid.</span>
         </li>
-        <li className="flex gap-2">
+        <li className="flex gap-1.5">
           <span className="text-accent">2</span>
-          <span>Press <strong className="text-foreground">Play</strong> to start audio, then drag steps to add or remove hits.</span>
+          <span><strong className="text-foreground">Play</strong>, then drag steps to add or remove hits.</span>
         </li>
-        <li className="flex gap-2">
+        <li className="flex gap-1.5">
           <span className="text-accent">3</span>
           <span>Double-click any lit step to shape velocity, chance, timing, and notes.</span>
         </li>
       </ol>
-      <div className="mt-3 flex gap-2">
+      <div className="mt-2 flex gap-1.5">
         <button
           onClick={() => useUiStore.getState().setGeneratorOpen(true)}
-          className="button-primary flex-1 rounded-md px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em]"
+          className="button-primary flex-1 rounded-md px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em]"
         >
           Start with AI
         </button>
         <button
           onClick={() => useUiStore.getState().setHelpOpen(true)}
-          className="button-secondary rounded-md px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em]"
+          className="button-secondary rounded-md px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em]"
         >
           Help
         </button>
@@ -309,8 +289,8 @@ function QuickStartPanel() {
 // ─── Brand mark — minimal monogram ─────────────────────────────
 function BrandMark() {
   return (
-    <div className="relative flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-accent to-[#c97e08] shadow-[inset_0_1px_0_rgba(255,255,255,0.4),0_4px_10px_rgba(245,165,36,0.3)]">
-      <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" aria-hidden="true">
+    <div className="relative flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-accent to-[#c97e08] shadow-[inset_0_1px_0_rgba(255,255,255,0.4),0_4px_10px_rgba(245,165,36,0.3)]">
+      <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5" aria-hidden="true">
         <path
           d="M3 5c0-1.5 1.5-2 3-2s2 1 2 1M3 11c0 1.5 1.5 2 3 2s7-1 7-3-3-2-5-2"
           stroke="#1a1408"
@@ -326,10 +306,10 @@ function BrandMark() {
 // ─── Compact section header ────────────────────────────────────
 function SectionHeader({ eyebrow, title, id }: { eyebrow: string; title: string; id?: string }) {
   return (
-    <div className="mb-2 flex items-baseline justify-between">
+    <div className="mb-1 flex items-baseline justify-between">
       <h2
         {...(id ? { id } : {})}
-        className="text-[13px] font-bold tracking-tight text-foreground"
+        className="text-[12px] font-bold tracking-tight text-foreground"
       >
         {title}
       </h2>
