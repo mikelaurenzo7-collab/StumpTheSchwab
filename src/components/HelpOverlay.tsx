@@ -28,6 +28,7 @@ const SHORTCUTS: ShortcutGroup[] = [
     title: "Step editing",
     items: [
       { keys: ["Click"], label: "Toggle step on/off (drag to paint)" },
+      { keys: ["Double-click"], label: "Open step detail without changing the hit" },
       { keys: ["Right-click"], label: "Open step detail (velocity, probability, nudge)" },
       { keys: ["Ctrl/⌘ + Click"], label: "Cycle step probability" },
     ],
@@ -35,11 +36,11 @@ const SHORTCUTS: ShortcutGroup[] = [
   {
     title: "Track tools",
     items: [
-      { keys: ["Hover", "→", "C"], label: "Copy track pattern" },
-      { keys: ["Hover", "→", "P"], label: "Paste track pattern" },
-      { keys: ["Hover", "→", "~"], label: "Humanize this track" },
-      { keys: ["Hover", "→", "E"], label: "Euclidean fill" },
-      { keys: ["Hover", "→", "✕"], label: "Clear track" },
+      { keys: ["Copy"], label: "Copy track pattern" },
+      { keys: ["Paste"], label: "Paste track pattern" },
+      { keys: ["Feel"], label: "Humanize this track" },
+      { keys: ["Fill"], label: "Euclidean fill" },
+      { keys: ["Clear"], label: "Clear track" },
     ],
   },
   {
@@ -62,6 +63,7 @@ const SHORTCUTS: ShortcutGroup[] = [
     items: [
       { keys: ["G"], label: "Generate beat with Claude" },
       { keys: ["H"], label: "Humanize all tracks" },
+      { keys: ["Ctrl/⌘ + K"], label: "Open command palette" },
       { keys: ["?"], label: "Toggle this help overlay" },
     ],
   },
@@ -125,7 +127,7 @@ export function HelpOverlay() {
               </div>
 
               <div className="panel-soft rounded-lg p-3 text-[11px] leading-relaxed text-muted">
-                Right-click a step for micro edits. Ctrl or Cmd click cycles chance. Drag across the grid to paint rhythm quickly.
+                Double-click or right-click a lit step for micro edits. Ctrl or Cmd click cycles chance. Drag across the grid to paint rhythm quickly.
               </div>
             </div>
           </aside>
