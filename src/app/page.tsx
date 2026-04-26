@@ -19,6 +19,11 @@ type Macro = {
   fracture: number;
 };
 
+type AudioWindow = Window &
+  typeof globalThis & {
+    webkitAudioContext?: typeof AudioContext;
+  };
+
 const STEPS = 16;
 const initialTracks: Track[] = [
   { id: "pulse", name: "Pulse Engine", voice: "kick", hue: 270, level: 0.92, pitch: 46, pattern: [true, false, false, false, true, false, false, true, true, false, false, false, true, false, true, false] },
@@ -80,7 +85,8 @@ export default function Home() {
 
   const ensureAudio = useCallback(async () => {
     if (!audioRef.current) {
-      const AudioCtor = window.AudioContext || window.webkitAudioContext;
+      const AudioCtor = window.AudioContext || (window as AudioWindow).webkitAudioContext;
+      if (!AudioCtor) return;
       const ctx = new AudioCtor();
       const master = ctx.createGain();
       const delay = ctx.createDelay(1.2);
