@@ -59,6 +59,7 @@ button { cursor: pointer; }
 
 .hero-panel,
 .command-strip,
+.vision-deck,
 .sequencer-card,
 .synth-card {
   border: 1px solid var(--line);
@@ -154,6 +155,45 @@ input[type="range"] {
   accent-color: var(--hot);
 }
 
+.vision-deck {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: clamp(1rem, 2vw, 1.5rem);
+  border-radius: 1.6rem;
+}
+.scene-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+.scene-card {
+  display: grid;
+  gap: 0.55rem;
+  min-height: 11rem;
+  padding: 1rem;
+  text-align: left;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 1.2rem;
+  color: var(--foreground);
+  background: linear-gradient(160deg, rgba(139,92,246,0.2), rgba(34,211,238,0.055));
+}
+.scene-card span {
+  color: var(--cyan);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.scene-card strong { font-size: 1.35rem; line-height: 0.95; letter-spacing: -0.04em; }
+.scene-card small { color: var(--muted); font-size: 0.9rem; line-height: 1.45; }
+.scene-card:hover, .scene-card.is-selected {
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,0.28);
+  background: linear-gradient(150deg, rgba(244,114,182,0.24), rgba(139,92,246,0.18), rgba(34,211,238,0.12));
+  box-shadow: 0 18px 46px rgba(139,92,246,0.18);
+}
+
 .studio-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(22rem, 0.38fr);
@@ -235,7 +275,7 @@ input[type="range"] {
 
 @media (max-width: 1050px) {
   .hero-panel, .brand-block { align-items: flex-start; flex-direction: column; }
-  .command-strip, .studio-grid { grid-template-columns: 1fr; }
+  .command-strip, .scene-grid, .studio-grid { grid-template-columns: 1fr; }
   .step-numbers { display: none; }
   .track-row { grid-template-columns: 1fr; }
 }

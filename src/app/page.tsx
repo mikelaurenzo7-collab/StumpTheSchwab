@@ -19,6 +19,15 @@ type Macro = {
   fracture: number;
 };
 
+type ScenePreset = {
+  name: string;
+  promise: string;
+  bpm: number;
+  density: number;
+  macros: Macro;
+  emphasis: Track["voice"][];
+};
+
 type AudioWindow = Window &
   typeof globalThis & {
     webkitAudioContext?: typeof AudioContext;
@@ -35,6 +44,41 @@ const initialTracks: Track[] = [
 ];
 
 const scale = [0, 2, 3, 5, 7, 10, 12, 14];
+
+const scenePresets: ScenePreset[] = [
+  {
+    name: "Nebula Breaks",
+    promise: "Velvet drums, glowing pads, and a wide-open first drop.",
+    bpm: 126,
+    density: 62,
+    macros: { bloom: 72, gravity: 44, shimmer: 63, fracture: 28 },
+    emphasis: ["kick", "hat", "pad"],
+  },
+  {
+    name: "Chrome Ritual",
+    promise: "Industrial swing for a headline moment with sharp transients.",
+    bpm: 138,
+    density: 74,
+    macros: { bloom: 54, gravity: 68, shimmer: 41, fracture: 52 },
+    emphasis: ["kick", "snare", "bass"],
+  },
+  {
+    name: "Solar Drill",
+    promise: "Fast kinetic pockets, heavy sub pressure, and bright motion.",
+    bpm: 152,
+    density: 82,
+    macros: { bloom: 61, gravity: 78, shimmer: 55, fracture: 64 },
+    emphasis: ["kick", "hat", "bass"],
+  },
+  {
+    name: "Dream Collider",
+    promise: "Floating harmony and broken percussion for late-night ideas.",
+    bpm: 112,
+    density: 48,
+    macros: { bloom: 88, gravity: 34, shimmer: 86, fracture: 21 },
+    emphasis: ["pluck", "pad", "snare"],
+  },
+];
 
 function makePattern(track: Track, density: number, gravity: number) {
   return Array.from({ length: STEPS }, (_, step) => {
@@ -62,6 +106,7 @@ export default function Home() {
   const [bpm, setBpm] = useState(126);
   const [density, setDensity] = useState(62);
   const [scene, setScene] = useState("Nebula Breaks");
+  const [directive, setDirective] = useState(scenePresets[0].promise);
   const [macros, setMacros] = useState<Macro>({ bloom: 72, gravity: 44, shimmer: 63, fracture: 28 });
   const audioRef = useRef<AudioContext | null>(null);
   const delayRef = useRef<DelayNode | null>(null);
@@ -217,7 +262,25 @@ export default function Home() {
   const regenerate = () => {
     const names = ["Nebula Breaks", "Quantum Bounce", "Chrome Ritual", "Zero-G Garage", "Solar Drill", "Dream Collider"];
     setScene(names[Math.floor(Math.random() * names.length)]);
+    setDirective("A newly generated world, ready to be sculpted into the hook.");
     setTracks((current) => current.map((track) => ({ ...track, pattern: makePattern(track, density, macros.gravity) })));
+  };
+
+  const applyScene = (preset: ScenePreset) => {
+    setScene(preset.name);
+    setDirective(preset.promise);
+    setBpm(preset.bpm);
+    setDensity(preset.density);
+    setMacros(preset.macros);
+    setTracks((current) => current.map((track) => ({
+      ...track,
+      level: clamp(track.level + (preset.emphasis.includes(track.voice) ? 0.12 : -0.08), 0.18, 1),
+      pattern: makePattern(track, preset.density, preset.macros.gravity).map((active, index) => {
+        if (preset.emphasis.includes(track.voice) && index % 4 === 0) return true;
+        if (preset.macros.fracture > 55 && (index + track.hue) % 5 === 0) return !active;
+        return active;
+      }),
+    })));
   };
 
   const mutate = () => {
@@ -267,6 +330,26 @@ export default function Home() {
         <div>
           <span>Energy</span>
           <strong>{energy}%</strong>
+        </div>
+      </section>
+
+      <section className="vision-deck" aria-label="Founder vision scenes">
+        <div className="section-heading">
+          <p>Founder launchpad</p>
+          <h2>Pick the next world.</h2>
+        </div>
+        <div className="scene-grid">
+          {scenePresets.map((preset) => (
+            <button
+              className={`scene-card ${scene === preset.name ? "is-selected" : ""}`}
+              key={preset.name}
+              onClick={() => applyScene(preset)}
+            >
+              <span>{preset.bpm} BPM · {preset.density}% density</span>
+              <strong>{preset.name}</strong>
+              <small>{preset.promise}</small>
+            </button>
+          ))}
         </div>
       </section>
 
@@ -330,8 +413,8 @@ export default function Home() {
           </div>
           <div className="ai-card">
             <p>Creative directive</p>
-            <strong>Design a session that feels alive before the first plugin loads.</strong>
-            <span>Local Web Audio synthesis, generative sequencing, responsive macro control, and a new interface built without the old components.</span>
+            <strong>{directive}</strong>
+            <span>Local Web Audio synthesis, generative sequencing, responsive macro control, and founder-grade scene direction for faster musical decisions.</span>
           </div>
         </aside>
       </section>
