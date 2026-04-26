@@ -275,7 +275,7 @@ export async function POST(req: NextRequest) {
     const response = await client.messages.create({
       model: "claude-opus-4-7",
       max_tokens: 16000,
-      thinking: { type: "adaptive" },
+      // Anthropic forbids `thinking` with a forced `tool_choice: { type: "tool" }`.
       output_config: { effort: "medium" },
       // Cache the system prompt — same prefix on every request, only the
       // user message varies.

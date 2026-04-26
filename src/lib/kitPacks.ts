@@ -5,12 +5,14 @@
 // disturbing patterns or melodic notes already programmed.
 //
 // Sound-design notes per pack:
-//   • Boom Bap     — woody kick, dusty snap, swung jazz hats, walking bass
-//   • Lo-Fi Tape   — soft kick, brushed snare, rolled-off hats, mellow keys
-//   • Trap 808     — sub-heavy kick, sharp clap, rolling hats, sustained 808
-//   • Synthwave    — analog kick, gated snare, bright hats, FM bell, saw bass
-//   • DnB Punch    — punchy kick, snare crack, ride-style hats, square reese
-//   • House Drive  — tight kick, clap-snare, shuffled hats, sub-bass
+//   • Boom Bap          — woody kick, dusty snap, swung jazz hats, walking bass
+//   • Lo-Fi Tape        — soft kick, brushed snare, rolled-off hats, mellow keys
+//   • Trap 808          — sub-heavy kick, sharp clap, rolling hats, sustained 808
+//   • Synthwave         — analog kick, gated snare, bright hats, FM bell, saw bass
+//   • DnB Punch         — punchy kick, snare crack, ride-style hats, square reese
+//   • House Drive       — tight kick, clap-snare, shuffled hats, sub-bass
+//   • Techno Warehouse  — pumping kick, metallic rim, dark stab, deep saw bass
+//   • Phonk Memphis     — distorted kick, cowbell, hi-hat rolls, FM bell, glided 808
 
 import type { TrackSound } from "./sounds";
 
@@ -204,6 +206,83 @@ export const KIT_PACKS: KitPack[] = [
       { name: "Sub Bass", color: "#6366f1", synth: "monosynth", note: "C2", melodic: true, noteRange: ["C1", "C3"],
         // Deep sine sub — the foundation of any house track.
         options: { oscillator: { type: "sine" }, envelope: { attack: 0.005, decay: 0.25, sustain: 0.7, release: 0.25 }, filterEnvelope: { attack: 0.005, decay: 0.2, sustain: 0.5, release: 0.3, baseFrequency: 70, octaves: 3 }, filter: { Q: 2, type: "lowpass", rolloff: -24 } } },
+    ],
+  },
+  {
+    id: "techno",
+    name: "Techno Warehouse",
+    vibe: "Pumping kick, metallic rim, dark stab, deep saw bass",
+    bpm: 130,
+    swing: 0,
+    sounds: [
+      { name: "Kick", color: "#ef4444", synth: "membrane", note: "C1", melodic: false,
+        // Berlin-style techno kick — fast pitch decay, tight body, hard transient.
+        // Sustained low end is provided by the bass; the kick is all attack.
+        options: { pitchDecay: 0.02, octaves: 4, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.32, sustain: 0, release: 0.22 } } },
+      { name: "Rim", color: "#f59e0b", synth: "metal", note: "C5", melodic: false,
+        // Industrial rim/click — short metallic burst doubling as a clave.
+        options: { frequency: 850, envelope: { attack: 0.001, decay: 0.05, release: 0.012 }, harmonicity: 3.2, modulationIndex: 28, resonance: 6800, octaves: 1 } },
+      { name: "Hi-Hat", color: "#22c55e", synth: "metal", note: "C6", melodic: false,
+        // Driving 16th-note hat — crisp transient with very fast decay so
+        // 130 BPM hi-hat patterns stay defined under the kick.
+        options: { frequency: 340, envelope: { attack: 0.001, decay: 0.035, release: 0.008 }, harmonicity: 5.6, modulationIndex: 28, resonance: 9200, octaves: 1 } },
+      { name: "Open Hat", color: "#06b6d4", synth: "metal", note: "C6", melodic: false,
+        // Mid-length open hat for offbeat shimmer — classic 909 placement.
+        options: { frequency: 340, envelope: { attack: 0.001, decay: 0.45, release: 0.22 }, harmonicity: 5.6, modulationIndex: 28, resonance: 9200, octaves: 1 } },
+      { name: "Clap", color: "#8b5cf6", synth: "noise", note: "16n", melodic: false,
+        // Tight techno clap — short, white, room-less; sits behind the rim.
+        options: { noise: { type: "white" }, envelope: { attack: 0.002, decay: 0.14, sustain: 0, release: 0.1 } } },
+      { name: "Tom", color: "#ec4899", synth: "membrane", note: "F2", melodic: true, noteRange: ["C2", "C3"],
+        // Industrial tom — short body, useful for syncopated breakdowns.
+        options: { pitchDecay: 0.04, octaves: 3, oscillator: { type: "triangle" }, envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.18 } } },
+      { name: "Stab", color: "#14b8a6", synth: "monosynth", note: "C4", melodic: true, noteRange: ["C3", "C5"],
+        // Dark detuned stab — the iconic techno chord-stab. Slight portamento
+        // for a humanised "played" feel, tight filter env so stabs stay percussive.
+        options: { oscillator: { type: "sawtooth" }, detune: 7, portamento: 0.01, envelope: { attack: 0.005, decay: 0.2, sustain: 0, release: 0.18 }, filterEnvelope: { attack: 0.005, decay: 0.18, sustain: 0, release: 0.18, baseFrequency: 200, octaves: 3 }, filter: { Q: 5, type: "lowpass", rolloff: -24 } } },
+      { name: "Saw Bass", color: "#6366f1", synth: "monosynth", note: "C2", melodic: true, noteRange: ["C1", "C3"],
+        // Sustained driving saw bass — long sustain so it locks under the kick,
+        // glide for sliding root notes, slight detune for analog width.
+        options: { oscillator: { type: "sawtooth" }, detune: -6, portamento: 0.04, envelope: { attack: 0.003, decay: 0.25, sustain: 0.85, release: 0.25 }, filterEnvelope: { attack: 0.005, decay: 0.2, sustain: 0.6, release: 0.25, baseFrequency: 70, octaves: 3 }, filter: { Q: 4, type: "lowpass", rolloff: -24 } } },
+    ],
+  },
+  {
+    id: "phonk",
+    name: "Phonk Memphis",
+    vibe: "Distorted kick, cowbell, hi-hat rolls, vocal-chop bell, 808",
+    bpm: 138,
+    swing: 0.06,
+    sounds: [
+      { name: "Kick", color: "#ef4444", synth: "membrane", note: "A0", melodic: false,
+        // Memphis phonk kick — deep & long, blurs the line between kick and 808.
+        // Heavy pitch sweep gives the "punched and dragged" character.
+        options: { pitchDecay: 0.06, octaves: 5, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.7, sustain: 0, release: 0.6 } } },
+      { name: "Snare", color: "#f59e0b", synth: "noise", note: "16n", melodic: false,
+        // Crunchy, slightly dirty snare — pink noise gives a tape-decayed feel.
+        options: { noise: { type: "pink" }, envelope: { attack: 0.001, decay: 0.16, sustain: 0, release: 0.12 } } },
+      { name: "Hi-Hat", color: "#22c55e", synth: "metal", note: "C6", melodic: false,
+        // Bright phonk hat that survives 32nd-note rolls. High harmonicity for
+        // that "trap-derived" presence with extra metallic edge.
+        options: { frequency: 360, envelope: { attack: 0.001, decay: 0.038, release: 0.008 }, harmonicity: 5.4, modulationIndex: 26, resonance: 9500, octaves: 1 } },
+      { name: "Cowbell", color: "#06b6d4", synth: "metal", note: "C6", melodic: false,
+        // Iconic Memphis cowbell — the "ride" of phonk. Longer decay than a
+        // hat, lower resonance so it sits between the snare and the hat.
+        options: { frequency: 540, envelope: { attack: 0.001, decay: 0.32, release: 0.14 }, harmonicity: 3.1, modulationIndex: 18, resonance: 7200, octaves: 1 } },
+      { name: "Clap", color: "#8b5cf6", synth: "noise", note: "16n", melodic: false,
+        // Wide phonk clap — slightly longer body for that "produced" feel.
+        options: { noise: { type: "white" }, envelope: { attack: 0.001, decay: 0.22, sustain: 0, release: 0.18 } } },
+      { name: "Tom", color: "#ec4899", synth: "membrane", note: "G1", melodic: true, noteRange: ["C1", "C3"],
+        // Sub-tom for cinematic transitions — long decay, deep tuning.
+        options: { pitchDecay: 0.07, octaves: 4, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.6, sustain: 0, release: 0.4 } } },
+      { name: "Bell Chop", color: "#14b8a6", synth: "fm", note: "C5", melodic: true, noteRange: ["C4", "C7"],
+        // FM bell with heavy modulation — stand-in for the chopped vocal /
+        // bell samples that define Memphis phonk leads. Square modulator gives
+        // the slightly dissonant inharmonic edge.
+        options: { harmonicity: 4.5, modulationIndex: 14, envelope: { attack: 0.002, decay: 0.5, sustain: 0.05, release: 0.6 }, modulation: { type: "square" }, modulationEnvelope: { attack: 0.002, decay: 0.3, sustain: 0.05, release: 0.4 } } },
+      { name: "808", color: "#6366f1", synth: "monosynth", note: "A1", melodic: true, noteRange: ["A0", "C3"],
+        // Phonk 808 — sub-only sine with very long sustain and aggressive glide
+        // so slides between root notes feel proper. Fast filter close keeps
+        // the attack defined when notes change rapidly.
+        options: { oscillator: { type: "sine" }, portamento: 0.08, envelope: { attack: 0.001, decay: 0.35, sustain: 0.95, release: 0.7 }, filterEnvelope: { attack: 0.001, decay: 0.4, sustain: 0.7, release: 0.5, baseFrequency: 70, octaves: 2.5 }, filter: { Q: 0.7, type: "lowpass", rolloff: -24 } } },
     ],
   },
 ];

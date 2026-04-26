@@ -19,6 +19,8 @@ const TRACK_FX_KEYS = new Set<keyof TrackEffects>([
   "driveOn", "driveAmount",
   "delayOn", "delayTime", "delayFeedback", "delayWet",
   "reverbOn", "reverbDecay", "reverbWet",
+  "bitCrushOn", "bitCrushBits", "bitCrushWet",
+  "chorusOn", "chorusRate", "chorusDepth", "chorusWet",
   "sidechainOn", "sidechainSource", "sidechainDepth", "sidechainRelease",
   "panLfoOn", "panLfoRate", "panLfoDepth", "panLfoShape",
   "modLfoOn", "modLfoRate", "modLfoDepth", "modLfoShape", "modLfoTarget",

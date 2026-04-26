@@ -25,6 +25,20 @@ export interface TrackEffects {
   reverbOn: boolean;
   reverbDecay: number;
   reverbWet: number;
+  // Bit Crusher — sample-rate / bit-depth reduction. The fastest path to
+  // crunchy lo-fi character: low bit values (3–6) deliver classic 8-bit grit,
+  // higher values (10–14) just colour the top end. Wet is a proper dry/wet
+  // mix so the effect can sit subtly behind a kick or smother an entire pad.
+  bitCrushOn: boolean;
+  bitCrushBits: number; // 1..16 (lower = grittier)
+  bitCrushWet: number;  // 0..1 dry/wet mix
+  // Stereo Chorus — twin-LFO modulated delay lines. Adds depth, width, and
+  // movement to leads, pads, and bass. depth + frequency control the modulation
+  // shape; wet mixes against the dry signal so the dry centre stays present.
+  chorusOn: boolean;
+  chorusRate: number;   // Hz, 0.05..8 (slow shimmer to fast warble)
+  chorusDepth: number;  // 0..1
+  chorusWet: number;    // 0..1
   // Sidechain ducking — Tone.js has no native sidechain input on its compressor,
   // so we model the classic kick→bass pump as scheduled gain automation:
   // whenever the source track fires a step, the target's duck gain dips to
@@ -432,6 +446,13 @@ export const DEFAULT_EFFECTS: TrackEffects = {
   reverbOn: false,
   reverbDecay: 1.5,
   reverbWet: 0.2,
+  bitCrushOn: false,
+  bitCrushBits: 8,
+  bitCrushWet: 0.4,
+  chorusOn: false,
+  chorusRate: 1.5,
+  chorusDepth: 0.5,
+  chorusWet: 0.4,
   sidechainOn: false,
   sidechainSource: null,
   sidechainDepth: 0.7,

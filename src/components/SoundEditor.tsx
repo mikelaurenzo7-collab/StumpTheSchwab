@@ -17,6 +17,18 @@ import { ErrorChip } from "./ErrorChip";
 
 type SynthType = TrackSound["synth"];
 
+// Voices that expose `detune` (cents) on the underlying instrument.
+// Tone.NoiseSynth has no oscillator, so detune does not apply.
+const HAS_DETUNE: ReadonlySet<SynthType> = new Set<SynthType>([
+  "synth", "monosynth", "am", "fm", "membrane", "metal",
+]);
+
+// Voices that respect `portamento` (glide between consecutive notes).
+// MembraneSynth pins portamento to 0 even though it inherits from Synth.
+const HAS_GLIDE: ReadonlySet<SynthType> = new Set<SynthType>([
+  "synth", "monosynth", "am", "fm",
+]);
+
 const SYNTH_TYPES: { value: SynthType; label: string; desc: string }[] = [
   { value: "membrane", label: "Membrane", desc: "Drum/kick — pitch sweep" },
   { value: "noise", label: "Noise", desc: "Snares, hats, claps" },
@@ -237,6 +249,13 @@ export function SoundEditor({ trackId, onClose, onTrigger }: { trackId: number; 
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => onTrigger?.()}
+              className="button-secondary rounded-lg px-3 py-1.5 text-[10px] font-bold"
+              title="Audition the current sound (also available via the keyboard shortcut on the track row)"
+            >
+              ▶ PREVIEW
+            </button>
+            <button
               onClick={() => resetTrackSound(trackId)}
               className="button-secondary rounded-lg px-3 py-1.5 text-[10px] font-bold"
               title="Restore default sound for this track"
@@ -315,6 +334,41 @@ export function SoundEditor({ trackId, onClose, onTrigger }: { trackId: number; 
             <p className="mt-2 text-[10px] text-muted">Mic input is live — no synth params to edit.</p>
           )}
         </div>
+
+        {/* Pitch & response — top-level voice characteristics that apply
+            across most voice types: detune (cents-level pitch offset; great
+            for layering or analog drift) and glide (portamento — how long the
+            pitch slides between consecutive notes, the secret to expressive
+            mono basslines). */}
+        {synth !== "mic" && synth !== "noise" && (HAS_DETUNE.has(synth) || HAS_GLIDE.has(synth)) && (
+          <div className="mb-4 rounded-xl border border-border bg-background-2 p-3">
+            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-accent">Pitch &amp; Response</div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {HAS_DETUNE.has(synth) && (
+                <Knob
+                  label="Detune"
+                  value={getNum(options, ["detune"], 0)}
+                  min={-100}
+                  max={100}
+                  step={1}
+                  onChange={(v) => patch({ detune: v })}
+                  format={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(0)} ¢`}
+                />
+              )}
+              {HAS_GLIDE.has(synth) && (
+                <Knob
+                  label="Glide"
+                  value={getNum(options, ["portamento"], 0)}
+                  min={0}
+                  max={0.5}
+                  step={0.001}
+                  onChange={(v) => patch({ portamento: v })}
+                  format={(v) => v < 0.001 ? "off" : `${(v * 1000).toFixed(0)}ms`}
+                />
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Voice-specific controls */}
         {synth !== "mic" && (
