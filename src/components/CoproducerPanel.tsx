@@ -11,7 +11,6 @@ import { useEngineStore, type GeneratedBeat } from "@/store/engine";
 import {
   addLearning,
   buildMemoryContext,
-  clearMemory,
   loadMemory,
   type LearningCategory,
 } from "@/lib/projectMemory";
@@ -20,6 +19,7 @@ import {
   applyMixPatches,
   type MixPatch,
 } from "@/lib/patchValidation";
+import { MemoryDrawer } from "./MemoryDrawer";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -177,8 +177,9 @@ export const CoproducerPanel = memo(function CoproducerPanel() {
   const streamTextRef  = useRef("");
   const streamChipsRef = useRef<ActionChip[]>([]);
 
-  // Memory count — re-read on memory-changed event so chips update live
+  // Memory count + drawer toggle
   const [memoryCount, setMemoryCount] = useState(0);
+  const [memoryOpen, setMemoryOpen] = useState(false);
   useEffect(() => {
     const update = () => setMemoryCount(loadMemory().learnings.length);
     update();
@@ -298,22 +299,19 @@ export const CoproducerPanel = memo(function CoproducerPanel() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-surface">
       {/* Header */}
-      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+      <div className="relative flex items-center gap-2 border-b border-border px-3 py-2">
         <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted">AI Co-Producer</span>
         {memoryCount > 0 && (
           <button
-            onClick={() => {
-              if (window.confirm(`Clear ${memoryCount} learning${memoryCount !== 1 ? "s" : ""}?`)) {
-                clearMemory();
-              }
-            }}
-            title="Click to clear project memory"
+            onClick={() => setMemoryOpen((v) => !v)}
+            title="View / curate project memory"
             className="ml-auto rounded bg-accent/20 px-1.5 py-0.5 text-[9px] font-semibold text-accent hover:bg-accent/30"
           >
             🧠 {memoryCount}
           </button>
         )}
         <span className={`text-[10px] text-muted ${memoryCount > 0 ? "" : "ml-auto"}`}>Opus 4.7</span>
+        {memoryOpen && <MemoryDrawer onClose={() => setMemoryOpen(false)} />}
       </div>
 
       {/* Message list */}
