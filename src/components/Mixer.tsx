@@ -704,12 +704,91 @@ const ChannelStrip = memo(function ChannelStrip({
 });
 
 // ── Master Bus Strip ──────────────────────────────────────────
-function MasterStrip({ getLevel }: { getLevel: () => number }) {
+function MasterStrip({
+  getLevel,
+  getLoudness,
+  getTruePeak,
+  getMasterSpectrum,
+}: {
+  getLevel: () => number;
+  getLoudness: () => number;
+  getTruePeak: () => number;
+  getMasterSpectrum: () => Float32Array | null;
+}) {
   const master = useEngineStore((s) => s.master);
   const setMaster = useEngineStore((s) => s.setMaster);
   const autoMix = useEngineStore((s) => s.autoMix);
 
   const [expanded, setExpanded] = useState(false);
+
+  // ── AI Master state ────────────────────────────────────────────
+  const [mastering, setMastering] = useState(false);
+  const [masterError, setMasterError] = useState<string | null>(null);
+  const [masterNote, setMasterNote] = useState<string | null>(null);
+
+  const runAiMaster = useCallback(async () => {
+    if (mastering) return;
+    setMastering(true);
+    setMasterError(null);
+    setMasterNote(null);
+    try {
+      // Build snapshot: current master + live LUFS/TP + spectrum zones
+      const spectrum = getMasterSpectrum();
+      const lufs = getLoudness();
+      const tp = getTruePeak();
+      const tpDb = tp > 0 ? 20 * Math.log10(tp) : -120;
+
+      // Compute 6-zone energy (same boundaries as X-Ray)
+      const zones = [
+        { name: "sub", lo: 20, hi: 60 },
+        { name: "bass", lo: 60, hi: 250 },
+        { name: "loMid", lo: 250, hi: 500 },
+        { name: "mid", lo: 500, hi: 2000 },
+        { name: "presence", lo: 2000, hi: 6000 },
+        { name: "air", lo: 6000, hi: 20000 },
+      ];
+      const sampleRate = 44100;
+      const zoneEnergies: Record<string, number> = {};
+      if (spectrum) {
+        const n = spectrum.length;
+        for (const z of zones) {
+          const start = Math.max(0, Math.floor((z.lo / (sampleRate / 2)) * n));
+          const end = Math.min(n, Math.ceil((z.hi / (sampleRate / 2)) * n));
+          let sum = 0;
+          for (let i = start; i < end; i++) sum += Math.pow(10, spectrum[i] / 20);
+          zoneEnergies[z.name] = end > start ? sum / (end - start) : 0;
+        }
+      }
+
+      const snapshot = {
+        master,
+        loudness: { lufs, truePeakDb: tpDb },
+        spectrumZones: zoneEnergies,
+        target: master.loudnessTarget,
+      };
+
+      const res = await fetch("/api/master", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ snapshot: JSON.stringify(snapshot) }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+
+      // Apply patches
+      type Patch = { key: string; value: unknown };
+      const patches = (json.patches ?? []) as Patch[];
+      for (const p of patches) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setMaster(p.key as any, p.value as any);
+      }
+      setMasterNote(`${json.explanation}${json.predicted_lufs_change != null ? ` (${json.predicted_lufs_change >= 0 ? "+" : ""}${json.predicted_lufs_change.toFixed(1)} LUFS)` : ""}`);
+    } catch (err) {
+      setMasterError(err instanceof Error ? err.message : "Master failed");
+    } finally {
+      setMastering(false);
+    }
+  }, [mastering, master, setMaster, getLoudness, getTruePeak, getMasterSpectrum]);
 
   return (
     <div className="ml-1 flex flex-col items-center gap-1.5 border-l border-border pl-3">
@@ -728,6 +807,15 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
           title="AI Auto-Mix: Intelligently balance levels, panning, and master FX"
         >
           ✨ Auto-Mix
+        </button>
+
+        <button
+          onClick={runAiMaster}
+          disabled={mastering}
+          className="w-full rounded-lg border border-accent/50 bg-accent/10 px-1 py-1.5 text-[9px] font-bold uppercase tracking-wider text-accent hover:bg-accent/20 disabled:opacity-50"
+          title="AI Master: hit your loudness target with optimal compression, EQ, tape and limiter settings"
+        >
+          {mastering ? "…" : "✦ AI Master"}
         </button>
 
         {/* Master fader + Meter */}
@@ -821,6 +909,17 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
         >
           {expanded ? "HIDE" : "CTRL"}
         </button>
+
+        {/* AI Master feedback */}
+        {(masterNote || masterError) && (
+          <div
+            className={`w-full rounded-md border px-1.5 py-1 text-[8px] leading-tight ${
+              masterError ? "border-red-500/40 bg-red-500/10 text-red-300" : "border-accent/30 bg-accent/5 text-soft"
+            }`}
+          >
+            {masterError ? `⚠ ${masterError}` : masterNote}
+          </div>
+        )}
       </div>
 
       {/* Expanded master controls */}
@@ -1204,7 +1303,12 @@ export function Mixer({
         ))}
 
         {/* Master bus */}
-          <MasterStrip getLevel={getMasterMeter} />
+          <MasterStrip
+            getLevel={getMasterMeter}
+            getLoudness={getLoudness}
+            getTruePeak={getTruePeak}
+            getMasterSpectrum={getMasterSpectrum}
+          />
         </div>
       </div>
 

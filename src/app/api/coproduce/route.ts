@@ -39,6 +39,9 @@ TOOL SELECTION GUIDE:
   "turn on tape / add stereo width / compress more" → set_master_fx
   "load the trap kit / try boom bap" → load_kit_pack
 
+PROJECT MEMORY:
+  Each turn includes a [MEMORY] block listing what you've learned about this user across sessions. Reference it implicitly — don't quote memory entries back. Use the remember tool sparingly when you observe a durable pattern (e.g. user always wants kicks tuned darker, always works at 90 BPM, prefers minor keys). Do NOT remember single-shot requests, timestamps, or volatile state.
+
 RULES:
   - ALWAYS use a tool if the user requests a musical change. Never just describe.
   - You may chain multiple tools per turn (e.g. set BPM → create a matching beat).
@@ -199,6 +202,26 @@ const loadKitPackTool: Anthropic.Tool = {
   },
 };
 
+const rememberTool: Anthropic.Tool = {
+  name: "remember",
+  description: "Persist a useful learning about this user / their style / their current project for future sessions. Use sparingly — only for facts likely to remain relevant. Examples: 'Prefers 90 BPM boom-bap', 'Working on a moody EP', 'Always sidechains bass to kick'.",
+  input_schema: {
+    type: "object",
+    properties: {
+      text: {
+        type: "string",
+        description: "The learning, ≤240 chars, written in third person ('User prefers...', 'Likes...').",
+      },
+      category: {
+        type: "string",
+        enum: ["preference","style","context","skill","fact"],
+        description: "preference=workflow defaults; style=sonic tendencies; context=current project; skill=area of focus; fact=miscellaneous.",
+      },
+    },
+    required: ["text","category"],
+  },
+};
+
 const TOOLS: Anthropic.Tool[] = [
   createBeatTool,
   applyMixPatchesTool,
@@ -206,6 +229,7 @@ const TOOLS: Anthropic.Tool[] = [
   setTransportTool,
   setMasterFxTool,
   loadKitPackTool,
+  rememberTool,
 ];
 
 // ── Route ──────────────────────────────────────────────────────────────────────
@@ -235,17 +259,22 @@ export async function POST(req: NextRequest): Promise<Response> {
   const b = body as Record<string, unknown>;
   const rawHistory = Array.isArray(b.messages) ? (b.messages as ConversationMessage[]) : [];
   const projectState = typeof b.projectState === "string" ? b.projectState : "{}";
+  const memoryBlock = typeof b.memory === "string" ? b.memory : "";
 
   if (rawHistory.length === 0 || rawHistory[rawHistory.length - 1]?.role !== "user") {
     return sseError("Last message must be from user.", 400);
   }
 
-  // Inject project state into the last user message only
+  // Inject project state + memory into the last user message only
+  const lastIndex = rawHistory.length - 1;
+  const memorySection = memoryBlock.trim()
+    ? `[MEMORY]\n${memoryBlock}\n\n`
+    : "";
   const messages: Anthropic.MessageParam[] = rawHistory.map((m, i) => ({
     role: m.role,
     content:
-      i === rawHistory.length - 1
-        ? `[PROJECT STATE]\n\`\`\`json\n${projectState}\n\`\`\`\n\n${m.content}`
+      i === lastIndex
+        ? `${memorySection}[PROJECT STATE]\n\`\`\`json\n${projectState}\n\`\`\`\n\n${m.content}`
         : m.content,
   }));
 

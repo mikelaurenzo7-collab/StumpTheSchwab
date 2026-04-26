@@ -8,6 +8,13 @@ import {
   useState,
 } from "react";
 import { useEngineStore, type GeneratedBeat } from "@/store/engine";
+import {
+  addLearning,
+  buildMemoryContext,
+  clearMemory,
+  loadMemory,
+  type LearningCategory,
+} from "@/lib/projectMemory";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -161,6 +168,15 @@ function useToolDispatcher() {
           return { label: `Kit: ${packId}` };
         }
 
+        case "remember": {
+          const text     = typeof input.text     === "string" ? input.text     : "";
+          const category = typeof input.category === "string" ? input.category : "fact";
+          if (text) {
+            addLearning(text, category as LearningCategory);
+          }
+          return { label: `Remembered` };
+        }
+
         default:
           return { label: name };
       }
@@ -186,6 +202,16 @@ export const CoproducerPanel = memo(function CoproducerPanel() {
   // streaming accumulator
   const streamTextRef  = useRef("");
   const streamChipsRef = useRef<ActionChip[]>([]);
+
+  // Memory count — re-read on memory-changed event so chips update live
+  const [memoryCount, setMemoryCount] = useState(0);
+  useEffect(() => {
+    const update = () => setMemoryCount(loadMemory().learnings.length);
+    update();
+    if (typeof window === "undefined") return;
+    window.addEventListener("sts-memory-changed", update);
+    return () => window.removeEventListener("sts-memory-changed", update);
+  }, []);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -216,6 +242,7 @@ export const CoproducerPanel = memo(function CoproducerPanel() {
         body: JSON.stringify({
           messages: nextHistory.map((m) => ({ role: m.role, content: m.content })),
           projectState: getProjectState(),
+          memory: buildMemoryContext(),
         }),
       });
 
@@ -299,7 +326,20 @@ export const CoproducerPanel = memo(function CoproducerPanel() {
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted">AI Co-Producer</span>
-        <span className="ml-auto text-[10px] text-muted">Opus 4.7</span>
+        {memoryCount > 0 && (
+          <button
+            onClick={() => {
+              if (window.confirm(`Clear ${memoryCount} learning${memoryCount !== 1 ? "s" : ""}?`)) {
+                clearMemory();
+              }
+            }}
+            title="Click to clear project memory"
+            className="ml-auto rounded bg-accent/20 px-1.5 py-0.5 text-[9px] font-semibold text-accent hover:bg-accent/30"
+          >
+            🧠 {memoryCount}
+          </button>
+        )}
+        <span className={`text-[10px] text-muted ${memoryCount > 0 ? "" : "ml-auto"}`}>Opus 4.7</span>
       </div>
 
       {/* Message list */}

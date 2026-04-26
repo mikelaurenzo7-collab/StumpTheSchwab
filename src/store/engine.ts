@@ -306,6 +306,7 @@ export interface EngineState {
   renamePattern: (index: number, name: string) => void;
   euclideanFill: (trackId: number, hits: number, rotation: number) => void;
   applyGeneratedBeat: (beat: GeneratedBeat) => void;
+  applyBeatToSlot: (slotIndex: number, beat: GeneratedBeat) => void;
 
   copyTrackSteps: (trackId: number) => void;
   pasteTrackSteps: (trackId: number) => void;
@@ -1182,6 +1183,57 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         tracks: newTracks,
         patterns: updatedPatterns,
       };
+    });
+  },
+
+  // Apply an AI-generated beat to a specific pattern slot WITHOUT touching
+  // the live tracks or current pattern. Used by the AI Song Builder to bulk
+  // fill slots B–H from a single arrange call.
+  applyBeatToSlot: (slotIndex, beat) => {
+    pushHistory();
+    set((state) => {
+      if (slotIndex < 0 || slotIndex >= MAX_PATTERNS) return state;
+      const total = state.totalSteps;
+      const trackCount = state.tracks.length;
+
+      const clampVel = (v: unknown): number => {
+        const n = typeof v === "number" ? v : 0;
+        return Math.max(0, Math.min(1, n));
+      };
+      const padArr = <T,>(src: T[] | undefined, length: number, fill: T): T[] =>
+        Array.from({ length }, (_, i) => (src && src[i] !== undefined ? src[i] : fill));
+
+      const newSteps = Array.from({ length: trackCount }, (_, i) => {
+        const key = GENERATED_TRACK_KEYS[i];
+        if (!key) return Array(total).fill(0);
+        return padArr(beat.tracks[key], total, 0).map(clampVel);
+      });
+      const newNotes = Array.from({ length: trackCount }, (_, i) => {
+        const key = GENERATED_TRACK_KEYS[i];
+        if (!key) return Array(total).fill("");
+        const isMelodic = key === "tom" || key === "perc" || key === "bass";
+        const notesRaw = isMelodic
+          ? beat.melodicNotes[key as "tom" | "perc" | "bass"]
+          : undefined;
+        return padArr<string>(notesRaw, total, "").map((n) =>
+          typeof n === "string" ? n : ""
+        );
+      });
+
+      const updatedPatterns = state.patterns.map((p, i) =>
+        i === slotIndex
+          ? {
+              ...p,
+              name: (beat.name || PATTERN_LABELS[slotIndex]).slice(0, 16),
+              steps: newSteps,
+              notes: newNotes,
+              probabilities: Array.from({ length: trackCount }, () => Array(total).fill(1.0)),
+              nudge: Array.from({ length: trackCount }, () => Array(total).fill(0)),
+            }
+          : p
+      );
+
+      return { patterns: updatedPatterns };
     });
   },
 
