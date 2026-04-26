@@ -253,7 +253,7 @@ function QuickStartPanel() {
       aria-labelledby={headingId}
       className="panel rounded-md border-accent/35 p-2 shadow-accent-soft"
     >
-      <SectionHeader id={headingId} eyebrow="Start here" title="Make a beat" />
+      <SectionHeader id={headingId} eyebrow="Start here" title="Make a beat in 3 moves" />
       <ol className="mt-1.5 space-y-1 text-[11px] text-soft">
         <li className="flex gap-1.5">
           <span className="text-accent">1</span>

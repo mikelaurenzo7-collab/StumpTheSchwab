@@ -227,7 +227,7 @@ const TrackRow = memo(function TrackRow({
             {name}
             {melodic && <span className="ml-1 text-[9px] opacity-60">♪</span>}
           </span>
-          <span className="block text-[8px] font-bold uppercase tracking-[0.18em] text-muted/80 leading-tight">
+          <span className="block text-[9px] font-bold uppercase tracking-[0.18em] text-muted/80 leading-tight">
             {melodic ? "Piano" : "Rhythm"}
           </span>
         </div>
