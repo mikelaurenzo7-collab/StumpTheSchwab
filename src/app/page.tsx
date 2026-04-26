@@ -30,9 +30,9 @@ type ScenePreset = {
 
 type PerformanceMove = {
   id: "lift" | "strip" | "pressure" | "glitch";
-  label: string;
-  summary: string;
-  directive: string;
+  label: string; // Button label shown in the performance deck.
+  summary: string; // Supporting copy that explains the musical effect.
+  directive: string; // Creative guidance surfaced after the move is applied.
 };
 
 type AudioWindow = Window &
@@ -57,7 +57,7 @@ const initialTracks: Track[] = [
   { id: "keys", name: "Neon Keys", voice: "pluck", hue: 42, level: 0.64, pitch: 330, pattern: [false, true, false, false, false, true, false, true, false, false, true, false, false, true, false, false] },
   { id: "aura", name: "Aura Pad", voice: "pad", hue: 226, level: 0.52, pitch: 110, pattern: [true, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false] },
 ];
-const initialTrackLevels = new Map(initialTracks.map((track) => [track.id, track.level]));
+const initialTrackLevels = new Map(initialTracks.map((track) => [track.id, track.level])); // Preserve the founder mix as the reset point for scene changes.
 
 const scale = [0, 2, 3, 5, 7, 10, 12, 14];
 
@@ -150,6 +150,10 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
+function scoreTrack(track: Track) {
+  return track.pattern.filter(Boolean).length * track.level;
+}
+
 function getMoveLevelDelta(voice: Track["voice"], move: PerformanceMove["id"]) {
   if (move === "lift") {
     return voice === "pluck" || voice === "pad" || voice === "hat" ? 0.08 : -0.02;
@@ -169,7 +173,7 @@ function getMoveLevelDelta(voice: Track["voice"], move: PerformanceMove["id"]) {
     return voice === "hat" || voice === "snare" || voice === "pluck" ? 0.05 : -0.01;
   }
 
-  return -0.01;
+  throw new Error(`Unhandled performance move: ${move satisfies never}`);
 }
 
 function getMoveDensityDelta(move: PerformanceMove["id"]) {
@@ -460,7 +464,7 @@ export default function Home() {
   };
 
   const energy = useMemo(() => {
-    const active = tracks.reduce((sum, track) => sum + track.pattern.filter(Boolean).length * track.level, 0);
+    const active = tracks.reduce((sum, track) => sum + scoreTrack(track), 0);
     return Math.round((active / (tracks.length * STEPS)) * 100);
   }, [tracks]);
 
@@ -471,7 +475,7 @@ export default function Home() {
   const spotlight = useMemo(() => {
     const defaultSpotlight = tracks[0] ? { name: tracks[0].name, voice: tracks[0].voice, score: 0 } : DEFAULT_SPOTLIGHT;
     return tracks.reduce((leader, track) => {
-      const score = track.pattern.filter(Boolean).length * track.level;
+      const score = scoreTrack(track);
       return score > leader.score ? { name: track.name, voice: track.voice, score } : leader;
     }, defaultSpotlight);
   }, [tracks]);
