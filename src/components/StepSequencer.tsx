@@ -45,6 +45,12 @@ const StepCell = memo(function StepCell({
   beatStart: boolean;
 }) {
   const singleClickTimer = useRef<number | null>(null);
+  const clearSingleClickTimer = useCallback(() => {
+    if (singleClickTimer.current !== null) {
+      window.clearTimeout(singleClickTimer.current);
+      singleClickTimer.current = null;
+    }
+  }, []);
   const active = velocity > 0;
   const hasProb = active && probability < 1;
   const hasNudge = active && nudge !== 0;
@@ -54,22 +60,15 @@ const StepCell = memo(function StepCell({
   }
 
   useEffect(() => {
-    return () => {
-      if (singleClickTimer.current !== null) {
-        window.clearTimeout(singleClickTimer.current);
-      }
-    };
-  }, []);
+    return clearSingleClickTimer;
+  }, [clearSingleClickTimer]);
 
   return (
     <button
       onMouseDown={(e) => {
         if (e.button !== 0) return;
         if (e.detail > 1) {
-          if (singleClickTimer.current !== null) {
-            window.clearTimeout(singleClickTimer.current);
-            singleClickTimer.current = null;
-          }
+          clearSingleClickTimer();
           paintState.mode = null;
           return;
         }
@@ -86,6 +85,7 @@ const StepCell = memo(function StepCell({
       }}
       onClick={(e) => {
         if (!active || e.ctrlKey || e.metaKey || e.detail > 1) return;
+        clearSingleClickTimer();
         singleClickTimer.current = window.setTimeout(() => {
           onErase();
           singleClickTimer.current = null;
@@ -105,10 +105,7 @@ const StepCell = memo(function StepCell({
       }}
       onDoubleClick={(e) => {
         e.preventDefault();
-        if (singleClickTimer.current !== null) {
-          window.clearTimeout(singleClickTimer.current);
-          singleClickTimer.current = null;
-        }
+        clearSingleClickTimer();
         const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
         onOpenDetail(rect);
       }}
