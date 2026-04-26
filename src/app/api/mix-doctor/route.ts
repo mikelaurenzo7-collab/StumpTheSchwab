@@ -183,6 +183,8 @@ export async function POST(req: NextRequest) {
   }
 
   const snapshot = (body as { snapshot: unknown }).snapshot;
+  const rawSpectrumImage = (body as Record<string, unknown>).spectrumImage;
+  const spectrumImage = typeof rawSpectrumImage === "string" ? rawSpectrumImage : null;
 
   const client = new Anthropic();
 
@@ -204,7 +206,22 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: "user",
-          content: `Analyze this mix and return improvement suggestions.\n\nMIX SNAPSHOT:\n\`\`\`json\n${JSON.stringify(snapshot, null, 2)}\n\`\`\``,
+          content: spectrumImage
+            ? [
+                {
+                  type: "image" as const,
+                  source: {
+                    type: "base64" as const,
+                    media_type: "image/png" as const,
+                    data: spectrumImage.replace(/^data:image\/png;base64,/, ""),
+                  },
+                },
+                {
+                  type: "text" as const,
+                  text: `Analyze this mix and return improvement suggestions. The image shows the live master spectrum (X-Ray on) — use the visual zone shape alongside the numeric snapshot to spot masking, missing range, or harshness.\n\nMIX SNAPSHOT:\n\`\`\`json\n${JSON.stringify(snapshot, null, 2)}\n\`\`\``,
+                },
+              ]
+            : `Analyze this mix and return improvement suggestions.\n\nMIX SNAPSHOT:\n\`\`\`json\n${JSON.stringify(snapshot, null, 2)}\n\`\`\``,
         },
       ],
     });

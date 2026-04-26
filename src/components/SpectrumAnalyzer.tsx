@@ -208,6 +208,7 @@ export const SpectrumAnalyzer = memo(function SpectrumAnalyzer({
   return (
     <canvas
       ref={canvasRef}
+      data-sts-canvas="master-spectrum"
       style={{ height: `${height}px` }}
       className="w-full block bg-surface-2 rounded"
     />

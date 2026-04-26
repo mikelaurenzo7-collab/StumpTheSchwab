@@ -8,6 +8,7 @@ import {
 import { useUiStore } from "@/store/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { analyzeReference, type ReferenceDescriptor } from "@/lib/refAnalyzer";
+import { buildFingerprintContext, recordAcceptedBeat } from "@/lib/styleFingerprint";
 
 // ── Voice-to-Beat helpers ─────────────────────────────────────────────────────
 
@@ -502,9 +503,11 @@ export function GeneratorModal() {
       abortRef.current = ac;
 
       try {
+        const fingerprint = buildFingerprintContext();
         const body: Record<string, unknown> = {
           description: text,
           target: opts.target,
+          ...(fingerprint ? { styleFingerprint: fingerprint } : {}),
         };
         if (opts.refine) {
           const snapshot = snapshotCurrentBeat();
@@ -547,6 +550,7 @@ export function GeneratorModal() {
         };
 
         applyGeneratedBeat(beat);
+        recordAcceptedBeat(beat);
         const cached = (data.usage?.cache_read_input_tokens ?? 0) > 0;
         setHistory((current) => [entry, ...current].slice(0, MAX_HISTORY));
         setLastResult({

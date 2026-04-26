@@ -1,7 +1,9 @@
 "use client";
 
 import { useEngineStore, PATTERN_LABELS } from "@/store/engine";
-import { useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { applyMixPatch } from "@/lib/patchValidation";
+import type { ImprovMicro } from "@/app/api/improv/route";
 
 export function PerformanceMode() {
   const {
@@ -24,6 +26,62 @@ export function PerformanceMode() {
   );
   const [newSceneDuration, setNewSceneDuration] = useState(4);
 
+  // ── AI Improv (3.2) — Haiku micro-patches every ~4 bars while playing ───
+  const [improvOn, setImprovOn] = useState(false);
+  const [lastImprov, setLastImprov] = useState<string | null>(null);
+  const improvBusyRef = useRef(false);
+
+  useEffect(() => {
+    if (!improvOn) return;
+    const tick = async () => {
+      if (improvBusyRef.current) return;
+      const state = useEngineStore.getState();
+      if (state.playbackState !== "playing") return;
+      improvBusyRef.current = true;
+      try {
+        const trackSummaries = state.tracks.slice(0, 8).map((t, i) => ({
+          id: i,
+          volume: Math.round(t.volume * 100) / 100,
+          delayWet: t.effects.delayWet,
+          reverbWet: t.effects.reverbWet,
+          filterFreq: t.effects.filterFreq,
+          driveAmount: t.effects.driveAmount,
+        }));
+        const snapshot = JSON.stringify({
+          bpm: state.bpm,
+          currentStep: state.currentStep,
+          tracks: trackSummaries,
+        });
+        const res = await fetch("/api/improv", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ snapshot }),
+        });
+        if (!res.ok) return;
+        const micro = (await res.json()) as ImprovMicro;
+        if (micro.key === "noop" || typeof micro.trackId !== "number" || typeof micro.value !== "number") {
+          setLastImprov(`(skipped) ${micro.reason}`);
+          return;
+        }
+        applyMixPatch({
+          type: "trackEffect",
+          trackId: micro.trackId,
+          key: micro.key,
+          value: micro.value,
+        });
+        setLastImprov(`track ${micro.trackId} · ${micro.key} → ${typeof micro.value === "number" ? micro.value.toFixed(2) : micro.value}`);
+      } catch {
+        // silent — improv is non-critical
+      } finally {
+        improvBusyRef.current = false;
+      }
+    };
+
+    // Trigger every 8 seconds — typically ~4 bars at 120 BPM
+    const intervalId = window.setInterval(tick, 8000);
+    return () => window.clearInterval(intervalId);
+  }, [improvOn]);
+
   const handleCreateScene = () => {
     if (!newSceneName.trim()) return;
     createScene(newSceneName, newSceneSlots, newSceneDuration);
@@ -43,6 +101,27 @@ export function PerformanceMode() {
 
   return (
     <div className="flex flex-col gap-4 rounded-lg border border-border bg-[#0a0f18]/80 p-4 backdrop-blur">
+      {/* AI Improv (3.2) */}
+      <div className="rounded-lg border border-accent/30 bg-accent/5 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-[11px] font-semibold text-accent">🎲 AI Improv</p>
+            <p className="text-[10px] text-muted">Claude (Haiku) nudges one FX param every ~4 bars while playing</p>
+          </div>
+          <button
+            onClick={() => setImprovOn((v) => !v)}
+            className={`rounded-md px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+              improvOn ? "bg-accent text-[#1a1408]" : "border border-border bg-surface-2 text-muted hover:text-foreground"
+            }`}
+          >
+            {improvOn ? "ON" : "OFF"}
+          </button>
+        </div>
+        {improvOn && lastImprov && (
+          <p className="mt-2 text-[10px] text-soft">↪ {lastImprov}</p>
+        )}
+      </div>
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h3 className="text-sm font-semibold text-foreground">Performance Mode</h3>

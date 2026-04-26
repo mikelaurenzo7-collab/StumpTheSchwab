@@ -251,9 +251,23 @@ export async function POST(req: NextRequest) {
   const currentBeat =
     isBeatResult(currentBeatRaw) ? (currentBeatRaw as BeatResult) : null;
 
+  // Optional style fingerprint: a compact summary of the user's recurring
+  // tendencies (BPM, swing, density). When present, prepend to the user
+  // message as a soft bias — Claude is told to lean toward it without
+  // copying it slavishly.
+  const styleFingerprint =
+    typeof body === "object" && body !== null && "styleFingerprint" in body &&
+    typeof (body as { styleFingerprint: unknown }).styleFingerprint === "string"
+      ? ((body as { styleFingerprint: string }).styleFingerprint).slice(0, 600)
+      : null;
+
+  const fingerprintBlock = styleFingerprint
+    ? `STYLE FINGERPRINT (recent user tendencies — bias subtly toward these unless contradicted by the description): ${styleFingerprint}\n\n`
+    : "";
+
   const userMessage = currentBeat
-    ? `CURRENT BEAT:\n\`\`\`json\n${JSON.stringify(currentBeat, null, 2)}\n\`\`\`\n\nTARGET FOCUS: ${TARGET_GUIDANCE[target]}\nINSTRUCTION: ${description}`
-    : `TARGET FOCUS: ${TARGET_GUIDANCE[target]}\nDESCRIPTION: ${description}`;
+    ? `${fingerprintBlock}CURRENT BEAT:\n\`\`\`json\n${JSON.stringify(currentBeat, null, 2)}\n\`\`\`\n\nTARGET FOCUS: ${TARGET_GUIDANCE[target]}\nINSTRUCTION: ${description}`
+    : `${fingerprintBlock}TARGET FOCUS: ${TARGET_GUIDANCE[target]}\nDESCRIPTION: ${description}`;
 
   const client = new Anthropic();
 

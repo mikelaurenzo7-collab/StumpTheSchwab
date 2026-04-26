@@ -129,8 +129,19 @@ export const MixDoctorPanel = memo(function MixDoctorPanel({
   const [dismissed, setDismissed]         = useState<Set<number>>(new Set());
   const [applied, setApplied]             = useState<Set<number>>(new Set());
   const [error, setError]                 = useState<string | null>(null);
+  // Vision mode: send the spectrum canvas as an image for visual reasoning.
+  // OFF by default since image tokens are extra cost. Opt-in toggle.
+  const [visionOn, setVisionOn] = useState(false);
 
   const applyPatch = useCallback((p: MixPatch) => { applyMixPatch(p); }, []);
+
+  const captureSpectrumPng = useCallback((): string | null => {
+    if (typeof document === "undefined") return null;
+    const canvas = document.querySelector<HTMLCanvasElement>("canvas[data-sts-canvas='master-spectrum']");
+    if (!canvas) return null;
+    try { return canvas.toDataURL("image/png"); }
+    catch { return null; }
+  }, []);
 
   const runAnalysis = useCallback(async () => {
     setLoading(true);
@@ -141,10 +152,11 @@ export const MixDoctorPanel = memo(function MixDoctorPanel({
 
     try {
       const snapshot = buildMixSnapshot(getMasterSpectrum, getLoudness, getTruePeak);
+      const spectrumImage = visionOn ? captureSpectrumPng() : null;
       const res = await fetch("/api/mix-doctor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ snapshot }),
+        body: JSON.stringify({ snapshot, spectrumImage }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Unknown error");
@@ -154,7 +166,7 @@ export const MixDoctorPanel = memo(function MixDoctorPanel({
     } finally {
       setLoading(false);
     }
-  }, [getMasterSpectrum, getLoudness, getTruePeak]);
+  }, [getMasterSpectrum, getLoudness, getTruePeak, captureSpectrumPng, visionOn]);
 
   const handleApply = useCallback((idx: number, patches: MixPatch[]) => {
     patches.forEach(applyPatch);
@@ -203,6 +215,18 @@ export const MixDoctorPanel = memo(function MixDoctorPanel({
             Apply All
           </button>
         )}
+        <label
+          className="ml-auto flex cursor-pointer items-center gap-1 text-[10px] text-muted hover:text-foreground"
+          title="Send the spectrum visual to Claude (uses image tokens)"
+        >
+          <input
+            type="checkbox"
+            checked={visionOn}
+            onChange={(e) => setVisionOn(e.target.checked)}
+            className="h-3 w-3 accent-accent"
+          />
+          📷 Vision
+        </label>
       </div>
 
       {error && <ErrorChip message={error} />}
