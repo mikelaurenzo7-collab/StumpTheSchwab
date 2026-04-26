@@ -832,6 +832,20 @@ export function useAudioEngine() {
     }
   }, []);
 
+  // Allow other parts of the app (Sound Designer preview, Co-Producer) to
+  // request a one-shot trigger without prop-drilling triggerTrack.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onPlay = (e: Event) => {
+      const ev = e as CustomEvent<{ index: number; velocity?: number }>;
+      if (typeof ev.detail?.index === "number") {
+        triggerTrack(ev.detail.index, ev.detail.velocity ?? 1.0);
+      }
+    };
+    window.addEventListener("sts-track-play", onPlay);
+    return () => window.removeEventListener("sts-track-play", onPlay);
+  }, [triggerTrack]);
+
   return {
     initAudio,
     getTrackMeter,

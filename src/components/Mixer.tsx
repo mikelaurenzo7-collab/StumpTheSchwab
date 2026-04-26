@@ -1225,7 +1225,7 @@ export function Mixer({
           onTrigger={() => {
             // Preview the sound immediately after AI design applies
             if (typeof window !== "undefined") {
-              window.dispatchEvent(new CustomEvent("sts-track-trigger", { detail: { index: editingSoundId } }));
+              window.dispatchEvent(new CustomEvent("sts-track-play", { detail: { index: editingSoundId } }));
             }
           }}
         />

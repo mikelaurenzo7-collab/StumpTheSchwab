@@ -130,7 +130,7 @@ function useToolDispatcher() {
           setTrackSynthType(trackId, synth as any);
           setTrackSoundOptions(trackId, options);
           if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("sts-track-trigger", { detail: { index: trackId } }));
+            window.dispatchEvent(new CustomEvent("sts-track-play", { detail: { index: trackId } }));
           }
           const trackNames = ["kick","snare","hihat","openhat","clap","tom","perc","bass"];
           return { label: `Sound: ${trackNames[trackId] ?? `track ${trackId}`}` };

@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 // patch suggestions land in the right parameter space.
 const SYSTEM_PROMPT = `You are an expert mixing engineer for StumpTheSchwab, a web-based step sequencer / DAW. Your job is to analyze a mix snapshot and return actionable patch suggestions by calling the analyze_mix tool.
 
-TRACK LAYOUT (indexed 0–8, matching slot order):
+TRACK LAYOUT (indexed 0–7, matching slot order):
   0  Kick     — sub/low punch, drives the rhythm
   1  Snare    — backbeat at 2 and 4
   2  Hi-Hat   — rhythmic texture, high frequencies
