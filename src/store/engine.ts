@@ -384,7 +384,7 @@ export interface EngineState {
 
 // ── Helpers ────────────────────────────────────────────────────
 const INITIAL_STEPS = 16;
-const STARTER_PRESET = PRESETS[0];
+const STARTER_PRESET: PatternPreset | undefined = PRESETS.length > 0 ? PRESETS[0] : undefined;
 
 /**
  * Generate an evenly-distributed (euclidean) rhythm.
@@ -485,7 +485,7 @@ function createTracks(totalSteps: number, preset?: PatternPreset): Track[] {
   return DEFAULT_KIT.map((sound, i) => ({
     id: i,
     sound,
-    steps: Array(totalSteps).fill(0).map((_, step) => preset?.tracks[i]?.[step] ?? 0),
+    steps: Array.from({ length: totalSteps }, (_, step) => preset?.tracks[i]?.[step] ?? 0),
     notes: Array(totalSteps).fill(""),
     probabilities: Array(totalSteps).fill(1.0),
     volume: 0.75,
@@ -645,7 +645,7 @@ function createPatternFromPreset(preset: PatternPreset, trackCount: number, tota
   return {
     name: preset.name.slice(0, PATTERN_NAME_MAX_LENGTH),
     steps: Array.from({ length: trackCount }, (_, trackIdx) =>
-      Array(totalSteps).fill(0).map((_, stepIdx) => preset.tracks[trackIdx]?.[stepIdx] ?? 0)
+      Array.from({ length: totalSteps }, (_, stepIdx) => preset.tracks[trackIdx]?.[stepIdx] ?? 0)
     ),
     notes: Array.from({ length: trackCount }, () => Array(totalSteps).fill("")),
     probabilities: Array.from({ length: trackCount }, () => Array(totalSteps).fill(1.0)),

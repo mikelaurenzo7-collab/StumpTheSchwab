@@ -49,7 +49,10 @@ const MELODIC_KEYS = ["tom","perc","bass"] as const;
 const BEATS_PER_BAR = 4;
 const PATTERN_NAME_MAX_LENGTH = 16;
 const MAX_CHAIN_LENGTH = 16;
-const ARRANGE_CHAIN_SLOT_COUNT = SECTION_ROLES.length + 1; // seed slot + 7 arranged sections
+// Claude/local arranger chain IDs use 0 for the seed pattern and 1..7 for arranged sections.
+const ARRANGE_CHAIN_SLOT_COUNT = SECTION_ROLES.length + 1;
+const BUILD_HIHAT_DOWNBEAT_VELOCITY = 0.5;
+const BUILD_HIHAT_OFFBEAT_VELOCITY = 0.25;
 
 const arrangeSongTool: Anthropic.Tool = {
   name: "arrange_song",
@@ -261,7 +264,9 @@ function buildFallbackArrangement(seed: SeedBeat, totalSteps: number): ArrangeRe
       ...t,
       kick: accent(t.kick, downbeats, 0.85),
       snare: accent(t.snare, backbeats, 0.9),
-      hihat: t.hihat.map((v, i) => quantizeVelocity(Math.max(v, i % 2 === 0 ? 0.5 : 0.25))),
+      hihat: t.hihat.map((v, i) =>
+        quantizeVelocity(Math.max(v, i % 2 === 0 ? BUILD_HIHAT_DOWNBEAT_VELOCITY : BUILD_HIHAT_OFFBEAT_VELOCITY))
+      ),
       perc: accent(t.perc, lastBar, 0.75),
     }), "Adds hat motion and end-bar tension before the drop."),
     make("drop", "Drop", (t) => ({
@@ -297,6 +302,7 @@ function buildFallbackArrangement(seed: SeedBeat, totalSteps: number): ArrangeRe
 
   return {
     patterns,
+    // Seed → verse x2 → build → drop x2 → break → drop → fill → outro.
     chain: [0, 1, 1, 2, 3, 3, 4, 3, 5, 6, 7],
     explanation: "Local arranger built a complete intro-to-outro chain from the seed pattern, with energy rising into the drop and resolving through fill and outro.",
   };
