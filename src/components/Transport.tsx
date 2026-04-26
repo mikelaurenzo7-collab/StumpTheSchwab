@@ -134,11 +134,11 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       : `${tapTimes.length}/6`;
 
   return (
-    <div className="glass-control relative flex flex-wrap items-center gap-2.5 rounded-lg px-2.5 py-2.5">
+    <div className="glass-control relative flex flex-wrap items-center gap-1.5 rounded-lg px-2 py-1.5">
       {/* AI Generate */}
       <button
         onClick={() => useUiStore.getState().setGeneratorOpen(true)}
-        className="button-primary group flex items-center gap-2 rounded-md px-3.5 py-2.5 text-[10px] font-bold uppercase tracking-[0.18em]"
+        className="button-primary group flex items-center gap-1.5 rounded-md px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em]"
         title="Generate or mutate a groove (G)"
       >
         <span className="text-base leading-none transition-transform group-hover:rotate-12">✦</span>
@@ -148,7 +148,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Play/Pause */}
       <button
         onClick={handlePlay}
-        className="flex h-11 w-11 items-center justify-center rounded-md border border-white/20 bg-white text-lg font-mono text-background shadow-lg shadow-white/10 hover:scale-105"
+        className="flex h-9 w-9 items-center justify-center rounded-md border border-white/20 bg-white text-base font-mono text-background shadow-lg shadow-white/10 hover:scale-105"
         title={playbackState === "playing" ? "Pause (Space)" : "Play (Space)"}
       >
         {playbackState === "playing" ? "⏸" : "▶"}
@@ -157,38 +157,35 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Stop */}
       <button
         onClick={handleStop}
-        className="button-secondary flex h-11 w-11 items-center justify-center rounded-md font-mono text-lg text-foreground"
+        className="button-secondary flex h-9 w-9 items-center justify-center rounded-md font-mono text-base text-foreground"
         title="Stop"
       >
         ⏹
       </button>
 
       {/* BPM */}
-      <div className="rounded-md border border-border bg-background-2 px-2.5 py-2">
-        <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-muted">BPM</div>
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 rounded-md border border-border bg-background-2 px-2 py-1">
+        <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted">BPM</span>
         <input
           type="number"
           min={30}
           max={300}
           value={bpm}
           onChange={(e) => setBpm(Number(e.target.value))}
-          className="control-input w-16 rounded-xl px-2 py-1.5 text-center text-sm font-mono"
+          className="control-input w-14 rounded-md px-1.5 py-1 text-center text-[12px] font-mono"
         />
         <button
           onClick={handleTap}
-          className="button-secondary min-w-[3rem] rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider"
+          className="button-secondary min-w-[2.5rem] rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
           title="Tap to set BPM — tap repeatedly at the desired tempo"
         >
           {tapHint}
         </button>
-        </div>
       </div>
 
       {/* Swing */}
-      <div className="rounded-md border border-border bg-background-2 px-2.5 py-2">
-        <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-muted">Swing</div>
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 rounded-md border border-border bg-background-2 px-2 py-1">
+        <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted">Swing</span>
         <input
           type="range"
           min={0}
@@ -196,44 +193,40 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
           step={0.01}
           value={swing}
           onChange={(e) => setSwing(Number(e.target.value))}
-          className="w-20"
+          className="w-16"
         />
-        <span className="text-xs font-mono text-muted w-8">
+        <span className="text-[10px] font-mono text-muted w-8">
           {Math.round(swing * 100)}%
         </span>
-        </div>
       </div>
 
       {/* Steps */}
-      <div className="rounded-md border border-border bg-background-2 px-2.5 py-2">
-        <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-muted">Steps</div>
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 rounded-md border border-border bg-background-2 px-2 py-1">
+        <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted">Steps</span>
         <select
           value={totalSteps}
           onChange={(e) => setTotalSteps(Number(e.target.value))}
-          className="control-select rounded-xl px-2 py-1.5 text-sm font-mono"
+          className="control-select rounded-md px-1.5 py-1 text-[12px] font-mono"
         >
           <option value={8}>8</option>
           <option value={16}>16</option>
           <option value={32}>32</option>
           <option value={64}>64</option>
         </select>
-        </div>
       </div>
 
       {/* Separator */}
-      <div className="mx-1 h-7 w-px bg-white/10" />
+      <div className="h-6 w-px bg-white/10" />
 
       {/* Pattern Selector */}
-      <div className="rounded-md border border-border bg-background-2 px-2.5 py-2">
-        <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-muted">Pattern bank</div>
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 rounded-md border border-border bg-background-2 px-2 py-1">
+        <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted">Pat</span>
         <div className="flex gap-0.5">
           {PATTERN_LABELS.map((label, i) => (
             <button
               key={label}
               onClick={() => handlePatternClick(i)}
-              className={`w-7 h-7 rounded-xl text-xs font-bold transition-all ${
+              className={`w-6 h-6 rounded-md text-[11px] font-bold transition-all ${
                 i === currentPattern
                   ? "bg-accent text-white shadow-sm shadow-accent/40"
                 : copySource === i
@@ -254,7 +247,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
         {/* Copy button */}
         <button
           onClick={handleCopy}
-            className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+            className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider transition-colors ${
                copySource !== null
                 ? "bg-warning text-black"
                 : "button-secondary"
@@ -282,27 +275,25 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
              }}
              maxLength={16}
              placeholder={PATTERN_LABELS[currentPattern]}
-             className="control-input w-24 rounded-xl border-accent px-2 py-1 text-xs font-medium"
+             className="control-input w-20 rounded-md border-accent px-1.5 py-0.5 text-[11px] font-medium"
            />
          ) : (
            <button
              onClick={startRename}
-              className="button-ghost max-w-[8rem] truncate rounded-xl px-2 py-1 text-xs font-medium"
+              className="button-ghost max-w-[6rem] truncate rounded-md px-1.5 py-0.5 text-[11px] font-medium"
              title="Click to rename this pattern"
            >
              {currentPatternName}
            </button>
          )}
-        </div>
       </div>
 
       {/* Separator */}
-      <div className="mx-1 h-7 w-px bg-white/10" />
+      <div className="h-6 w-px bg-white/10" />
 
       {/* Preset Loader */}
-      <div className="rounded-md border border-border bg-background-2 px-2.5 py-2">
-        <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-muted">Preset</div>
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 rounded-md border border-border bg-background-2 px-2 py-1">
+        <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted">Preset</span>
         <select
           value=""
           onChange={(e) => {
@@ -311,7 +302,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
               loadPreset(PRESETS[idx]);
             }
           }}
-          className="control-select rounded-xl px-2 py-1.5 text-sm font-mono"
+          className="control-select rounded-md px-1.5 py-1 text-[12px] font-mono"
         >
           <option value="" disabled>
             Load...
@@ -322,18 +313,17 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
             </option>
           ))}
         </select>
-        </div>
       </div>
 
       {/* Spacer */}
-      <div className="hidden min-w-4 flex-1 xl:block" />
+      <div className="hidden min-w-2 flex-1 xl:block" />
 
       {/* Undo / Redo */}
       <div className="flex gap-0.5">
         <button
           onClick={undo}
           disabled={!canUndo}
-          className="button-secondary h-9 w-9 rounded-xl text-sm disabled:opacity-25"
+          className="button-secondary h-8 w-8 rounded-md text-sm disabled:opacity-25"
           title="Undo (Ctrl+Z)"
         >
           ↶
@@ -341,7 +331,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
         <button
           onClick={redo}
           disabled={!canRedo}
-          className="button-secondary h-9 w-9 rounded-xl text-sm disabled:opacity-25"
+          className="button-secondary h-8 w-8 rounded-md text-sm disabled:opacity-25"
           title="Redo (Ctrl+Shift+Z)"
         >
           ↷
@@ -353,7 +343,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
         <select
           value={exportFormat}
           onChange={(e) => setExportFormat(e.target.value as "wav" | "stems" | "midi")}
-          className="control-select rounded-xl px-2 py-1.5 text-[10px] font-mono text-muted"
+          className="control-select rounded-md px-1.5 py-1 text-[10px] font-mono text-muted"
           title="Export format"
         >
           <option value="wav">WAV Mix</option>
@@ -364,7 +354,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
           <select
             value={exportLoops}
             onChange={(e) => setExportLoops(Number(e.target.value))}
-              className="control-select w-14 rounded-xl px-2 py-1.5 text-[10px] font-mono text-muted"
+              className="control-select w-12 rounded-md px-1.5 py-1 text-[10px] font-mono text-muted"
             title="Number of loops to export"
           >
             <option value={1}>1x</option>
@@ -378,7 +368,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
             <select
               value={stemRenderMode}
               onChange={(e) => setStemRenderMode(e.target.value as StemRenderMode)}
-              className="control-select rounded-xl px-2 py-1.5 text-[10px] font-mono text-muted"
+              className="control-select rounded-md px-1.5 py-1 text-[10px] font-mono text-muted"
               title={
                 STEM_RENDER_MODE_OPTIONS.find((option) => option.value === stemRenderMode)?.hint ??
                 "Choose how stems are rendered"
@@ -394,7 +384,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
               type="button"
               onClick={() => setIncludeMasterPrint((value) => !value)}
               aria-pressed={includeMasterPrint}
-              className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${
+              className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.18em] transition-colors ${
                 includeMasterPrint
                   ? "bg-accent text-white shadow-sm shadow-accent/30"
                   : "button-secondary"
@@ -420,7 +410,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
             }
           }}
           disabled={exporting || exportingMidi}
-            className={`rounded-xl px-3.5 py-2 text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${
+            className={`rounded-md px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${
              exporting || exportingMidi
                ? "bg-accent/50 text-white/50 cursor-wait"
                : "button-secondary bg-white text-background hover:bg-accent-hover hover:text-white"
@@ -451,7 +441,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Humanize */}
       <button
         onClick={() => humanize(null, 0.15)}
-        className="button-secondary rounded-xl px-3 py-2 text-[10px] uppercase tracking-[0.18em] hover:text-accent"
+        className="button-secondary rounded-md px-2.5 py-1.5 text-[10px] uppercase tracking-[0.18em] hover:text-accent"
         title="Humanize all tracks — randomize velocities slightly for a more natural feel (H)"
       >
         Humanize
@@ -460,7 +450,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Clear */}
       <button
         onClick={clearAll}
-        className="button-secondary rounded-xl px-3 py-2 text-[10px] uppercase tracking-[0.18em] hover:bg-danger/20 hover:text-danger"
+        className="button-secondary rounded-md px-2.5 py-1.5 text-[10px] uppercase tracking-[0.18em] hover:bg-danger/20 hover:text-danger"
       >
         Clear All
       </button>
@@ -468,7 +458,7 @@ export function Transport({ onInit, lastSaved }: { onInit: () => Promise<void>; 
       {/* Help */}
       <button
         onClick={() => useUiStore.getState().toggleHelp()}
-        className="button-secondary h-9 w-9 rounded-full text-sm"
+        className="button-secondary h-8 w-8 rounded-full text-sm"
         title="Keyboard shortcuts (?)"
       >
         ?
