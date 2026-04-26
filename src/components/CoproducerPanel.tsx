@@ -173,9 +173,17 @@ export const CoproducerPanel = memo(function CoproducerPanel() {
   const getProjectState = useProjectState();
   const dispatchTool    = useToolDispatcher();
 
-  // streaming accumulator
+  // streaming accumulator + abort
   const streamTextRef  = useRef("");
   const streamChipsRef = useRef<ActionChip[]>([]);
+  const abortRef       = useRef<AbortController | null>(null);
+
+  // Abort any in-flight stream when the panel unmounts (tab switch, etc.)
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   // Memory count + drawer toggle
   const [memoryCount, setMemoryCount] = useState(0);
@@ -199,6 +207,11 @@ export const CoproducerPanel = memo(function CoproducerPanel() {
     const text = input.trim();
     if (!text || streaming) return;
 
+    // Cancel any prior in-flight request
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
     const userMsg: ChatMessage = { role: "user", content: text };
     const nextHistory = [...messages, userMsg];
     setMessages(nextHistory);
@@ -210,15 +223,19 @@ export const CoproducerPanel = memo(function CoproducerPanel() {
     // Add a placeholder assistant message that we'll update in-place
     setMessages((prev) => [...prev, { role: "assistant", content: "", chips: [] }]);
 
+    // Send only the last 8 turns — older context lives in memory + projectState
+    const trimmedHistory = nextHistory.slice(-8);
+
     try {
       const res = await fetch("/api/coproduce", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: nextHistory.map((m) => ({ role: m.role, content: m.content })),
+          messages: trimmedHistory.map((m) => ({ role: m.role, content: m.content })),
           projectState: getProjectState(),
           memory: buildMemoryContext(),
         }),
+        signal: ac.signal,
       });
 
       if (!res.ok || !res.body) {
@@ -272,12 +289,21 @@ export const CoproducerPanel = memo(function CoproducerPanel() {
         }
       }
     } catch (err) {
+      // Aborted requests aren't an error to show — just drop the placeholder
+      const aborted = err instanceof DOMException && err.name === "AbortError";
       setMessages((prev) => {
         const next = [...prev];
-        next[next.length - 1] = {
-          role: "assistant",
-          content: `⚠ ${err instanceof Error ? err.message : "Connection failed"}`,
-        };
+        if (aborted) {
+          // Remove the empty assistant placeholder
+          if (next[next.length - 1]?.role === "assistant" && !next[next.length - 1].content) {
+            next.pop();
+          }
+        } else {
+          next[next.length - 1] = {
+            role: "assistant",
+            content: `⚠ ${err instanceof Error ? err.message : "Connection failed"}`,
+          };
+        }
         return next;
       });
     } finally {
