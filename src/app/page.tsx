@@ -41,6 +41,7 @@ type AudioWindow = Window &
   };
 
 const STEPS = 16;
+// Scene and performance transformation thresholds.
 const EMPHASIS_BOOST = 0.12; // Give scene-focus voices a noticeable push without clipping the balance.
 const BACKGROUND_DIP = -0.08; // Pull non-focus voices back just enough to create space.
 const MIN_AUDIBLE_TRACK_LEVEL = 0.18; // Keep every lane present after aggressive transformations.
@@ -48,7 +49,7 @@ const FRACTURE_SCENE_THRESHOLD = 55; // Only highly fractured scenes should inve
 const FRACTURE_SCENE_INTERVAL = 5; // Flip every fifth slot for a repeatable broken-grid feel.
 const FALLBACK_DIRECTIVE = "Design a session that feels alive before the first plugin loads.";
 const REGENERATE_DIRECTIVE = "A newly generated world, ready to be sculpted into the hook.";
-const DEFAULT_SPOTLIGHT = { name: "Pulse Engine", voice: "kick" as const, score: 0 };
+const FALLBACK_SPOTLIGHT = { name: "Pulse Engine", voice: "kick" as const, score: 0 };
 const initialTracks: Track[] = [
   { id: "pulse", name: "Pulse Engine", voice: "kick", hue: 270, level: 0.92, pitch: 46, pattern: [true, false, false, false, true, false, false, true, true, false, false, false, true, false, true, false] },
   { id: "glass", name: "Glass Impact", voice: "snare", hue: 318, level: 0.76, pitch: 188, pattern: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, true] },
@@ -473,7 +474,9 @@ export default function Home() {
   }, [macros]);
 
   const spotlight = useMemo(() => {
-    const defaultSpotlight = tracks[0] ? { name: tracks[0].name, voice: tracks[0].voice, score: 0 } : DEFAULT_SPOTLIGHT;
+    const defaultSpotlight = tracks[0]
+      ? { name: tracks[0].name, voice: tracks[0].voice, score: scoreTrack(tracks[0]) }
+      : FALLBACK_SPOTLIGHT;
     return tracks.reduce((leader, track) => {
       const score = scoreTrack(track);
       return score > leader.score ? { name: track.name, voice: track.voice, score } : leader;
