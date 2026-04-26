@@ -1,8 +1,10 @@
 "use client";
 
 import { useEngineStore, type Sample } from "@/store/engine";
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { RecorderModal } from "./RecorderModal";
+import { analyzeReference, type ReferenceDescriptor } from "@/lib/refAnalyzer";
+import type { RefMatchResult } from "@/app/api/ref-match/route";
 
 export function SampleBrowser() {
   const {
@@ -22,7 +24,20 @@ export function SampleBrowser() {
   const [showUpload, setShowUpload] = useState(false);
   const [showRecorder, setShowRecorder] = useState(false);
 
+  // Reference match state
+  const [showRefMatch, setShowRefMatch]   = useState(false);
+  const [analyzing, setAnalyzing]         = useState(false);
+  const [refDescriptor, setRefDescriptor] = useState<ReferenceDescriptor | null>(null);
+  const [refResult, setRefResult]         = useState<RefMatchResult | null>(null);
+  const [refError, setRefError]           = useState<string | null>(null);
+  const [appliedRef, setAppliedRef]       = useState(false);
+
+  const refFileRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const {
+    setTrackVolume, setTrackPan, setTrackEffect, setMaster, setBpm, setSwing, loadKitPack,
+  } = useEngineStore();
 
   const displaySamples =
     searchQuery.trim() !== ""
@@ -61,12 +76,104 @@ export function SampleBrowser() {
     loadSampleFromLibrary(selectedTrack, sampleId);
   };
 
+  // ── Reference match handlers ───────────────────────────────────────────────
+
+  const buildProjectState = useCallback(() => {
+    const s = useEngineStore.getState();
+    return JSON.stringify({
+      bpm: s.bpm,
+      swing: s.swing,
+      activeKitPackId: s.activeKitPackId,
+      tracks: s.tracks.slice(0, 8).map((t, i) => ({
+        id: i,
+        volume: t.volume,
+        pan: t.pan,
+        muted: t.muted,
+      })),
+      master: {
+        volume: s.master.volume,
+        eqLow: s.master.eqLow,
+        eqMid: s.master.eqMid,
+        eqHigh: s.master.eqHigh,
+        eqOn: s.master.eqOn,
+        compressorOn: s.master.compressorOn,
+        tapeOn: s.master.tapeOn,
+        widthOn: s.master.widthOn,
+      },
+    });
+  }, []);
+
+  const handleRefFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setRefError(null);
+    setRefResult(null);
+    setRefDescriptor(null);
+    setAppliedRef(false);
+    setAnalyzing(true);
+    try {
+      const descriptor = await analyzeReference(file);
+      setRefDescriptor(descriptor);
+    } catch (err) {
+      setRefError(err instanceof Error ? err.message : "Analysis failed");
+    } finally {
+      setAnalyzing(false);
+      if (refFileRef.current) refFileRef.current.value = "";
+    }
+  }, []);
+
+  const runRefMatch = useCallback(async () => {
+    if (!refDescriptor) return;
+    setRefError(null);
+    setAnalyzing(true);
+    try {
+      const res = await fetch("/api/ref-match", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reference: refDescriptor, projectState: buildProjectState() }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      setRefResult(json as RefMatchResult);
+    } catch (err) {
+      setRefError(err instanceof Error ? err.message : "Match failed");
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [refDescriptor, buildProjectState]);
+
+  const applyRefPatches = useCallback(() => {
+    if (!refResult) return;
+    for (const p of refResult.mix_patches) {
+      if (p.type === "trackVolume" && p.trackId != null)  setTrackVolume(p.trackId, Number(p.value));
+      else if (p.type === "trackPan"  && p.trackId != null) setTrackPan(p.trackId, Number(p.value));
+      else if (p.type === "trackEffect" && p.trackId != null) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (p.enable) setTrackEffect(p.trackId, p.enable as any, true);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setTrackEffect(p.trackId, p.key as any, p.value);
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      else if (p.type === "master") setMaster(p.key as any, p.value);
+    }
+    if (refResult.bpm)   setBpm(refResult.bpm);
+    if (refResult.swing != null) setSwing(refResult.swing);
+    if (refResult.kit_suggestion) loadKitPack(refResult.kit_suggestion, false);
+    setAppliedRef(true);
+  }, [refResult, setTrackVolume, setTrackPan, setTrackEffect, setMaster, setBpm, setSwing, loadKitPack]);
+
   return (
     <>
     <div className="flex flex-col gap-4 rounded-lg border border-border bg-[#0a0f18]/80 p-4 backdrop-blur">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-foreground">Sample Browser</h3>
         <div className="flex gap-2">
+          <button
+            onClick={() => { setShowRefMatch((v) => !v); setRefResult(null); setRefDescriptor(null); setRefError(null); }}
+            className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${showRefMatch ? "bg-accent/30 text-accent" : "bg-accent/10 text-accent hover:bg-accent/20"}`}
+          >
+            ✦ Match Ref
+          </button>
           <button
             onClick={() => setShowRecorder(true)}
             className="flex items-center gap-1 flex-row rounded bg-yellow-500/20 px-3 py-1.5 text-xs text-yellow-400 hover:bg-yellow-500/30"
@@ -81,6 +188,103 @@ export function SampleBrowser() {
           </button>
         </div>
       </div>
+
+      {/* ── Reference Match panel ─────────────────────────────── */}
+      {showRefMatch && (
+        <div className="rounded-lg border border-accent/30 bg-accent/5 p-3">
+          <p className="mb-2 text-[11px] font-semibold text-accent">AI Reference Match</p>
+          <p className="mb-3 text-[10px] text-muted">
+            Drop a reference track — Claude analyses its tonal balance and suggests patches to shift your mix toward it.
+          </p>
+
+          {/* File picker */}
+          <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-accent/40 bg-accent/5 px-3 py-2 text-[11px] text-soft hover:bg-accent/10">
+            <span>{refDescriptor ? "✓ Analysed" : "Choose audio file…"}</span>
+            <input
+              ref={refFileRef}
+              type="file"
+              accept="audio/*"
+              className="hidden"
+              onChange={handleRefFile}
+              disabled={analyzing}
+            />
+          </label>
+
+          {/* Descriptor preview */}
+          {refDescriptor && !refResult && (
+            <div className="mt-2 rounded-md bg-surface-2 p-2 text-[10px] text-muted">
+              <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                <span>⏱ {Math.round(refDescriptor.durationSeconds)}s</span>
+                {refDescriptor.estimatedBpm && <span>♩ ~{refDescriptor.estimatedBpm} BPM</span>}
+                <span>Peak {Math.round(refDescriptor.peakLinear * 100)}%</span>
+                <span>RMS {(20 * Math.log10(Math.max(refDescriptor.overallRms, 1e-6))).toFixed(1)} dB</span>
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-0.5 text-[9px]">
+                {(["sub","bass","loMid","mid","presence","air"] as const).map((z) => (
+                  <span key={z} className="text-soft">
+                    {z} {(20 * Math.log10(Math.max(refDescriptor.zones[z], 1e-6))).toFixed(0)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Match button */}
+          {refDescriptor && !refResult && (
+            <button
+              onClick={runRefMatch}
+              disabled={analyzing}
+              className="mt-2 w-full rounded-md bg-accent px-3 py-1.5 text-[11px] font-semibold text-[#1a1408] disabled:opacity-50"
+            >
+              {analyzing ? "Analysing…" : "Match with Claude"}
+            </button>
+          )}
+
+          {/* Results */}
+          {refResult && (
+            <div className="mt-2 space-y-2">
+              <p className="text-[11px] text-soft">{refResult.explanation}</p>
+
+              {/* Suggestions summary */}
+              <div className="flex flex-wrap gap-1">
+                {refResult.bpm && (
+                  <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-foreground">
+                    ♩ {refResult.bpm} BPM
+                  </span>
+                )}
+                {refResult.kit_suggestion && (
+                  <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-foreground">
+                    Kit: {refResult.kit_suggestion}
+                  </span>
+                )}
+                <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-foreground">
+                  {refResult.mix_patches.length} patch{refResult.mix_patches.length !== 1 ? "es" : ""}
+                </span>
+              </div>
+
+              <button
+                onClick={applyRefPatches}
+                disabled={appliedRef}
+                className="w-full rounded-md bg-accent px-3 py-1.5 text-[11px] font-semibold text-[#1a1408] disabled:opacity-60"
+              >
+                {appliedRef ? "✓ Applied" : "Apply All"}
+              </button>
+
+              <button
+                onClick={() => { setRefResult(null); setRefDescriptor(null); setAppliedRef(false); }}
+                className="w-full rounded-md border border-border px-3 py-1 text-[10px] text-muted hover:text-foreground"
+              >
+                Try another reference
+              </button>
+            </div>
+          )}
+
+          {/* Error */}
+          {refError && (
+            <p className="mt-2 text-[11px] text-red-400">⚠ {refError}</p>
+          )}
+        </div>
+      )}
 
       {/* Upload Section */}
       {showUpload && (

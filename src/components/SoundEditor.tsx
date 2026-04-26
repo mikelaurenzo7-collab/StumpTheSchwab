@@ -10,7 +10,7 @@
  * (no clicks where possible).
  */
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useEngineStore } from "@/store/engine";
 import type { TrackSound } from "@/lib/sounds";
 
@@ -157,7 +157,7 @@ function EnvelopeSection({ options, patch, prefix = "envelope" }: {
 }
 
 // ── Main editor ─────────────────────────────────────────────────
-export function SoundEditor({ trackId, onClose }: { trackId: number; onClose: () => void }) {
+export function SoundEditor({ trackId, onClose, onTrigger }: { trackId: number; onClose: () => void; onTrigger?: () => void }) {
   const track = useEngineStore((s) => s.tracks.find((t) => t.id === trackId));
   const setTrackSoundOptions = useEngineStore((s) => s.setTrackSoundOptions);
   const setTrackSynthType = useEngineStore((s) => s.setTrackSynthType);
@@ -170,6 +170,48 @@ export function SoundEditor({ trackId, onClose }: { trackId: number; onClose: ()
     (partial) => setTrackSoundOptions(trackId, partial),
     [trackId, setTrackSoundOptions]
   );
+
+  // ── AI Sound Designer state ───────────────────────────────────
+  const [designOpen, setDesignOpen] = useState(false);
+  const [designPrompt, setDesignPrompt] = useState("");
+  const [designing, setDesigning] = useState(false);
+  const [designExplanation, setDesignExplanation] = useState<string | null>(null);
+  const [designError, setDesignError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const runDesign = useCallback(async () => {
+    if (!designPrompt.trim() || designing || !sound) return;
+    setDesigning(true);
+    setDesignError(null);
+    setDesignExplanation(null);
+    try {
+      const res = await fetch("/api/sound-designer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trackName: sound.name,
+          currentSynth: sound.synth,
+          description: designPrompt.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Unknown error");
+      const { synth, options: newOpts, explanation } = data;
+      // Apply the new voice — synth type first (triggers hot-swap if changed),
+      // then options in a second dispatch so the new voice receives its params.
+      if (synth && synth !== sound.synth) {
+        setTrackSynthType(trackId, synth);
+      }
+      if (newOpts) setTrackSoundOptions(trackId, newOpts);
+      if (explanation) setDesignExplanation(explanation);
+      // Trigger a preview hit so the user hears the result immediately.
+      onTrigger?.();
+    } catch (err) {
+      setDesignError(err instanceof Error ? err.message : "Request failed");
+    } finally {
+      setDesigning(false);
+    }
+  }, [designPrompt, designing, sound, trackId, setTrackSynthType, setTrackSoundOptions, onTrigger]);
 
   if (!track || !sound) return null;
 
@@ -208,6 +250,49 @@ export function SoundEditor({ trackId, onClose }: { trackId: number; onClose: ()
               ✕
             </button>
           </div>
+        </div>
+
+        {/* AI Sound Designer */}
+        <div className="mb-4 rounded-xl border border-accent/30 bg-accent/5 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-accent">✨ AI Sound Designer</span>
+            <button
+              onClick={() => { setDesignOpen((v) => !v); setDesignError(null); setDesignExplanation(null); }}
+              className="text-[10px] text-muted hover:text-foreground"
+            >
+              {designOpen ? "collapse" : "describe a sound"}
+            </button>
+          </div>
+          {designOpen && (
+            <div className="mt-2 flex flex-col gap-2">
+              <div className="flex gap-2">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={designPrompt}
+                  onChange={(e) => setDesignPrompt(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && runDesign()}
+                  placeholder={`Describe the sound you want for ${sound.name}…`}
+                  className="flex-1 rounded-lg border border-border bg-surface px-3 py-1.5 text-[11px] text-foreground placeholder-muted focus:outline-none focus:border-accent"
+                />
+                <button
+                  onClick={runDesign}
+                  disabled={designing || !designPrompt.trim()}
+                  className="button-primary flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold disabled:opacity-50"
+                >
+                  {designing ? (
+                    <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  ) : "Generate"}
+                </button>
+              </div>
+              {designError && (
+                <p className="text-[10px] text-red-400">{designError}</p>
+              )}
+              {designExplanation && (
+                <p className="text-[11px] leading-relaxed text-soft">{designExplanation}</p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Voice swap */}

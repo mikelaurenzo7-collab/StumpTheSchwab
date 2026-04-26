@@ -14,6 +14,7 @@ import {
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SpectrumAnalyzer } from "./SpectrumAnalyzer";
 import { SoundEditor } from "./SoundEditor";
+import { MixDoctorPanel } from "./MixDoctorPanel";
 import { KIT_PACKS } from "@/lib/kitPacks";
 
 // ── Knob-style mini slider ────────────────────────────────────
@@ -961,11 +962,15 @@ export function Mixer({
   getMasterMeter,
   getMasterSpectrum,
   getMasterWaveform,
+  getLoudness,
+  getTruePeak,
 }: {
   getTrackMeter: (index: number) => number;
   getMasterMeter: () => number;
   getMasterSpectrum: () => Float32Array | null;
   getMasterWaveform: () => Float32Array | null;
+  getLoudness: () => number;
+  getTruePeak: () => number;
 }) {
   const tracks = useEngineStore((s) => s.tracks);
   const setTrackVolume = useEngineStore((s) => s.setTrackVolume);
@@ -1035,6 +1040,7 @@ export function Mixer({
   const handleEditSound = useCallback((id: number) => setEditingSoundId(id), []);
 
   const [xrayOn, setXrayOn] = useState(false);
+  const [doctorOpen, setDoctorOpen] = useState(false);
   const activeKitPackId = useEngineStore((s) => s.activeKitPackId);
   const loadKitPack = useEngineStore((s) => s.loadKitPack);
   const [applyKitTempo, setApplyKitTempo] = useState(false);
@@ -1103,6 +1109,18 @@ export function Mixer({
           >
             X-Ray
           </button>
+          <button
+            type="button"
+            onClick={() => setDoctorOpen((v) => !v)}
+            className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+              doctorOpen
+                ? "border-accent bg-accent/20 text-accent"
+                : "border-border bg-surface-3 text-muted hover:text-foreground"
+            }`}
+            title="AI Mix Doctor — Claude analyses your mix and suggests one-click patches"
+          >
+            ✦ Doctor
+          </button>
         </div>
         {/* Kit Packs row */}
         <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
@@ -1138,6 +1156,21 @@ export function Mixer({
           </label>
         </div>
       </div>
+
+      {/* Mix Doctor panel */}
+      {doctorOpen && (
+        <div className="mb-3 rounded-lg border border-border bg-surface-2 px-3 py-3">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-[11px] font-bold text-accent">✦ Mix Doctor</span>
+            <span className="text-[10px] text-muted">Claude analyses your mix and proposes one-click fixes</span>
+          </div>
+          <MixDoctorPanel
+            getMasterSpectrum={getMasterSpectrum}
+            getLoudness={getLoudness}
+            getTruePeak={getTruePeak}
+          />
+        </div>
+      )}
 
       <div className="panel-soft rounded-xl p-3">
         <div className="flex items-start gap-3 overflow-x-auto pb-1 [scroll-snap-type:x_mandatory]">
@@ -1186,7 +1219,16 @@ export function Mixer({
 
       {/* Sound Editor modal — per-track synth params + voice swap */}
       {editingSoundId !== null && (
-        <SoundEditor trackId={editingSoundId} onClose={() => setEditingSoundId(null)} />
+        <SoundEditor
+          trackId={editingSoundId}
+          onClose={() => setEditingSoundId(null)}
+          onTrigger={() => {
+            // Preview the sound immediately after AI design applies
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("sts-track-trigger", { detail: { index: editingSoundId } }));
+            }
+          }}
+        />
       )}
     </div>
   );

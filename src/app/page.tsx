@@ -12,6 +12,7 @@ import { GroovePanel } from "@/components/GroovePanel";
 import { AutomationEditor } from "@/components/AutomationEditor";
 import { PerformanceMode } from "@/components/PerformanceMode";
 import { SampleBrowser } from "@/components/SampleBrowser";
+import { CoproducerPanel } from "@/components/CoproducerPanel";
 import { StatusBar } from "@/components/StatusBar";
 import { CommandPalette } from "@/components/CommandPalette";
 import { useAudioEngine } from "@/lib/useAudioEngine";
@@ -25,6 +26,7 @@ const TABS = [
   { id: "automation", label: "Auto" },
   { id: "performance", label: "Perf" },
   { id: "samples", label: "Samples" },
+  { id: "ai", label: "AI" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -36,6 +38,8 @@ export default function DAW() {
     getMasterMeter,
     getMasterSpectrum,
     getMasterWaveform,
+    getMasterLoudness,
+    getMasterTruePeak,
     triggerTrack,
   } = useAudioEngine();
   useKeyboardShortcuts(initAudio, triggerTrack);
@@ -170,6 +174,7 @@ export default function DAW() {
           {sidebarTab === "automation" && <AutomationEditor />}
           {sidebarTab === "performance" && <PerformanceMode />}
           {sidebarTab === "samples" && <SampleBrowser />}
+          {sidebarTab === "ai" && <CoproducerPanel />}
         </aside>
       </main>
 
@@ -207,6 +212,8 @@ export default function DAW() {
               getMasterMeter={getMasterMeter}
               getMasterSpectrum={getMasterSpectrum}
               getMasterWaveform={getMasterWaveform}
+              getLoudness={getMasterLoudness}
+              getTruePeak={getMasterTruePeak}
             />
           </div>
         )}

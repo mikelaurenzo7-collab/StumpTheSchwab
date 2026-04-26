@@ -764,6 +764,37 @@ export function useAudioEngine() {
     return masterWaveformRef.current?.getValue() ?? null;
   }, []);
 
+  // Approximate integrated loudness (LUFS-S) from the smoothed RMS meter.
+  // -1.5 dB offset is a rough K-weighting approximation. Good enough for
+  // Mix Doctor and LoudnessChip targets (±2 dB tolerance).
+  const loudnessRef = useRef(-Infinity);
+  const getMasterLoudness = useCallback((): number => {
+    const db = (() => {
+      const meter = masterMeterRef.current;
+      if (!meter) return -Infinity;
+      const val = meter.getValue();
+      return typeof val === "number" ? val : val[0];
+    })();
+    if (!Number.isFinite(db)) return -Infinity;
+    const prev = loudnessRef.current;
+    const alpha = db > prev ? 0.35 : 0.07;
+    const next = !Number.isFinite(prev) ? db : prev + alpha * (db - prev);
+    loudnessRef.current = next;
+    return next - 1.5;
+  }, []);
+
+  // True peak: max abs sample over the latest waveform buffer.
+  const getMasterTruePeak = useCallback((): number => {
+    const wave = masterWaveformRef.current?.getValue();
+    if (!wave) return -Infinity;
+    let max = 0;
+    for (let i = 0; i < wave.length; i++) {
+      const v = Math.abs(wave[i]);
+      if (v > max) max = v;
+    }
+    return max > 0 ? 20 * Math.log10(max) : -Infinity;
+  }, []);
+
   // Live trigger — used by performance keys (Q-I) to play any track on demand,
   // independent of the step sequencer. Honors the track's noteLength and
   // fires sidechain envelopes the same way the sequence does, so manual
@@ -807,6 +838,8 @@ export function useAudioEngine() {
     getMasterMeter,
     getMasterSpectrum,
     getMasterWaveform,
+    getMasterLoudness,
+    getMasterTruePeak,
     triggerTrack,
   };
 }
