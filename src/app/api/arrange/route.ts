@@ -46,6 +46,9 @@ CHAIN — return a chain array (pattern slot indices in playback order) that use
 const SECTION_ROLES = ["intro","verse","build","drop","break","fill","outro"] as const;
 const TRACK_KEYS = ["kick","snare","hihat","openhat","clap","tom","perc","bass"] as const;
 const MELODIC_KEYS = ["tom","perc","bass"] as const;
+const BEATS_PER_BAR = 4;
+const PATTERN_NAME_MAX_LENGTH = 16;
+const MAX_CHAIN_LENGTH = 16;
 
 const arrangeSongTool: Anthropic.Tool = {
   name: "arrange_song",
@@ -209,9 +212,18 @@ function accent(track: number[], positions: number[], velocity = 0.75): number[]
 }
 
 function buildFallbackArrangement(seed: SeedBeat, totalSteps: number): ArrangeResult {
-  const downbeats = Array.from({ length: Math.max(1, Math.floor(totalSteps / 4)) }, (_, i) => i * 4);
-  const backbeats = [Math.floor(totalSteps / 4), Math.floor((totalSteps * 3) / 4)];
-  const lastBar = Array.from({ length: Math.min(4, totalSteps) }, (_, i) => totalSteps - 1 - i);
+  const downbeats = Array.from(
+    { length: Math.max(1, Math.floor(totalSteps / BEATS_PER_BAR)) },
+    (_, i) => i * BEATS_PER_BAR,
+  );
+  const backbeats = [
+    Math.floor(totalSteps / BEATS_PER_BAR),
+    Math.floor((totalSteps * 3) / BEATS_PER_BAR),
+  ];
+  const lastBar = Array.from(
+    { length: Math.min(BEATS_PER_BAR, totalSteps) },
+    (_, i) => totalSteps - 1 - i,
+  );
 
   const make = (
     role: ArrangedPattern["role"],
@@ -291,9 +303,9 @@ function buildFallbackArrangement(seed: SeedBeat, totalSteps: number): ArrangeRe
 
 function normalizeArrangeResult(input: ArrangeResult, totalSteps: number): ArrangeResult {
   return {
-    patterns: input.patterns.slice(0, 7).map((pattern, index) => ({
+    patterns: input.patterns.slice(0, SECTION_ROLES.length).map((pattern, index) => ({
       role: SECTION_ROLES.includes(pattern.role) ? pattern.role : SECTION_ROLES[index],
-      name: (pattern.name || SECTION_ROLES[index]).slice(0, 16),
+      name: (pattern.name || SECTION_ROLES[index]).slice(0, PATTERN_NAME_MAX_LENGTH),
       tracks: Object.fromEntries(
         TRACK_KEYS.map((key) => [
           key,
@@ -311,8 +323,8 @@ function normalizeArrangeResult(input: ArrangeResult, totalSteps: number): Arran
       explanation: pattern.explanation || `${SECTION_ROLES[index]} variation.`,
     })),
     chain: input.chain
-      .filter((idx) => Number.isInteger(idx) && idx >= 0 && idx <= 7)
-      .slice(0, 16),
+      .filter((idx) => Number.isInteger(idx) && idx >= 0 && idx <= SECTION_ROLES.length)
+      .slice(0, MAX_CHAIN_LENGTH),
     explanation: input.explanation || "Arrangement generated.",
   };
 }

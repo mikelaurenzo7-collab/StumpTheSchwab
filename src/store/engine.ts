@@ -194,6 +194,7 @@ type StoredPatternData = {
 
 export const PATTERN_LABELS = ["A", "B", "C", "D", "E", "F", "G", "H"] as const;
 export const MAX_PATTERNS = PATTERN_LABELS.length;
+export const PATTERN_NAME_MAX_LENGTH = 16;
 
 // ── AI beat generation types ─────────────────────────────────
 // Track keys here match the order of DEFAULT_KIT in src/lib/sounds.ts.
@@ -642,7 +643,7 @@ function createEmptyPattern(name: string, trackCount: number, totalSteps: number
 
 function createPatternFromPreset(preset: PatternPreset, trackCount: number, totalSteps: number): Pattern {
   return {
-    name: preset.name.slice(0, 16),
+    name: preset.name.slice(0, PATTERN_NAME_MAX_LENGTH),
     steps: Array.from({ length: trackCount }, (_, trackIdx) =>
       Array(totalSteps).fill(0).map((_, stepIdx) => preset.tracks[trackIdx]?.[stepIdx] ?? 0)
     ),
@@ -1108,7 +1109,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
     pushHistory();
     set((state) => ({
       patterns: state.patterns.map((p, i) =>
-        i === index ? { ...p, name: name.slice(0, 16) } : p
+        i === index ? { ...p, name: name.slice(0, PATTERN_NAME_MAX_LENGTH) } : p
       ),
     }));
   },
@@ -1179,7 +1180,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         if (i === state.currentPattern) {
           return {
             ...p,
-            name: (beat.name || PATTERN_LABELS[state.currentPattern]).slice(0, 16),
+            name: (beat.name || PATTERN_LABELS[state.currentPattern]).slice(0, PATTERN_NAME_MAX_LENGTH),
             steps: snapshot.steps,
             notes: snapshot.notes,
             probabilities: snapshot.probabilities,
@@ -1252,7 +1253,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         i === slotIndex
           ? {
               ...p,
-              name: (beat.name || PATTERN_LABELS[slotIndex]).slice(0, 16),
+              name: (beat.name || PATTERN_LABELS[slotIndex]).slice(0, PATTERN_NAME_MAX_LENGTH),
               steps: newSteps,
               notes: newNotes,
               probabilities: Array.from({ length: trackCount }, () => Array(total).fill(1.0)),
@@ -1333,7 +1334,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         });
         return {
           ...p,
-          name: (beat.name || PATTERN_LABELS[slotIdx]).slice(0, 16),
+          name: (beat.name || PATTERN_LABELS[slotIdx]).slice(0, PATTERN_NAME_MAX_LENGTH),
           steps: newSteps,
           notes: newNotes,
           probabilities: Array.from({ length: trackCount }, () => Array(total).fill(1.0)),
