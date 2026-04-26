@@ -19,6 +19,7 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { useAudioEngine } from "@/lib/useAudioEngine";
 import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
 import { useAutoSave } from "@/lib/useAutoSave";
+import { useUiStore } from "@/store/ui";
 import "@/store/history";
 
 const TABS = [
@@ -145,6 +146,8 @@ export default function DAW() {
           {/* Tab content */}
           {sidebarTab === "arrange" && (
             <>
+              <QuickStartPanel />
+
               <div className="panel rounded-lg p-3">
                 <SectionHeader eyebrow="Arrange" title="Song chain" />
                 <SongChain />
@@ -164,7 +167,7 @@ export default function DAW() {
                   <li className="flex gap-2">
                     <span className="text-accent">▸</span>
                     <span>
-                      Press <kbd className="kbd">G</kbd> for AI generation.
+                      Click <strong className="text-foreground">Generate</strong> when you want a starting beat.
                     </span>
                   </li>
                 </ul>
@@ -218,7 +221,7 @@ export default function DAW() {
             </span>
           </div>
           <span className="text-[10px] font-mono text-muted">
-            {mixerOpen ? "ESC to close" : "M to toggle"}
+            {mixerOpen ? "Click to close" : "Click to open"}
           </span>
         </button>
         {mixerOpen && (
@@ -262,6 +265,47 @@ export default function DAW() {
   );
 }
 
+function QuickStartPanel() {
+  const headingId = "quick-start-heading";
+
+  return (
+    <section
+      aria-labelledby={headingId}
+      className="panel rounded-lg border-accent/35 p-3 shadow-accent-soft"
+    >
+      <SectionHeader id={headingId} eyebrow="Start here" title="Make a beat in 3 moves" />
+      <ol className="mt-2 space-y-2 text-[12px] text-soft">
+        <li className="flex gap-2">
+          <span className="text-accent">1</span>
+          <span>Click <strong className="text-foreground">Generate</strong> for an instant idea, or paint the grid yourself.</span>
+        </li>
+        <li className="flex gap-2">
+          <span className="text-accent">2</span>
+          <span>Press <strong className="text-foreground">Play</strong> to start audio, then drag steps to add or remove hits.</span>
+        </li>
+        <li className="flex gap-2">
+          <span className="text-accent">3</span>
+          <span>Double-click any lit step to shape velocity, chance, timing, and notes.</span>
+        </li>
+      </ol>
+      <div className="mt-3 flex gap-2">
+        <button
+          onClick={() => useUiStore.getState().setGeneratorOpen(true)}
+          className="button-primary flex-1 rounded-md px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em]"
+        >
+          Start with AI
+        </button>
+        <button
+          onClick={() => useUiStore.getState().setHelpOpen(true)}
+          className="button-secondary rounded-md px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em]"
+        >
+          Help
+        </button>
+      </div>
+    </section>
+  );
+}
+
 // ─── Brand mark — minimal monogram ─────────────────────────────
 function BrandMark() {
   return (
@@ -280,10 +324,15 @@ function BrandMark() {
 }
 
 // ─── Compact section header ────────────────────────────────────
-function SectionHeader({ eyebrow, title }: { eyebrow: string; title: string }) {
+function SectionHeader({ eyebrow, title, id }: { eyebrow: string; title: string; id?: string }) {
   return (
     <div className="mb-2 flex items-baseline justify-between">
-      <h2 className="text-[13px] font-bold tracking-tight text-foreground">{title}</h2>
+      <h2
+        {...(id ? { id } : {})}
+        className="text-[13px] font-bold tracking-tight text-foreground"
+      >
+        {title}
+      </h2>
       <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted">
         {eyebrow}
       </span>

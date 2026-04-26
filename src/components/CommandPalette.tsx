@@ -64,15 +64,6 @@ export function CommandPalette({ onInit }: CommandPaletteProps) {
         run: () => useEngineStore.getState().stop(),
       },
       {
-        id: "transport.tap",
-        group: "Transport",
-        label: "Tap tempo (use BPM tap button)",
-        hint: "T",
-        run: () => {
-          // No-op — actual tap is in Transport. Surface here as a hint.
-        },
-      },
-      {
         id: "transport.bpmUp",
         group: "Transport",
         label: `BPM +1 (${eng.bpm} → ${eng.bpm + 1})`,

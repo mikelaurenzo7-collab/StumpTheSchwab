@@ -10,6 +10,7 @@ import { StepDetailPopover } from "@/components/StepDetailPopover";
 // at a time, app-wide.
 type PaintMode = "paint" | "erase" | null;
 const paintState: { mode: PaintMode } = { mode: null };
+const SINGLE_CLICK_COMMIT_DELAY_MS = 350;
 
 const velLabel = (v: number) =>
   v >= 1 ? "Full" : v >= 0.75 ? "High" : v >= 0.5 ? "Med" : "Soft";
@@ -43,6 +44,13 @@ const StepCell = memo(function StepCell({
   onCtrlClick: () => void;
   beatStart: boolean;
 }) {
+  const singleClickEraseTimer = useRef<number | null>(null);
+  const clearSingleClickEraseTimer = useCallback(() => {
+    if (singleClickEraseTimer.current !== null) {
+      window.clearTimeout(singleClickEraseTimer.current);
+      singleClickEraseTimer.current = null;
+    }
+  }, []);
   const active = velocity > 0;
   const hasProb = active && probability < 1;
   const hasNudge = active && nudge !== 0;
@@ -51,11 +59,16 @@ const StepCell = memo(function StepCell({
     activeStateClass = "border-border-strong bg-surface-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_26px_rgba(0,0,0,0.26)]";
   }
 
+  useEffect(() => {
+    return clearSingleClickEraseTimer;
+  }, [clearSingleClickEraseTimer]);
+
   return (
     <button
       onMouseDown={(e) => {
         if (e.button !== 0) return;
         if (e.detail > 1) {
+          clearSingleClickEraseTimer();
           paintState.mode = null;
           return;
         }
@@ -65,11 +78,18 @@ const StepCell = memo(function StepCell({
         }
         if (active) {
           paintState.mode = "erase";
-          onErase();
         } else {
           paintState.mode = "paint";
           onPaint();
         }
+      }}
+      onClick={(e) => {
+        if (!active || e.ctrlKey || e.metaKey || e.detail > 1) return;
+        clearSingleClickEraseTimer();
+        singleClickEraseTimer.current = window.setTimeout(() => {
+          onErase();
+          singleClickEraseTimer.current = null;
+        }, SINGLE_CLICK_COMMIT_DELAY_MS);
       }}
       onMouseEnter={() => {
         if (paintState.mode === "paint" && !active) {
@@ -85,6 +105,7 @@ const StepCell = memo(function StepCell({
       }}
       onDoubleClick={(e) => {
         e.preventDefault();
+        clearSingleClickEraseTimer();
         const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
         onOpenDetail(rect);
       }}
