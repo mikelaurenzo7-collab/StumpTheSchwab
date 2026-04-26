@@ -43,7 +43,7 @@ type AudioWindow = Window &
 const STEPS = 16;
 const EMPHASIS_BOOST = 0.12;
 const BACKGROUND_DIP = -0.08;
-const MIN_TRACK_LEVEL = 0.18;
+const MIN_AUDIBLE_TRACK_LEVEL = 0.18;
 const FRACTURE_SCENE_THRESHOLD = 55;
 const FRACTURE_SCENE_INTERVAL = 5;
 const REGENERATE_DIRECTIVE_MESSAGE = "A newly generated world, ready to be sculpted into the hook.";
@@ -148,10 +148,54 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
+function getMoveLevelDelta(voice: Track["voice"], move: PerformanceMove["id"]) {
+  if (move === "lift") {
+    return voice === "pluck" || voice === "pad" || voice === "hat" ? 0.08 : -0.02;
+  }
+
+  if (move === "strip") {
+    if (voice === "kick" || voice === "snare") return 0.06;
+    if (voice === "bass") return -0.02;
+    return -0.18;
+  }
+
+  if (move === "pressure") {
+    return voice === "kick" || voice === "bass" ? 0.1 : -0.03;
+  }
+
+  return voice === "hat" || voice === "snare" || voice === "pluck" ? 0.05 : -0.01;
+}
+
+function getMoveDensityDelta(move: PerformanceMove["id"]) {
+  switch (move) {
+    case "lift":
+      return 10;
+    case "strip":
+      return -18;
+    case "pressure":
+      return 8;
+    case "glitch":
+      return 6;
+  }
+}
+
+function getMoveMacroDeltas(move: PerformanceMove["id"]) {
+  switch (move) {
+    case "lift":
+      return { bloom: 12, gravity: -6, shimmer: 16, fracture: 4 };
+    case "strip":
+      return { bloom: -8, gravity: 4, shimmer: -20, fracture: -12 };
+    case "pressure":
+      return { bloom: 4, gravity: 18, shimmer: -8, fracture: 6 };
+    case "glitch":
+      return { bloom: -4, gravity: 8, shimmer: 10, fracture: 24 };
+  }
+}
+
 function shapeTrackForMove(track: Track, move: PerformanceMove["id"], activeStep: number, trackIndex: number) {
   if (move === "lift") {
     return {
-      level: clamp(track.level + (track.voice === "pluck" || track.voice === "pad" || track.voice === "hat" ? 0.08 : -0.02), MIN_TRACK_LEVEL, 1),
+      level: clamp(track.level + getMoveLevelDelta(track.voice, move), MIN_AUDIBLE_TRACK_LEVEL, 1),
       pattern: track.pattern.map((active, index) => {
         if (track.voice === "hat") return index % 2 === 0 || active;
         if (track.voice === "pluck" || track.voice === "pad") return active || index % 4 === 2;
@@ -162,7 +206,7 @@ function shapeTrackForMove(track: Track, move: PerformanceMove["id"], activeStep
 
   if (move === "strip") {
     return {
-      level: clamp(track.level + (track.voice === "kick" || track.voice === "snare" ? 0.06 : track.voice === "bass" ? -0.02 : -0.18), MIN_TRACK_LEVEL, 1),
+      level: clamp(track.level + getMoveLevelDelta(track.voice, move), MIN_AUDIBLE_TRACK_LEVEL, 1),
       pattern: track.pattern.map((active, index) => {
         if (track.voice === "kick") return index % 4 === 0;
         if (track.voice === "snare") return index === 4 || index === 12;
@@ -175,7 +219,7 @@ function shapeTrackForMove(track: Track, move: PerformanceMove["id"], activeStep
 
   if (move === "pressure") {
     return {
-      level: clamp(track.level + (track.voice === "kick" || track.voice === "bass" ? 0.1 : -0.03), MIN_TRACK_LEVEL, 1),
+      level: clamp(track.level + getMoveLevelDelta(track.voice, move), MIN_AUDIBLE_TRACK_LEVEL, 1),
       pattern: track.pattern.map((active, index) => {
         if (track.voice === "bass") return index % 4 === 0 || index % 8 === 3 || index % 8 === 6;
         if (track.voice === "kick") return index % 4 === 0 || index === 7 || index === 15;
@@ -186,7 +230,7 @@ function shapeTrackForMove(track: Track, move: PerformanceMove["id"], activeStep
   }
 
   return {
-    level: clamp(track.level + (track.voice === "hat" || track.voice === "snare" || track.voice === "pluck" ? 0.05 : -0.01), MIN_TRACK_LEVEL, 1),
+    level: clamp(track.level + getMoveLevelDelta(track.voice, move), MIN_AUDIBLE_TRACK_LEVEL, 1),
     pattern: track.pattern.map((active, index) => {
       if (index === activeStep) return true;
       if (track.voice === "hat" && index % 2 === 1) return true;
@@ -379,7 +423,7 @@ export default function Home() {
 
       return {
         ...track,
-        level: clamp(baseline + (preset.emphasis.includes(track.voice) ? EMPHASIS_BOOST : BACKGROUND_DIP), MIN_TRACK_LEVEL, 1),
+        level: clamp(baseline + (preset.emphasis.includes(track.voice) ? EMPHASIS_BOOST : BACKGROUND_DIP), MIN_AUDIBLE_TRACK_LEVEL, 1),
         pattern: makeScenePattern(track, preset, trackIndex),
       };
     }));
@@ -393,14 +437,15 @@ export default function Home() {
   };
 
   const applyMove = (move: PerformanceMove) => {
+    const macroDeltas = getMoveMacroDeltas(move.id);
     setLastMove(move.label);
     setDirective(move.directive);
-    setDensity((current) => clamp(current + (move.id === "strip" ? -18 : move.id === "lift" ? 10 : move.id === "pressure" ? 8 : 6), 12, 96));
+    setDensity((current) => clamp(current + getMoveDensityDelta(move.id), 12, 96));
     setMacros((current) => ({
-      bloom: clamp(current.bloom + (move.id === "lift" ? 12 : move.id === "strip" ? -8 : move.id === "pressure" ? 4 : -4), 0, 100),
-      gravity: clamp(current.gravity + (move.id === "lift" ? -6 : move.id === "strip" ? 4 : move.id === "pressure" ? 18 : 8), 0, 100),
-      shimmer: clamp(current.shimmer + (move.id === "lift" ? 16 : move.id === "strip" ? -20 : move.id === "pressure" ? -8 : 10), 0, 100),
-      fracture: clamp(current.fracture + (move.id === "lift" ? 4 : move.id === "strip" ? -12 : move.id === "pressure" ? 6 : 24), 0, 100),
+      bloom: clamp(current.bloom + macroDeltas.bloom, 0, 100),
+      gravity: clamp(current.gravity + macroDeltas.gravity, 0, 100),
+      shimmer: clamp(current.shimmer + macroDeltas.shimmer, 0, 100),
+      fracture: clamp(current.fracture + macroDeltas.fracture, 0, 100),
     }));
     setTracks((current) => current.map((track, trackIndex) => {
       const shaped = shapeTrackForMove(track, move.id, step, trackIndex);
@@ -417,7 +462,7 @@ export default function Home() {
     return tracks.reduce((leader, track) => {
       const score = track.pattern.filter(Boolean).length * track.level;
       return score > leader.score ? { name: track.name, voice: track.voice, score } : leader;
-    }, { name: tracks[0]?.name ?? "Pulse Engine", voice: tracks[0]?.voice ?? "kick", score: 0 });
+    }, { name: tracks[0]?.name ?? initialTracks[0].name, voice: tracks[0]?.voice ?? initialTracks[0].voice, score: 0 });
   }, [tracks]);
 
   return (
