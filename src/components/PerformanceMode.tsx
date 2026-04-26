@@ -221,9 +221,10 @@ export function PerformanceMode() {
               No scenes yet. Create your first scene to start performing.
             </div>
           ) : (
-            scenes.map((scene) => {
+            scenes.map((scene, sceneIdx) => {
               const isActive = activeScenes.has(scene.id);
               const isPlaying = playbackState === "playing";
+              const shortcutLabel = sceneIdx < 8 ? `⇧${sceneIdx + 1}` : null;
 
               return (
                 <div
@@ -237,6 +238,7 @@ export function PerformanceMode() {
                   <button
                     onClick={() => handleTrigger(scene.id)}
                     disabled={!isPlaying}
+                    title={!isPlaying ? "Press Play first to trigger scenes" : isActive ? "Stop scene" : "Trigger scene"}
                     className={`flex h-12 w-12 items-center justify-center rounded font-bold transition-all ${
                       !isPlaying
                         ? "cursor-not-allowed bg-surface-3 text-white/30"
@@ -249,7 +251,14 @@ export function PerformanceMode() {
                   </button>
 
                   <div className="flex-1">
-                    <div className="text-sm font-medium text-foreground">{scene.name}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm font-medium text-foreground">{scene.name}</div>
+                      {shortcutLabel && (
+                        <kbd className="rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[9px] text-foreground/50" title={`Keyboard shortcut: Shift+${sceneIdx + 1}`}>
+                          {shortcutLabel}
+                        </kbd>
+                      )}
+                    </div>
                     <div className="mt-1 flex items-center gap-2 text-xs text-muted">
                       <span>
                         {scene.patternSlots.filter((s) => s !== null).length}{" "}
@@ -295,7 +304,7 @@ export function PerformanceMode() {
           <li>Scenes trigger patterns across multiple tracks simultaneously</li>
           <li>Press play first, then click scene buttons to trigger</li>
           <li>Click again to stop a scene</li>
-          <li>Use keyboard 1-8 to trigger first 8 scenes (coming soon)</li>
+          <li>Hold <kbd className="rounded bg-surface-3 px-1 py-0.5 font-mono text-[9px] text-foreground/70">⇧</kbd> + <kbd className="rounded bg-surface-3 px-1 py-0.5 font-mono text-[9px] text-foreground/70">1–8</kbd> to trigger scenes by keyboard</li>
         </ul>
       </div>
     </div>

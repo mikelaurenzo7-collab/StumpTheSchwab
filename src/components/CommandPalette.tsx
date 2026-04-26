@@ -5,6 +5,7 @@ import { useEngineStore, MAX_PATTERNS } from "@/store/engine";
 import { useUiStore } from "@/store/ui";
 import { useHistoryStore } from "@/store/history";
 import { useExport } from "@/lib/useExport";
+import { useMidiExport } from "@/lib/useMidiExport";
 
 interface CommandPaletteProps {
   onInit: () => Promise<void>;
@@ -28,7 +29,8 @@ const PATTERN_LETTERS = "ABCDEFGH";
 export function CommandPalette({ onInit }: CommandPaletteProps) {
   const open = useUiStore((s) => s.paletteOpen);
   const setOpen = useUiStore((s) => s.setPaletteOpen);
-  const { exportWAV } = useExport();
+  const { exportWAV, exportStems } = useExport();
+  const { exportMidi } = useMidiExport();
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -133,11 +135,38 @@ export function CommandPalette({ onInit }: CommandPaletteProps) {
         },
       },
       {
+        id: "export.stems",
+        group: "Export",
+        label: "Export stems as WAV (2× loops)",
+        keywords: "render bounce stems tracks",
+        run: () => {
+          setOpen(false);
+          void exportStems({ loops: 2, renderMode: "fx-post-fader", includeMasterPrint: true });
+        },
+      },
+      {
+        id: "export.midi",
+        group: "Export",
+        label: "Export pattern as MIDI",
+        keywords: "midi smf daw import",
+        run: () => {
+          setOpen(false);
+          void exportMidi();
+        },
+      },
+      {
         id: "song.toggle",
         group: "Song",
         label: eng.songMode ? "Disable song mode" : "Enable song mode",
         keywords: "chain arrange",
         run: () => useEngineStore.getState().setSongMode(!useEngineStore.getState().songMode),
+      },
+      {
+        id: "perf.toggle",
+        group: "Performance",
+        label: eng.performanceMode ? "Disable performance mode" : "Enable performance mode",
+        keywords: "scene live launch trigger",
+        run: () => useEngineStore.getState().setPerformanceMode(!useEngineStore.getState().performanceMode),
       },
     ];
 
@@ -165,7 +194,7 @@ export function CommandPalette({ onInit }: CommandPaletteProps) {
     });
 
     return acts;
-  }, [open, onInit, exportWAV, setOpen]);
+  }, [open, onInit, exportWAV, exportStems, exportMidi, setOpen]);
 
   // Fuzzy filter — simple substring across label + keywords + group.
   const filtered = useMemo(() => {
