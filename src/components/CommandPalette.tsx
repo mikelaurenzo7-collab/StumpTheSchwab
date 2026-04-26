@@ -117,6 +117,28 @@ export function CommandPalette({ onInit }: CommandPaletteProps) {
         run: () => ui.setGeneratorOpen(true),
       },
       {
+        id: "view.matrix",
+        group: "View",
+        label: "Open Pattern Matrix",
+        keywords: "clip launcher grid patterns",
+        run: () => window.dispatchEvent(new CustomEvent("sts-focus-tab", { detail: "matrix" })),
+      },
+      {
+        id: "view.fill",
+        group: "View",
+        label: "Open Fill Engine",
+        hint: "F",
+        keywords: "drum fill break build drop ghost",
+        run: () => window.dispatchEvent(new CustomEvent("sts-focus-tab", { detail: "fill" })),
+      },
+      {
+        id: "view.mix",
+        group: "View",
+        label: "Open AutoMix Panel",
+        keywords: "ai mix balance master",
+        run: () => window.dispatchEvent(new CustomEvent("sts-focus-tab", { detail: "mix" })),
+      },
+      {
         id: "view.help",
         group: "View",
         label: ui.helpOpen ? "Close help overlay" : "Open help overlay",

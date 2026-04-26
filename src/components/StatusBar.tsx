@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useEngineStore, MAX_PATTERNS, LOUDNESS_TARGETS, type LoudnessTarget } from "@/store/engine";
+import { useEngineStore, MAX_PATTERNS } from "@/store/engine";
 import { useUiStore } from "@/store/ui";
 import * as Tone from "tone";
+import type { MidiStatus } from "@/lib/useMidi";
 
 interface StatusBarProps {
   getMasterMeter: () => number;
-  getMasterWaveform?: () => Float32Array | null;
+  midiStatus?: MidiStatus;
 }
 
 const PATTERN_LETTERS = "ABCDEFGH";
@@ -17,36 +18,26 @@ const PATTERN_LETTERS = "ABCDEFGH";
  * Shows: audio context state, BPM, pattern, playhead, master peak (peak-hold),
  * and a Cmd+K hint to open the command palette.
  */
-export function StatusBar({ getMasterMeter, getMasterWaveform }: StatusBarProps) {
+export function StatusBar({ getMasterMeter, midiStatus }: StatusBarProps) {
   const bpm = useEngineStore((s) => s.bpm);
   const playbackState = useEngineStore((s) => s.playbackState);
   const currentPattern = useEngineStore((s) => s.currentPattern);
   const currentStep = useEngineStore((s) => s.currentStep);
   const songMode = useEngineStore((s) => s.songMode);
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
+  const setMidiOpen = useUiStore((s) => s.setMidiOpen);
   const tracks = useEngineStore((s) => s.tracks);
   const totalSteps = tracks[0]?.steps.length ?? 16;
-  const loudnessTarget = useEngineStore((s) => s.master.loudnessTarget);
-  const setMaster = useEngineStore((s) => s.setMaster);
 
   const [peakDb, setPeakDb] = useState(-Infinity);
   const [peakHold, setPeakHold] = useState(-Infinity);
   const [audioState, setAudioState] = useState<AudioContextState | "uninit">("uninit");
-  const [loudness, setLoudness] = useState(-Infinity);
-  const [truePeak, setTruePeak] = useState(-Infinity);
   const peakHoldRef = useRef({ value: -Infinity, expires: 0 });
-  const loudnessRef = useRef(-Infinity);
 
   // Animate peak meter at ~30fps. Decay toward floor; hold true peak for 1s.
-  // We also derive a LUFS-S-style integrated loudness from a slow-following
-  // exponential filter on the master RMS, plus a true-peak reading from the
-  // waveform's max sample. This is approximate (no K-weighting filter), but
-  // the verdict bands tolerate ±2 dB, which is well inside our error margin
-  // versus a real ITU-R BS.1770-4 measurement.
   useEffect(() => {
     let raf = 0;
     let last = 0;
-    let loudnessLast = 0;
     const tick = (t: number) => {
       raf = requestAnimationFrame(tick);
       if (t - last < 33) return;
@@ -60,34 +51,6 @@ export function StatusBar({ getMasterMeter, getMasterWaveform }: StatusBarProps)
           setPeakHold(db);
         }
       }
-
-      // Loudness follower: ~3-second time constant on the RMS meter.
-      // Only tick at ~10 Hz (every 100 ms) so it doesn't dance per-frame.
-      if (t - loudnessLast > 100 && Number.isFinite(db)) {
-        loudnessLast = t;
-        const prev = loudnessRef.current;
-        const target = db;
-        // Exponential follower; fast attack on rising signal, slow on falling.
-        const alpha = target > prev ? 0.35 : 0.07;
-        const next = !Number.isFinite(prev) ? target : prev + alpha * (target - prev);
-        loudnessRef.current = next;
-        // Approximate LUFS by adding a -1.5 dB K-weighting offset (rough).
-        setLoudness(next - 1.5);
-      }
-
-      // True peak from waveform — max abs sample over the last buffer.
-      if (getMasterWaveform) {
-        const wave = getMasterWaveform();
-        if (wave) {
-          let max = 0;
-          for (let i = 0; i < wave.length; i++) {
-            const v = Math.abs(wave[i]);
-            if (v > max) max = v;
-          }
-          setTruePeak(max > 0 ? 20 * Math.log10(max) : -Infinity);
-        }
-      }
-
       // Reflect Tone audio context state when changed.
       try {
         const ctxState = Tone.getContext().state as AudioContextState;
@@ -98,7 +61,7 @@ export function StatusBar({ getMasterMeter, getMasterWaveform }: StatusBarProps)
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [getMasterMeter, getMasterWaveform]);
+  }, [getMasterMeter]);
 
   const peakColor =
     peakHold > -1
@@ -108,8 +71,6 @@ export function StatusBar({ getMasterMeter, getMasterWaveform }: StatusBarProps)
         : peakHold > -24
           ? "text-foreground"
           : "text-muted";
-
-  const clipping = peakHold > -1;
 
   const peakLabel = !Number.isFinite(peakDb) ? "—∞" : `${peakDb.toFixed(1)}`;
   const holdLabel = !Number.isFinite(peakHold) ? "—∞" : `${peakHold.toFixed(1)}`;
@@ -167,19 +128,31 @@ export function StatusBar({ getMasterMeter, getMasterWaveform }: StatusBarProps)
       </div>
 
       <div className="flex items-center gap-3">
-        <LoudnessChip
-          loudness={loudness}
-          truePeak={truePeak}
-          target={loudnessTarget}
-          onTargetChange={(v) => setMaster("loudnessTarget", v)}
-        />
-        <span className="opacity-40">·</span>
         <div className="flex items-center gap-2">
           <span className="text-soft">PEAK</span>
           <PeakMeter db={peakDb} />
-          <span className={`tabular-nums ${peakColor}${clipping ? " animate-clip-pulse" : ""}`}>{peakLabel}</span>
+          <span className={`tabular-nums ${peakColor}`}>{peakLabel}</span>
           <span className="text-muted/70">/ hold {holdLabel}</span>
         </div>
+        <button
+          type="button"
+          onClick={() => setMidiOpen(true)}
+          className={`flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] transition-colors ${
+            midiStatus?.enabled
+              ? "border-accent/50 text-accent"
+              : "border-border bg-surface-2 text-soft hover:border-accent hover:text-accent"
+          }`}
+          title={
+            midiStatus?.enabled
+              ? `MIDI: ${midiStatus.inputs.length} device${midiStatus.inputs.length === 1 ? "" : "s"}`
+              : "Enable MIDI input (⌘M)"
+          }
+        >
+          <span>MIDI</span>
+          {midiStatus?.enabled && (
+            <span className="font-mono">{midiStatus.inputs.length}</span>
+          )}
+        </button>
         <button
           type="button"
           onClick={() => setPaletteOpen(true)}
@@ -190,87 +163,6 @@ export function StatusBar({ getMasterMeter, getMasterWaveform }: StatusBarProps)
           <span>K</span>
         </button>
       </div>
-    </div>
-  );
-}
-
-// ── Loudness chip ────────────────────────────────────────────────────────────
-// Compact LUFS-S + True Peak reading with a verdict against the chosen
-// streaming target. Click the target name to cycle through platforms.
-const TARGET_ORDER: LoudnessTarget[] = ["spotify", "apple", "youtube", "club", "off"];
-
-function LoudnessChip({
-  loudness,
-  truePeak,
-  target,
-  onTargetChange,
-}: {
-  loudness: number;
-  truePeak: number;
-  target: LoudnessTarget;
-  onTargetChange: (t: LoudnessTarget) => void;
-}) {
-  const lufsLabel = !Number.isFinite(loudness) ? "—∞" : loudness.toFixed(1);
-  const tpLabel = !Number.isFinite(truePeak) ? "—∞" : truePeak.toFixed(1);
-  const cfg = target !== "off" ? LOUDNESS_TARGETS[target] : null;
-
-  // Verdict colour: green within ±1 LUFS of target, amber within ±3, red beyond.
-  let verdictColor = "text-muted";
-  let verdict = "";
-  if (cfg && Number.isFinite(loudness)) {
-    const delta = loudness - cfg.lufs;
-    const absDelta = Math.abs(delta);
-    if (absDelta <= 1) {
-      verdictColor = "text-emerald-400";
-      verdict = "on target";
-    } else if (absDelta <= 3) {
-      verdictColor = "text-amber-300";
-      verdict = delta > 0 ? "loud" : "quiet";
-    } else {
-      verdictColor = "text-red-400";
-      verdict = delta > 0 ? "too loud" : "too quiet";
-    }
-  }
-
-  // True peak warning: anything above the platform ceiling is dangerous.
-  const tpWarn = cfg && Number.isFinite(truePeak) && truePeak > cfg.tp;
-  const tpClip = Number.isFinite(truePeak) && truePeak > 0;
-
-  const cycle = () => {
-    const idx = TARGET_ORDER.indexOf(target);
-    onTargetChange(TARGET_ORDER[(idx + 1) % TARGET_ORDER.length]);
-  };
-
-  return (
-    <div className="flex items-center gap-2" title="Loudness vs streaming target">
-      <button
-        type="button"
-        onClick={cycle}
-        className="rounded border border-border bg-surface-2 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-soft transition-colors hover:border-accent hover:text-accent"
-      >
-        {target === "off" ? "OFF" : cfg?.label ?? target}
-      </button>
-      <span className="tabular-nums text-foreground">{lufsLabel}</span>
-      <span className="text-muted/70 text-[9px]">LUFS</span>
-      {cfg && (
-        <span className="text-muted/70 text-[9px]">
-          tgt {cfg.lufs}
-        </span>
-      )}
-      {verdict && (
-        <span className={`text-[9px] uppercase tracking-wider ${verdictColor}`}>
-          {verdict}
-        </span>
-      )}
-      <span className="opacity-30">|</span>
-      <span className="text-soft text-[9px]">TP</span>
-      <span
-        className={`tabular-nums ${
-          tpClip ? "text-red-400" : tpWarn ? "text-amber-300" : "text-foreground"
-        }`}
-      >
-        {tpLabel}
-      </span>
     </div>
   );
 }

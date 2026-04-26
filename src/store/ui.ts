@@ -12,6 +12,10 @@ interface UiState {
   paletteOpen: boolean;
   setPaletteOpen: (on: boolean) => void;
   togglePalette: () => void;
+
+  midiOpen: boolean;
+  setMidiOpen: (on: boolean) => void;
+  toggleMidi: () => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -26,4 +30,8 @@ export const useUiStore = create<UiState>((set) => ({
   paletteOpen: false,
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   togglePalette: () => set((s) => ({ paletteOpen: !s.paletteOpen })),
+
+  midiOpen: false,
+  setMidiOpen: (midiOpen) => set({ midiOpen }),
+  toggleMidi: () => set((s) => ({ midiOpen: !s.midiOpen })),
 }));

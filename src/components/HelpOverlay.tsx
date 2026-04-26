@@ -28,7 +28,6 @@ const SHORTCUTS: ShortcutGroup[] = [
     title: "Step editing",
     items: [
       { keys: ["Click"], label: "Toggle step on/off (drag to paint)" },
-      { keys: ["Double-click"], label: "Open step detail without changing the hit" },
       { keys: ["Right-click"], label: "Open step detail (velocity, probability, nudge)" },
       { keys: ["Ctrl/⌘ + Click"], label: "Cycle step probability" },
     ],
@@ -36,11 +35,11 @@ const SHORTCUTS: ShortcutGroup[] = [
   {
     title: "Track tools",
     items: [
-      { keys: ["Copy"], label: "Copy track pattern" },
-      { keys: ["Paste"], label: "Paste track pattern" },
-      { keys: ["Feel"], label: "Humanize this track" },
-      { keys: ["Fill"], label: "Euclidean fill" },
-      { keys: ["Clear"], label: "Clear track" },
+      { keys: ["Hover", "→", "C"], label: "Copy track pattern" },
+      { keys: ["Hover", "→", "P"], label: "Paste track pattern" },
+      { keys: ["Hover", "→", "~"], label: "Humanize this track" },
+      { keys: ["Hover", "→", "E"], label: "Euclidean fill" },
+      { keys: ["Hover", "→", "✕"], label: "Clear track" },
     ],
   },
   {
@@ -56,7 +55,6 @@ const SHORTCUTS: ShortcutGroup[] = [
     items: [
       { keys: ["Q", "W", "E", "R"], label: "Trigger tracks 1–4" },
       { keys: ["T", "Y", "U", "I"], label: "Trigger tracks 5–8" },
-      { keys: ["⇧1", "–", "⇧8"], label: "Trigger scenes 1–8 (Perf Mode)" },
     ],
   },
   {
@@ -64,8 +62,17 @@ const SHORTCUTS: ShortcutGroup[] = [
     items: [
       { keys: ["G"], label: "Generate beat with Claude" },
       { keys: ["H"], label: "Humanize all tracks" },
-      { keys: ["Ctrl/⌘ + K"], label: "Open command palette" },
+      { keys: ["F"], label: "Open Fill Engine panel" },
       { keys: ["?"], label: "Toggle this help overlay" },
+    ],
+  },
+  {
+    title: "New Features",
+    items: [
+      { keys: ["Matrix"], label: "Pattern launcher grid — live-launch clips" },
+      { keys: ["Fill"], label: "Smart fills, breaks, builds, drops, ghost notes" },
+      { keys: ["Mix"], label: "AI AutoMix — frequency-aware intelligent mixing" },
+      { keys: ["3D"], label: "WebGL 3D spectrum visualizer in mixer" },
     ],
   },
 ];
@@ -128,7 +135,7 @@ export function HelpOverlay() {
               </div>
 
               <div className="panel-soft rounded-lg p-3 text-[11px] leading-relaxed text-muted">
-                Double-click or right-click a lit step for micro edits. Ctrl or ⌘ click cycles chance. Drag across the grid to paint rhythm quickly.
+                Right-click a step for micro edits. Ctrl or Cmd click cycles chance. Drag across the grid to paint rhythm quickly.
               </div>
             </div>
           </aside>
