@@ -222,7 +222,7 @@ function buildFallbackArrangement(seed: SeedBeat, totalSteps: number): ArrangeRe
   );
   const backbeats = [
     Math.floor(totalSteps / BEATS_PER_BAR),
-    Math.floor((totalSteps * 3) / BEATS_PER_BAR),
+    Math.floor(totalSteps / 2) + Math.floor(totalSteps / BEATS_PER_BAR),
   ];
   const lastBar = Array.from(
     { length: Math.min(BEATS_PER_BAR, totalSteps) },
@@ -397,7 +397,7 @@ export async function POST(req: NextRequest) {
     }
 
     const normalized = normalizeArrangeResult(toolUse.input as ArrangeResult, totalSteps);
-    if (normalized.patterns.length !== 7 || normalized.chain.length === 0) {
+    if (normalized.patterns.length !== SECTION_ROLES.length || normalized.chain.length === 0) {
       return NextResponse.json({ ...fallback, fallback: true });
     }
 
