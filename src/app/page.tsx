@@ -144,7 +144,7 @@ export default function DAW() {
           </div>
 
           {/* Tab content */}
-           {sidebarTab === "arrange" && (
+          {sidebarTab === "arrange" && (
             <>
               <QuickStartPanel />
 
