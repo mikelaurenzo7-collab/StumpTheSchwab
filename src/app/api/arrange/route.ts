@@ -44,6 +44,15 @@ CHAIN — return a chain array (pattern slot indices in playback order) that use
 // ── Tool ────────────────────────────────────────────────────────────────────────
 
 const SECTION_ROLES = ["intro","verse","build","drop","break","fill","outro"] as const;
+const TRACK_KEYS = ["kick","snare","hihat","openhat","clap","tom","perc","bass"] as const;
+const MELODIC_KEYS = ["tom","perc","bass"] as const;
+const BEATS_PER_BAR = 4;
+const PATTERN_NAME_MAX_LENGTH = 16;
+const MAX_CHAIN_LENGTH = 16;
+// Claude/local arranger chain IDs use 0 for the seed pattern and 1..7 for arranged sections.
+const ARRANGE_CHAIN_SLOT_COUNT = SECTION_ROLES.length + 1;
+const BUILD_HIHAT_DOWNBEAT_VELOCITY = 0.5;
+const BUILD_HIHAT_OFFBEAT_VELOCITY = 0.25;
 
 const arrangeSongTool: Anthropic.Tool = {
   name: "arrange_song",
@@ -132,13 +141,204 @@ function isArrangeResult(v: unknown): v is ArrangeResult {
   );
 }
 
+type TrackKey = typeof TRACK_KEYS[number];
+type MelodicKey = typeof MELODIC_KEYS[number];
+
+interface SeedBeat {
+  name?: string;
+  tracks: Record<TrackKey, number[]>;
+  melodicNotes: Record<MelodicKey, string[]>;
+}
+
+function clampVelocity(v: unknown): number {
+  const n = typeof v === "number" && Number.isFinite(v) ? v : 0;
+  return Math.max(0, Math.min(1, n));
+}
+
+function resize<T>(src: T[] | undefined, length: number, fill: T): T[] {
+  return Array.from({ length }, (_, i) => (src?.[i] !== undefined ? src[i] : fill));
+}
+
+function parseSeed(seedJson: string, totalSteps: number): SeedBeat | null {
+  try {
+    const raw = JSON.parse(seedJson) as Record<string, unknown>;
+    const tracksRaw = raw.tracks as Partial<Record<TrackKey, unknown[]>> | undefined;
+    const notesRaw = raw.melodicNotes as Partial<Record<MelodicKey, unknown[]>> | undefined;
+    if (!tracksRaw || typeof tracksRaw !== "object") return null;
+
+    const tracks = Object.fromEntries(
+      TRACK_KEYS.map((key) => [
+        key,
+        resize(tracksRaw[key], totalSteps, 0).map(clampVelocity),
+      ]),
+    ) as Record<TrackKey, number[]>;
+    const melodicNotes = Object.fromEntries(
+      MELODIC_KEYS.map((key) => [
+        key,
+        resize(notesRaw?.[key], totalSteps, "").map((note) =>
+          typeof note === "string" ? note : "",
+        ),
+      ]),
+    ) as Record<MelodicKey, string[]>;
+
+    return {
+      name: typeof raw.name === "string" ? raw.name : undefined,
+      tracks,
+      melodicNotes,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function quantizeVelocity(v: number): number {
+  if (v <= 0) return 0;
+  if (v < 0.375) return 0.25;
+  if (v < 0.625) return 0.5;
+  if (v < 0.875) return 0.75;
+  return 1;
+}
+
+function scaleTrack(track: number[], factor: number, every = 1): number[] {
+  return track.map((v, i) => {
+    if (v <= 0 || i % every !== 0) return 0;
+    return quantizeVelocity(v * factor);
+  });
+}
+
+function accent(track: number[], positions: number[], velocity = 0.75): number[] {
+  const next = [...track];
+  positions.forEach((pos) => {
+    const idx = ((pos % next.length) + next.length) % next.length;
+    next[idx] = Math.max(next[idx], velocity);
+  });
+  return next;
+}
+
+function buildFallbackArrangement(seed: SeedBeat, totalSteps: number): ArrangeResult {
+  const downbeats = Array.from(
+    { length: Math.max(1, Math.floor(totalSteps / BEATS_PER_BAR)) },
+    (_, i) => i * BEATS_PER_BAR,
+  );
+  const backbeats = [
+    Math.floor(totalSteps / BEATS_PER_BAR),
+    Math.floor(totalSteps / 2) + Math.floor(totalSteps / BEATS_PER_BAR),
+  ];
+  const lastBar = Array.from(
+    { length: Math.min(BEATS_PER_BAR, totalSteps) },
+    (_, i) => totalSteps - 1 - i,
+  );
+
+  const make = (
+    role: ArrangedPattern["role"],
+    name: string,
+    mutate: (tracks: SeedBeat["tracks"]) => SeedBeat["tracks"],
+    explanation: string,
+  ): ArrangedPattern => ({
+    role,
+    name,
+    tracks: mutate(seed.tracks),
+    melodicNotes: {
+      tom: [...seed.melodicNotes.tom],
+      perc: [...seed.melodicNotes.perc],
+      bass: [...seed.melodicNotes.bass],
+    },
+    explanation,
+  });
+
+  const patterns: ArrangedPattern[] = [
+    make("intro", "Intro", (t) => ({
+      ...t,
+      kick: scaleTrack(t.kick, 0.5, 2),
+      snare: scaleTrack(t.snare, 0.5, 2),
+      hihat: scaleTrack(t.hihat, 0.45, 2),
+      openhat: scaleTrack(t.openhat, 0.4, 2),
+      bass: scaleTrack(t.bass, 0.45, 2),
+    }), "Sparse opener that keeps the seed's identity while leaving space."),
+    make("verse", "Verse", (t) => ({
+      ...t,
+      openhat: scaleTrack(t.openhat, 0.6, 2),
+      perc: scaleTrack(t.perc, 0.7, 2),
+    }), "Close seed variation for the main groove."),
+    make("build", "Build", (t) => ({
+      ...t,
+      kick: accent(t.kick, downbeats, 0.85),
+      snare: accent(t.snare, backbeats, 0.9),
+      hihat: t.hihat.map((v, i) =>
+        quantizeVelocity(Math.max(v, i % 2 === 0 ? BUILD_HIHAT_DOWNBEAT_VELOCITY : BUILD_HIHAT_OFFBEAT_VELOCITY))
+      ),
+      perc: accent(t.perc, lastBar, 0.75),
+    }), "Adds hat motion and end-bar tension before the drop."),
+    make("drop", "Drop", (t) => ({
+      ...t,
+      kick: accent(t.kick, downbeats, 1),
+      snare: accent(t.snare, backbeats, 1),
+      clap: accent(t.clap, backbeats, 0.85),
+      openhat: accent(t.openhat, downbeats.map((d) => d + 2), 0.75),
+      bass: accent(t.bass, downbeats, 0.9),
+    }), "Peak-energy section with reinforced drums and bass."),
+    make("break", "Break", (t) => ({
+      ...t,
+      kick: scaleTrack(t.kick, 0.4, 4),
+      bass: scaleTrack(t.bass, 0.5, 2),
+      hihat: scaleTrack(t.hihat, 0.6, 2),
+      perc: accent(scaleTrack(t.perc, 0.7, 2), [totalSteps - 2], 0.7),
+    }), "Stripped break that breathes before the groove returns."),
+    make("fill", "Fill", (t) => ({
+      ...t,
+      snare: accent(t.snare, lastBar, 0.75),
+      tom: accent(t.tom, lastBar, 0.8),
+      perc: accent(t.perc, lastBar, 0.7),
+    }), "Transition fill with last-bar movement."),
+    make("outro", "Outro", (t) => ({
+      ...t,
+      kick: scaleTrack(t.kick, 0.45, 2),
+      snare: scaleTrack(t.snare, 0.45, 2),
+      hihat: scaleTrack(t.hihat, 0.35, 2),
+      openhat: scaleTrack(t.openhat, 0.35, 4),
+      bass: scaleTrack(t.bass, 0.35, 4),
+    }), "Low-density ending that tails the arrangement off cleanly."),
+  ];
+
+  return {
+    patterns,
+    // Seed → verse x2 → build → drop x2 → break → drop → fill → outro.
+    chain: [0, 1, 1, 2, 3, 3, 4, 3, 5, 6, 7],
+    explanation: "Local arranger built a complete intro-to-outro chain from the seed pattern, with energy rising into the drop and resolving through fill and outro.",
+  };
+}
+
+function normalizeArrangeResult(input: ArrangeResult, totalSteps: number): ArrangeResult {
+  return {
+    patterns: input.patterns.slice(0, SECTION_ROLES.length).map((pattern, index) => ({
+      role: SECTION_ROLES.includes(pattern.role) ? pattern.role : SECTION_ROLES[index],
+      name: (pattern.name || SECTION_ROLES[index]).slice(0, PATTERN_NAME_MAX_LENGTH),
+      tracks: Object.fromEntries(
+        TRACK_KEYS.map((key) => [
+          key,
+          resize(pattern.tracks?.[key], totalSteps, 0).map(clampVelocity),
+        ]),
+      ) as ArrangedPattern["tracks"],
+      melodicNotes: Object.fromEntries(
+        MELODIC_KEYS.map((key) => [
+          key,
+          resize(pattern.melodicNotes?.[key], totalSteps, "").map((note) =>
+            typeof note === "string" ? note : "",
+          ),
+        ]),
+      ) as ArrangedPattern["melodicNotes"],
+      explanation: pattern.explanation || `${SECTION_ROLES[index]} variation.`,
+    })),
+    chain: input.chain
+      .filter((idx) => Number.isInteger(idx) && idx >= 0 && idx < ARRANGE_CHAIN_SLOT_COUNT)
+      .slice(0, MAX_CHAIN_LENGTH),
+    explanation: input.explanation || "Arrangement generated.",
+  };
+}
+
 // ── Route ───────────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set." }, { status: 503 });
-  }
-
   let body: unknown;
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 }); }
@@ -155,6 +355,19 @@ export async function POST(req: NextRequest) {
 
   if (!seedJson) {
     return NextResponse.json({ error: "Seed beat (pattern A) is required." }, { status: 400 });
+  }
+  const seed = parseSeed(seedJson, totalSteps);
+  if (!seed) {
+    return NextResponse.json({ error: "Seed beat could not be parsed." }, { status: 400 });
+  }
+
+  const fallback = buildFallbackArrangement(seed, totalSteps);
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json({
+      ...fallback,
+      fallback: true,
+      warning: "ANTHROPIC_API_KEY is not set, so a local arrangement was generated.",
+    });
   }
 
   const client = new Anthropic();
@@ -183,8 +396,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Model did not return an arrangement." }, { status: 502 });
     }
 
+    const normalized = normalizeArrangeResult(toolUse.input as ArrangeResult, totalSteps);
+    if (normalized.patterns.length !== SECTION_ROLES.length || normalized.chain.length === 0) {
+      return NextResponse.json({ ...fallback, fallback: true });
+    }
+
     return NextResponse.json({
-      ...(toolUse.input as ArrangeResult),
+      ...normalized,
       usage: {
         input_tokens:                response.usage.input_tokens,
         output_tokens:               response.usage.output_tokens,
@@ -193,15 +411,10 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    if (error instanceof Anthropic.AuthenticationError) {
-      return NextResponse.json({ error: "Invalid ANTHROPIC_API_KEY." }, { status: 401 });
-    }
-    if (error instanceof Anthropic.RateLimitError) {
-      return NextResponse.json({ error: "Rate limited. Wait a moment." }, { status: 429 });
-    }
-    if (error instanceof Anthropic.APIError) {
-      return NextResponse.json({ error: `Anthropic API error: ${error.message}` }, { status: error.status ?? 502 });
-    }
-    return NextResponse.json({ error: "Unexpected server error." }, { status: 500 });
+    const warning =
+      error instanceof Anthropic.APIError
+        ? `Anthropic API error: ${error.message}`
+        : "Unexpected server error.";
+    return NextResponse.json({ ...fallback, fallback: true, warning });
   }
 }
