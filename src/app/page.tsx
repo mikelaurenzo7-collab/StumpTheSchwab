@@ -1,544 +1,334 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import { Transport } from "@/components/Transport";
-import { StepSequencer } from "@/components/StepSequencer";
-import { PianoRoll } from "@/components/PianoRoll";
-import { Mixer } from "@/components/Mixer";
-import { SongChain } from "@/components/SongChain";
-import { HelpOverlay } from "@/components/HelpOverlay";
-import { GeneratorModal } from "@/components/GeneratorModal";
-import { GroovePanel } from "@/components/GroovePanel";
-import { AutomationEditor } from "@/components/AutomationEditor";
-import { PerformanceMode } from "@/components/PerformanceMode";
-import { SampleBrowser } from "@/components/SampleBrowser";
-import { CoproducerPanel } from "@/components/CoproducerPanel";
-import { CoverSongModal } from "@/components/CoverSongModal";
-import { StatusBar } from "@/components/StatusBar";
-import { PatternMatrix } from "@/components/PatternMatrix";
-import { FillEnginePanel } from "@/components/FillEnginePanel";
-import { AutoMixPanel } from "@/components/AutoMixPanel";
-import { ArrangementPanel } from "@/components/ArrangementPanel";
-import { CommandPalette } from "@/components/CommandPalette";
-import { MidiPanel } from "@/components/MidiPanel";
-import { useAudioEngine } from "@/lib/useAudioEngine";
-import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
-import { useMidi } from "@/lib/useMidi";
-import { useAutoSave } from "@/lib/useAutoSave";
-import { useEngineStore } from "@/store/engine";
-import { useUiStore } from "@/store/ui";
-import "@/store/history";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-const TABS = [
-  { id: "matrix",       label: "Matrix",  icon: "matrix" },
-  { id: "arrange",      label: "Arrange", icon: "arrange" },
-  { id: "groove",       label: "Groove",  icon: "groove" },
-  { id: "automation",   label: "Auto",    icon: "auto" },
-  { id: "fill",         label: "Fill",    icon: "fill" },
-  { id: "mix",          label: "Mix",     icon: "mix" },
-  { id: "arrange-ai",   label: "Arr+",    icon: "arrange-ai" },
-  { id: "performance",  label: "Perf",    icon: "perf" },
-  { id: "samples",      label: "Smpl",    icon: "samples" },
-  { id: "ai",           label: "Coproducer", icon: "ai" },
-] as const;
+type Track = {
+  id: string;
+  name: string;
+  voice: "kick" | "snare" | "hat" | "bass" | "pluck" | "pad";
+  hue: number;
+  pattern: boolean[];
+  level: number;
+  pitch: number;
+};
 
-type TabId = (typeof TABS)[number]["id"];
+type Macro = {
+  bloom: number;
+  gravity: number;
+  shimmer: number;
+  fracture: number;
+};
 
-export default function DAW() {
-  const {
-    initAudio,
-    getTrackMeter,
-    getMasterMeter,
-    getMasterSpectrum,
-    getMasterWaveform,
-    getMasterLoudness,
-    getMasterTruePeak,
-    triggerTrack,
-  } = useAudioEngine();
-  useKeyboardShortcuts(initAudio, triggerTrack);
-  const { status: midiStatus, enable: enableMidi } = useMidi(initAudio, triggerTrack);
+const STEPS = 16;
+const initialTracks: Track[] = [
+  { id: "pulse", name: "Pulse Engine", voice: "kick", hue: 270, level: 0.92, pitch: 46, pattern: [true, false, false, false, true, false, false, true, true, false, false, false, true, false, true, false] },
+  { id: "glass", name: "Glass Impact", voice: "snare", hue: 318, level: 0.76, pitch: 188, pattern: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, true] },
+  { id: "dust", name: "Photon Dust", voice: "hat", hue: 190, level: 0.58, pitch: 6200, pattern: [true, false, true, false, true, true, true, false, true, false, true, false, true, true, false, true] },
+  { id: "sub", name: "Sub Collider", voice: "bass", hue: 154, level: 0.84, pitch: 55, pattern: [true, false, false, true, false, false, true, false, false, true, false, false, true, false, false, false] },
+  { id: "keys", name: "Neon Keys", voice: "pluck", hue: 42, level: 0.64, pitch: 330, pattern: [false, true, false, false, false, true, false, true, false, false, true, false, false, true, false, false] },
+  { id: "aura", name: "Aura Pad", voice: "pad", hue: 226, level: 0.52, pitch: 110, pattern: [true, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false] },
+];
 
-  const { lastSaved, recoverAutosave, clearAutosave } = useAutoSave();
-  const [mixerOpen, setMixerOpen] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState<TabId>("matrix");
-  const [coverOpen, setCoverOpen] = useState(false);
-  const playbackState = useEngineStore((s) => s.playbackState);
+const scale = [0, 2, 3, 5, 7, 10, 12, 14];
+
+function makePattern(track: Track, density: number, gravity: number) {
+  return Array.from({ length: STEPS }, (_, step) => {
+    const downbeat = step % 4 === 0;
+    const offbeat = step % 4 === 2;
+    const phase = Math.sin((step + track.hue / 36) * (0.9 + gravity / 80));
+    const threshold = density / 100 + (downbeat ? 0.22 : 0) + (offbeat ? 0.08 : 0);
+
+    if (track.voice === "kick") return downbeat || (phase > 0.75 && density > 64);
+    if (track.voice === "snare") return step === 4 || step === 12 || (phase > 0.86 && density > 74);
+    if (track.voice === "hat") return step % 2 === 0 || phase > 0.38;
+    if (track.voice === "pad") return step === 0 || step === 8 || (phase > 0.92 && density > 80);
+    return phase + threshold > 1.08;
+  });
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+export default function Home() {
+  const [tracks, setTracks] = useState(initialTracks);
+  const [playing, setPlaying] = useState(false);
+  const [step, setStep] = useState(0);
+  const [bpm, setBpm] = useState(126);
+  const [density, setDensity] = useState(62);
+  const [scene, setScene] = useState("Nebula Breaks");
+  const [macros, setMacros] = useState<Macro>({ bloom: 72, gravity: 44, shimmer: 63, fracture: 28 });
+  const audioRef = useRef<AudioContext | null>(null);
+  const delayRef = useRef<DelayNode | null>(null);
+  const feedbackRef = useRef<GainNode | null>(null);
+  const masterRef = useRef<GainNode | null>(null);
+  const tracksRef = useRef(tracks);
+  const macrosRef = useRef(macros);
+  const stepRef = useRef(step);
 
   useEffect(() => {
-    const handler = (e: Event) => {
-      const tab = (e as CustomEvent<string>).detail;
-      if (TABS.some((t) => t.id === tab)) {
-        setSidebarTab(tab as TabId);
-      }
-    };
-    window.addEventListener("sts-focus-tab", handler);
-    return () => window.removeEventListener("sts-focus-tab", handler);
+    tracksRef.current = tracks;
+  }, [tracks]);
+
+  useEffect(() => {
+    macrosRef.current = macros;
+  }, [macros]);
+
+  useEffect(() => {
+    stepRef.current = step;
+  }, [step]);
+
+  const ensureAudio = useCallback(async () => {
+    if (!audioRef.current) {
+      const AudioCtor = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AudioCtor();
+      const master = ctx.createGain();
+      const delay = ctx.createDelay(1.2);
+      const feedback = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      master.gain.value = 0.78;
+      delay.delayTime.value = 0.18;
+      feedback.gain.value = 0.22;
+      filter.type = "lowpass";
+      filter.frequency.value = 7800;
+
+      delay.connect(feedback);
+      feedback.connect(filter);
+      filter.connect(delay);
+      delay.connect(master);
+      master.connect(ctx.destination);
+
+      audioRef.current = ctx;
+      delayRef.current = delay;
+      feedbackRef.current = feedback;
+      masterRef.current = master;
+    }
+
+    if (audioRef.current.state === "suspended") {
+      await audioRef.current.resume();
+    }
   }, []);
 
-  const [recoveryBanner, setRecoveryBanner] = useState(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return localStorage.getItem("sts_session___autosave") !== null;
-    } catch {
-      return false;
+  const triggerVoice = useCallback((track: Track, time: number, index: number) => {
+    const ctx = audioRef.current;
+    const master = masterRef.current;
+    if (!ctx || !master) return;
+
+    const macro = macrosRef.current;
+    const out = ctx.createGain();
+    const pan = ctx.createStereoPanner();
+    const filter = ctx.createBiquadFilter();
+    const send = ctx.createGain();
+    const note = track.pitch * 2 ** (scale[(index + Math.round(macro.gravity / 14)) % scale.length] / 12);
+
+    out.gain.value = 0;
+    pan.pan.value = Math.sin(index + track.hue) * 0.42;
+    filter.type = track.voice === "pad" ? "lowpass" : "bandpass";
+    filter.frequency.value = clamp(380 + macro.bloom * 86 + track.pitch * 2, 180, 12000);
+    filter.Q.value = 0.7 + macro.fracture / 42;
+    send.gain.value = macro.shimmer / 260;
+
+    out.connect(filter);
+    filter.connect(pan);
+    pan.connect(master);
+    pan.connect(send);
+    if (delayRef.current) send.connect(delayRef.current);
+
+    if (track.voice === "kick") {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(145, time);
+      osc.frequency.exponentialRampToValueAtTime(42, time + 0.22);
+      out.gain.setValueAtTime(track.level * 0.88, time);
+      out.gain.exponentialRampToValueAtTime(0.001, time + 0.28);
+      osc.connect(out);
+      osc.start(time);
+      osc.stop(time + 0.3);
+      return;
     }
-  });
 
-  const handleRecover = useCallback(() => {
-    recoverAutosave();
-    setRecoveryBanner(false);
-  }, [recoverAutosave]);
+    if (track.voice === "snare" || track.voice === "hat") {
+      const bufferSize = Math.floor(ctx.sampleRate * (track.voice === "hat" ? 0.07 : 0.18));
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i += 1) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      out.gain.setValueAtTime(track.level * (track.voice === "hat" ? 0.26 : 0.54), time);
+      out.gain.exponentialRampToValueAtTime(0.001, time + (track.voice === "hat" ? 0.05 : 0.16));
+      noise.connect(out);
+      noise.start(time);
+      return;
+    }
 
-  const handleDismiss = useCallback(() => {
-    clearAutosave();
-    setRecoveryBanner(false);
-  }, [clearAutosave]);
+    const osc = ctx.createOscillator();
+    const mod = ctx.createOscillator();
+    const modGain = ctx.createGain();
+    osc.type = track.voice === "pad" ? "sawtooth" : "triangle";
+    mod.type = "sine";
+    osc.frequency.value = note;
+    mod.frequency.value = 0.6 + macro.fracture / 18;
+    modGain.gain.value = track.voice === "pad" ? 11 : 4;
+    mod.connect(modGain);
+    modGain.connect(osc.frequency);
+    out.gain.setValueAtTime(0.001, time);
+    out.gain.linearRampToValueAtTime(track.level * (track.voice === "pad" ? 0.24 : 0.36), time + 0.025);
+    out.gain.exponentialRampToValueAtTime(0.001, time + (track.voice === "pad" ? 1.15 : 0.34));
+    osc.connect(out);
+    osc.start(time);
+    mod.start(time);
+    osc.stop(time + (track.voice === "pad" ? 1.2 : 0.38));
+    mod.stop(time + (track.voice === "pad" ? 1.2 : 0.38));
+  }, []);
 
-  const activeTabIndex = TABS.findIndex((t) => t.id === sidebarTab);
-  const activeTab = TABS[activeTabIndex] ?? TABS[0];
+  const pulse = useCallback((nextStep: number) => {
+    const ctx = audioRef.current;
+    if (!ctx) return;
+    const time = ctx.currentTime + 0.015;
+    tracksRef.current.forEach((track, index) => {
+      if (track.pattern[nextStep]) triggerVoice(track, time, index + nextStep);
+    });
+  }, [triggerVoice]);
 
-  return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
-      {recoveryBanner && (
-        <div className="mx-3 mt-3 flex items-center justify-between gap-3 rounded-xl border border-aurora bg-surface-2/80 px-3.5 py-2.5 text-xs shadow-accent-soft backdrop-blur">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-aurora text-white shadow-[0_4px_12px_rgba(168,85,247,0.35)]">
-              <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" aria-hidden="true">
-                <path d="M3 8a5 5 0 1 1 1.46 3.54M3 8V4M3 8h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </span>
-            <span className="text-soft">Autosave found a recent session.</span>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={handleRecover} className="button-primary rounded-md px-3 py-1 text-[11px]">Restore</button>
-            <button onClick={handleDismiss} className="button-secondary rounded-md px-3 py-1 text-[11px]">Dismiss</button>
-          </div>
-        </div>
-      )}
+  useEffect(() => {
+    if (!playing) return;
+    const interval = window.setInterval(() => {
+      const next = (stepRef.current + 1) % STEPS;
+      setStep(next);
+      pulse(next);
+    }, (60 / bpm / 4) * 1000);
 
-      <header className="relative flex items-center gap-3 border-b border-border bg-surface/85 px-3 py-2 backdrop-blur-md">
-        <div className="flex items-center gap-2.5">
-          <BrandMark isPlaying={playbackState === "playing"} />
-          <div className="leading-tight">
-            <div className="text-[13px] font-extrabold tracking-tight text-foreground">
-              Stump<span className="text-aurora">The</span>Schwab
-            </div>
-            <div className="text-[9px] font-bold uppercase tracking-[0.24em] text-muted">Studio · Aurora</div>
-          </div>
-        </div>
-        <div className="mx-2 h-7 w-px bg-border" />
-        <div className="min-w-0 flex-1">
-          <Transport onInit={initAudio} lastSaved={lastSaved} />
-        </div>
-        <div className={`sts-aurora-line pointer-events-none absolute inset-x-0 -bottom-px ${playbackState === "playing" ? "is-playing" : ""}`} />
-      </header>
+    return () => window.clearInterval(interval);
+  }, [bpm, playing, pulse]);
 
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        {/* ── Vertical activity rail ───────────────────────── */}
-        <nav
-          aria-label="Workspace"
-          className="sts-rail hidden md:flex"
-        >
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setSidebarTab(tab.id)}
-              className={`sts-rail-btn ${sidebarTab === tab.id ? "is-active" : ""}`}
-              aria-pressed={sidebarTab === tab.id}
-              aria-label={tab.label}
-              title={tab.label}
-            >
-              <RailIcon name={tab.icon} />
-              <span className="sts-rail-label">{tab.label}</span>
-            </button>
-          ))}
-          <div className="mt-auto">
-            <div className="sts-rail-divider" />
-            <button
-              type="button"
-              onClick={() => useUiStore.getState().setHelpOpen(true)}
-              className="sts-rail-btn"
-              aria-label="Help"
-              title="Help & shortcuts"
-            >
-              <RailIcon name="help" />
-              <span className="sts-rail-label">Help</span>
-            </button>
-          </div>
-        </nav>
-
-        {/* ── Center canvas + right panel ──────────────────── */}
-        <main className="grid min-h-0 flex-1 grid-cols-1 gap-1.5 p-1.5 xl:grid-cols-[minmax(0,1fr)_22rem]">
-          <section className="panel flex min-h-0 flex-col overflow-hidden rounded-xl">
-            <StepSequencer />
-            <PianoRoll />
-          </section>
-
-          <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl panel">
-            {/* Mobile/tab strip — only when rail is hidden */}
-            <div className="md:hidden border-b border-border p-1.5">
-              <div className="sts-tabbar">
-                {TABS.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setSidebarTab(tab.id)}
-                    className={`sts-tab ${sidebarTab === tab.id ? "is-active" : ""}`}
-                    aria-pressed={sidebarTab === tab.id}
-                    title={tab.label}
-                  >
-                    <TabIcon name={tab.icon} />
-                    <span>{tab.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Right panel header — shows active workspace */}
-            <div className="hidden md:flex shrink-0 items-center justify-between gap-2 border-b border-border bg-surface-2/60 px-3 py-2 backdrop-blur">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-aurora text-white shadow-[0_4px_12px_rgba(168,85,247,0.30)]">
-                  <RailIcon name={activeTab.icon} small />
-                </span>
-                <div className="min-w-0 leading-tight">
-                  <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted truncate">Workspace</div>
-                  <div className="text-[12px] font-bold tracking-tight text-foreground truncate">{activeTab.label}</div>
-                </div>
-              </div>
-              <span className="rounded-full border border-border bg-surface-3 px-2 py-0.5 font-mono text-[9px] tracking-wider text-muted">
-                {String((activeTabIndex < 0 ? 0 : activeTabIndex) + 1).padStart(2, "0")} / {String(TABS.length).padStart(2, "0")}
-              </span>
-            </div>
-
-            {/* Scrollable panel body */}
-            <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto p-1.5">
-              {sidebarTab === "matrix" && (
-                <div className="panel rounded-xl p-3">
-                  <SectionHeader eyebrow="Launch" title="Pattern matrix" />
-                  <PatternMatrix />
-                </div>
-              )}
-
-              {sidebarTab === "arrange" && (
-                <>
-                  <QuickStartPanel />
-                  <div className="panel rounded-xl p-2">
-                    <SectionHeader eyebrow="Arrange" title="Song chain" />
-                    <SongChain />
-                  </div>
-                </>
-              )}
-
-              {sidebarTab === "groove" && <GroovePanel />}
-              {sidebarTab === "automation" && <AutomationEditor />}
-
-              {sidebarTab === "fill" && (
-                <div className="panel rounded-xl p-3">
-                  <SectionHeader eyebrow="Smart" title="Fill engine" />
-                  <FillEnginePanel />
-                </div>
-              )}
-
-              {sidebarTab === "mix" && (
-                <div className="panel rounded-xl p-3">
-                  <SectionHeader eyebrow="AI" title="AutoMix" />
-                  <AutoMixPanel />
-                </div>
-              )}
-
-              {sidebarTab === "arrange-ai" && (
-                <div className="panel rounded-xl p-3">
-                  <SectionHeader eyebrow="Smart" title="Arrangement AI" />
-                  <ArrangementPanel />
-                </div>
-              )}
-
-              {sidebarTab === "performance" && <PerformanceMode />}
-              {sidebarTab === "samples" && <SampleBrowser />}
-              {sidebarTab === "ai" && (
-                <div className="flex min-h-0 flex-1 flex-col gap-1.5">
-                  <button
-                    onClick={() => setCoverOpen(true)}
-                    className="group flex items-center justify-between rounded-xl border border-aurora bg-surface-2/70 px-3 py-2.5 text-left text-[11px] shadow-accent-soft transition-transform hover:-translate-y-0.5"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-aurora text-white shadow-[0_4px_12px_rgba(168,85,247,0.35)]">
-                        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
-                          <path d="M8 2v8m0 0 3-3m-3 3L5 7M3 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </span>
-                      <div>
-                        <div className="font-bold text-foreground">Cover a Song</div>
-                        <div className="text-[10px] text-muted">Drop in audio → remix-ready arrangement</div>
-                      </div>
-                    </div>
-                    <span className="text-[14px] text-accent transition-transform group-hover:translate-x-0.5">›</span>
-                  </button>
-                  <CoproducerPanel />
-                </div>
-              )}
-            </div>
-          </aside>
-        </main>
-      </div>
-
-      <footer className={`relative border-t border-border bg-surface/90 backdrop-blur-md ${playbackState === "playing" && mixerOpen ? "sts-master-hot" : ""}`}>
-        <button
-          onClick={() => setMixerOpen((open) => !open)}
-          className="group flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-surface-2"
-        >
-          <div className="flex items-center gap-2.5">
-            <span className={`text-[10px] text-muted transition-transform ${mixerOpen ? "rotate-90 text-accent" : ""}`}>▸</span>
-            <MixerEqGlyph isPlaying={playbackState === "playing"} />
-            <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted">Mixer</span>
-            <span className="text-[11px] text-soft">{mixerOpen ? "Channel strips, FX, master" : "Click to open mix view"}</span>
-          </div>
-          <span className="text-[10px] font-mono text-muted">{mixerOpen ? "Esc to close" : "Click to open"}</span>
-        </button>
-        {mixerOpen && (
-          <div className="border-t border-border">
-            <Mixer
-              getTrackMeter={getTrackMeter}
-              getMasterMeter={getMasterMeter}
-              getMasterSpectrum={getMasterSpectrum}
-              getMasterWaveform={getMasterWaveform}
-              getLoudness={getMasterLoudness}
-              getTruePeak={getMasterTruePeak}
-            />
-          </div>
-        )}
-      </footer>
-
-      <HelpOverlay />
-      <GeneratorModal />
-      <CoverSongModal open={coverOpen} onClose={() => setCoverOpen(false)} />
-      <CommandPalette onInit={initAudio} />
-      <MidiPanel status={midiStatus} onEnable={enableMidi} />
-
-      <StatusBar getMasterMeter={getMasterMeter} getMasterWaveform={getMasterWaveform} midiStatus={midiStatus} />
-
-      <style jsx global>{`
-        .kbd {
-          display: inline-block;
-          padding: 0 5px;
-          margin: 0 1px;
-          font-family: var(--font-mono);
-          font-size: 10px;
-          font-weight: 600;
-          color: var(--foreground-soft);
-          background: var(--surface-3);
-          border: 1px solid var(--border-strong);
-          border-bottom-width: 2px;
-          border-radius: 4px;
-          line-height: 1.4;
-        }
-      `}</style>
-    </div>
-  );
-}
-
-function QuickStartPanel() {
-  const headingId = "quick-start-heading";
-  return (
-    <section aria-labelledby={headingId} className="panel rounded-xl p-2.5 shadow-accent-soft">
-      <SectionHeader id={headingId} eyebrow="Start here" title="Make a beat in 3 moves" />
-      <ol className="mt-1.5 space-y-1.5 text-[11px] text-soft">
-        <li className="flex gap-2">
-          <span className="mt-[1px] flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-aurora text-[9px] font-bold text-white shadow-[0_2px_6px_rgba(168,85,247,0.4)]">1</span>
-          <span><strong className="text-foreground">Generate</strong> for an instant idea, or paint the grid.</span>
-        </li>
-        <li className="flex gap-2">
-          <span className="mt-[1px] flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-aurora text-[9px] font-bold text-white shadow-[0_2px_6px_rgba(168,85,247,0.4)]">2</span>
-          <span><strong className="text-foreground">Play</strong>, then drag steps to add or remove hits.</span>
-        </li>
-        <li className="flex gap-2">
-          <span className="mt-[1px] flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-aurora text-[9px] font-bold text-white shadow-[0_2px_6px_rgba(168,85,247,0.4)]">3</span>
-          <span>Double-click any lit step to shape velocity, chance, timing, and notes.</span>
-        </li>
-      </ol>
-      <div className="mt-2.5 flex gap-1.5">
-        <button onClick={() => useUiStore.getState().setGeneratorOpen(true)} className="button-primary flex-1 rounded-md px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em]">Start with AI</button>
-        <button onClick={() => useUiStore.getState().setHelpOpen(true)} className="button-secondary rounded-md px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em]">Help</button>
-      </div>
-    </section>
-  );
-}
-
-function BrandMark({ isPlaying }: { isPlaying?: boolean }) {
-  return (
-    <div
-      className={`relative flex h-8 w-8 items-center justify-center rounded-lg sts-brand-aurora shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_6px_18px_rgba(168,85,247,0.4)] ${isPlaying ? "sts-brand-breathe" : ""}`}
-      aria-hidden="true"
-    >
-      {/* Inner glass */}
-      <span className="pointer-events-none absolute inset-[2px] rounded-md bg-[rgba(8,8,14,0.55)] backdrop-blur-[2px]" />
-      {/* Stylized "S" waveform monogram */}
-      <svg viewBox="0 0 16 16" fill="none" className="relative h-4 w-4" aria-hidden="true">
-        <defs>
-          <linearGradient id="sts-mono" x1="0" y1="0" x2="16" y2="16" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#ffffff" />
-            <stop offset="100%" stopColor="#fbcfe8" />
-          </linearGradient>
-        </defs>
-        <path
-          d="M11.5 4.2c-.9-.7-2-1.1-3.2-1.1-1.9 0-3.4 1-3.4 2.5 0 3 6.6 1.5 6.6 4.7 0 1.6-1.6 2.7-3.6 2.7-1.4 0-2.6-.5-3.5-1.3"
-          stroke="url(#sts-mono)"
-          strokeWidth="1.7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <circle cx="8" cy="8" r="0.9" fill="#ffffff" opacity="0.95" />
-      </svg>
-    </div>
-  );
-}
-
-function SectionHeader({ eyebrow, title, id }: { eyebrow: string; title: string; id?: string }) {
-  return (
-    <div className="mb-1.5 flex items-baseline justify-between">
-      <h2 {...(id ? { id } : {})} className="flex items-center text-[12px] font-bold tracking-tight text-foreground">
-        <span className="sts-section-rule" aria-hidden="true" />
-        {title}
-      </h2>
-      <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-muted">{eyebrow}</span>
-    </div>
-  );
-}
-
-function MixerEqGlyph({ isPlaying }: { isPlaying?: boolean }) {
-  return (
-    <span className="flex h-3.5 items-end gap-[2px]" aria-hidden="true">
-      {[0.45, 0.85, 0.6, 1.0, 0.55].map((h, i) => (
-        <span
-          key={i}
-          className="w-[2px] rounded-sm bg-aurora"
-          style={{
-            height: `${h * 100}%`,
-            opacity: isPlaying ? 0.95 : 0.55,
-            animation: isPlaying ? `sts-breathe ${0.45 + i * 0.07}s ease-in-out infinite` : undefined,
-          }}
-        />
-      ))}
-    </span>
-  );
-}
-
-function TabIcon({ name }: { name: string }) {
-  return <Icon name={name} size={12} />;
-}
-
-function RailIcon({ name, small = false }: { name: string; small?: boolean }) {
-  return <Icon name={name} size={small ? 12 : 18} className="sts-rail-icon" />;
-}
-
-function Icon({ name, size, className }: { name: string; size: number; className?: string }) {
-  const common = {
-    className: className ?? "sts-tab-icon",
-    width: size,
-    height: size,
-    viewBox: "0 0 16 16",
-    fill: "none" as const,
-    stroke: "currentColor",
-    strokeWidth: 1.6,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-    "aria-hidden": true,
+  const launch = async () => {
+    await ensureAudio();
+    if (!playing) pulse(step);
+    setPlaying((value) => !value);
   };
-  switch (name) {
-    case "matrix":
-      return (
-        <svg {...common}>
-          <rect x="2.5" y="2.5" width="3" height="3" rx="0.6" />
-          <rect x="6.5" y="2.5" width="3" height="3" rx="0.6" />
-          <rect x="10.5" y="2.5" width="3" height="3" rx="0.6" />
-          <rect x="2.5" y="6.5" width="3" height="3" rx="0.6" />
-          <rect x="6.5" y="6.5" width="3" height="3" rx="0.6" fill="currentColor" />
-          <rect x="10.5" y="6.5" width="3" height="3" rx="0.6" />
-          <rect x="2.5" y="10.5" width="3" height="3" rx="0.6" />
-          <rect x="6.5" y="10.5" width="3" height="3" rx="0.6" />
-          <rect x="10.5" y="10.5" width="3" height="3" rx="0.6" fill="currentColor" />
-        </svg>
-      );
-    case "arrange":
-      return (
-        <svg {...common}>
-          <rect x="2"  y="4"  width="4" height="3" rx="0.6" fill="currentColor" />
-          <rect x="6.5" y="4" width="3" height="3" rx="0.6" />
-          <rect x="10" y="4" width="4" height="3" rx="0.6" />
-          <rect x="2"  y="9"  width="3" height="3" rx="0.6" />
-          <rect x="5.5" y="9" width="5" height="3" rx="0.6" fill="currentColor" />
-          <rect x="11" y="9" width="3" height="3" rx="0.6" />
-        </svg>
-      );
-    case "groove":
-      return (
-        <svg {...common}>
-          <path d="M2 8c1.5-3 3-3 4 0s2.5 3 4 0 2.5-3 4 0" />
-        </svg>
-      );
-    case "auto":
-      return (
-        <svg {...common}>
-          <path d="M2 12 6 6l3 4 5-7" />
-          <circle cx="6" cy="6" r="1" fill="currentColor" />
-          <circle cx="9" cy="10" r="1" fill="currentColor" />
-        </svg>
-      );
-    case "fill":
-      return (
-        <svg {...common}>
-          <path d="M2 13V3M5 13V6M8 13V8M11 13V5M14 13V9" />
-        </svg>
-      );
-    case "mix":
-      return (
-        <svg {...common}>
-          <path d="M4 2v12M9 2v12M14 2v12" />
-          <circle cx="4"  cy="6"  r="1.6" fill="currentColor" />
-          <circle cx="9"  cy="10" r="1.6" fill="currentColor" />
-          <circle cx="14" cy="5"  r="1.6" fill="currentColor" />
-        </svg>
-      );
-    case "arrange-ai":
-      return (
-        <svg {...common}>
-          <path d="M3 4h10M3 8h7M3 12h10" />
-          <path d="M12.5 7.5l1 1.6 1.6 1-1.6 1-1 1.6-1-1.6-1.6-1 1.6-1z" fill="currentColor" stroke="none" />
-        </svg>
-      );
-    case "perf":
-      return (
-        <svg {...common}>
-          <rect x="2.5" y="9" width="2.5" height="4" rx="0.5" fill="currentColor" />
-          <rect x="6.5" y="6" width="2.5" height="7" rx="0.5" fill="currentColor" />
-          <rect x="10.5" y="3" width="2.5" height="10" rx="0.5" fill="currentColor" />
-        </svg>
-      );
-    case "samples":
-      return (
-        <svg {...common}>
-          <circle cx="8" cy="8" r="5.5" />
-          <circle cx="8" cy="8" r="1.4" fill="currentColor" />
-          <path d="M8 2.5v2.5M8 11v2.5M2.5 8h2.5M11 8h2.5" />
-        </svg>
-      );
-    case "ai":
-      return (
-        <svg {...common}>
-          <path d="M8 2l1.4 3.2L12.6 6 9.8 7.6 8 11l-1.8-3.4L3.4 6l3.2-.8z" fill="currentColor" stroke="none" />
-          <circle cx="13" cy="12" r="1.2" fill="currentColor" />
-          <circle cx="3.5" cy="12.5" r="0.8" fill="currentColor" />
-        </svg>
-      );
-    case "help":
-      return (
-        <svg {...common}>
-          <circle cx="8" cy="8" r="5.5" />
-          <path d="M6.3 6.2c.2-.9 1-1.5 1.9-1.5 1 0 1.8.7 1.8 1.7 0 .8-.5 1.2-1.1 1.6-.5.3-.9.6-.9 1.3" />
-          <circle cx="8" cy="11.5" r="0.6" fill="currentColor" />
-        </svg>
-      );
-    default:
-      return null;
-  }
+
+  const regenerate = () => {
+    const names = ["Nebula Breaks", "Quantum Bounce", "Chrome Ritual", "Zero-G Garage", "Solar Drill", "Dream Collider"];
+    setScene(names[Math.floor(Math.random() * names.length)]);
+    setTracks((current) => current.map((track) => ({ ...track, pattern: makePattern(track, density, macros.gravity) })));
+  };
+
+  const mutate = () => {
+    setTracks((current) => current.map((track) => ({
+      ...track,
+      pattern: track.pattern.map((active, index) => (Math.random() < macros.fracture / 260 || index === step ? !active : active)),
+    })));
+  };
+
+  const energy = useMemo(() => {
+    const active = tracks.reduce((sum, track) => sum + track.pattern.filter(Boolean).length * track.level, 0);
+    return Math.round((active / (tracks.length * STEPS)) * 100);
+  }, [tracks]);
+
+  return (
+    <main className="studio-shell">
+      <section className="hero-panel">
+        <div className="brand-block">
+          <div className="orbital-mark" aria-hidden="true"><span /></div>
+          <div>
+            <p className="eyebrow">StumpTheSchwab rebuilt from zero</p>
+            <h1>Future studio for beats, sound design, and impossible textures.</h1>
+          </div>
+        </div>
+        <div className="hero-actions">
+          <button className="primary-action" onClick={launch}>{playing ? "Pause engine" : "Start engine"}</button>
+          <button className="ghost-action" onClick={regenerate}>Generate world</button>
+          <button className="ghost-action" onClick={mutate}>Fracture pattern</button>
+        </div>
+      </section>
+
+      <section className="command-strip" aria-label="Session controls">
+        <div>
+          <span>Scene</span>
+          <strong>{scene}</strong>
+        </div>
+        <label>
+          <span>BPM</span>
+          <input type="range" min="72" max="178" value={bpm} onChange={(event) => setBpm(Number(event.target.value))} />
+          <strong>{bpm}</strong>
+        </label>
+        <label>
+          <span>Density</span>
+          <input type="range" min="12" max="96" value={density} onChange={(event) => setDensity(Number(event.target.value))} />
+          <strong>{density}%</strong>
+        </label>
+        <div>
+          <span>Energy</span>
+          <strong>{energy}%</strong>
+        </div>
+      </section>
+
+      <section className="studio-grid">
+        <div className="sequencer-card">
+          <div className="section-heading">
+            <p>Neural sequencer</p>
+            <h2>Six engines, sixteen moments.</h2>
+          </div>
+          <div className="step-numbers" aria-hidden="true">
+            {Array.from({ length: STEPS }, (_, index) => <span key={index}>{index + 1}</span>)}
+          </div>
+          <div className="tracks">
+            {tracks.map((track, trackIndex) => (
+              <div className="track-row" key={track.id} style={{ "--track-hue": track.hue } as React.CSSProperties}>
+                <div className="track-meta">
+                  <strong>{track.name}</strong>
+                  <span>{track.voice}</span>
+                </div>
+                <div className="step-grid">
+                  {track.pattern.map((active, index) => (
+                    <button
+                      aria-label={`${track.name} step ${index + 1}`}
+                      className={`step-cell ${active ? "is-active" : ""} ${step === index ? "is-current" : ""}`}
+                      key={`${track.id}-${index}`}
+                      onClick={() => setTracks((current) => current.map((item, itemIndex) => itemIndex === trackIndex ? { ...item, pattern: item.pattern.map((value, stepIndex) => stepIndex === index ? !value : value) } : item))}
+                    />
+                  ))}
+                </div>
+                <label className="mini-fader">
+                  <span>Level</span>
+                  <input type="range" min="0" max="1" step="0.01" value={track.level} onChange={(event) => setTracks((current) => current.map((item) => item.id === track.id ? { ...item, level: Number(event.target.value) } : item))} />
+                </label>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <aside className="synth-card">
+          <div className="section-heading">
+            <p>Sound design cockpit</p>
+            <h2>Morph the whole machine.</h2>
+          </div>
+          {(Object.keys(macros) as Array<keyof Macro>).map((key) => (
+            <label className="macro" key={key}>
+              <span>{key}</span>
+              <input type="range" min="0" max="100" value={macros[key]} onChange={(event) => setMacros((current) => ({ ...current, [key]: Number(event.target.value) }))} />
+              <strong>{macros[key]}</strong>
+            </label>
+          ))}
+          <div className="visualizer" aria-label="Generative studio visualizer">
+            {tracks.map((track, index) => (
+              <span
+                key={track.id}
+                style={{
+                  "--track-hue": track.hue,
+                  "--height": `${18 + track.pattern.filter(Boolean).length * 5 + index * 4}%`,
+                } as React.CSSProperties}
+              />
+            ))}
+          </div>
+          <div className="ai-card">
+            <p>Creative directive</p>
+            <strong>Design a session that feels alive before the first plugin loads.</strong>
+            <span>Local Web Audio synthesis, generative sequencing, responsive macro control, and a new interface built without the old components.</span>
+          </div>
+        </aside>
+      </section>
+    </main>
+  );
 }
