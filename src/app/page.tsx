@@ -86,6 +86,7 @@ const scenePresets: ScenePreset[] = [
     emphasis: ["pluck", "pad", "snare"],
   },
 ];
+const DEFAULT_DIRECTIVE = scenePresets[0]?.promise ?? "Design a session that feels alive before the first plugin loads.";
 
 function makePattern(track: Track, density: number, gravity: number) {
   return Array.from({ length: STEPS }, (_, step) => {
@@ -121,7 +122,7 @@ export default function Home() {
   const [bpm, setBpm] = useState(126);
   const [density, setDensity] = useState(62);
   const [scene, setScene] = useState("Nebula Breaks");
-  const [directive, setDirective] = useState(scenePresets[0].promise);
+  const [directive, setDirective] = useState(DEFAULT_DIRECTIVE);
   const [macros, setMacros] = useState<Macro>({ bloom: 72, gravity: 44, shimmer: 63, fracture: 28 });
   const audioRef = useRef<AudioContext | null>(null);
   const delayRef = useRef<DelayNode | null>(null);
@@ -288,7 +289,11 @@ export default function Home() {
     setDensity(preset.density);
     setMacros(preset.macros);
     setTracks((current) => current.map((track, trackIndex) => {
-      const baseline = initialTrackLevels.get(track.id) ?? track.level;
+      const baseline = initialTrackLevels.get(track.id);
+
+      if (baseline === undefined) {
+        throw new Error(`Missing baseline level for track "${track.id}".`);
+      }
 
       return {
         ...track,
