@@ -6,6 +6,7 @@ import { RecorderModal } from "./RecorderModal";
 import { analyzeReference, type ReferenceDescriptor } from "@/lib/refAnalyzer";
 import type { RefMatchResult } from "@/app/api/ref-match/route";
 import { applyMixPatches, type MixPatch } from "@/lib/patchValidation";
+import { ErrorChip } from "./ErrorChip";
 
 export function SampleBrowser() {
   const {
@@ -270,9 +271,7 @@ export function SampleBrowser() {
           )}
 
           {/* Error */}
-          {refError && (
-            <p className="mt-2 text-[11px] text-red-400">⚠ {refError}</p>
-          )}
+          {refError && <ErrorChip message={refError} className="mt-2" />}
         </div>
       )}
 

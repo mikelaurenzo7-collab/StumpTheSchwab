@@ -3,6 +3,7 @@
 import { useEngineStore, PATTERN_LABELS, type GeneratedBeat } from "@/store/engine";
 import { useCallback, useState, type DragEvent, type KeyboardEvent } from "react";
 import type { ArrangeResult } from "@/app/api/arrange/route";
+import { ErrorChip } from "./ErrorChip";
 
 export function SongChain() {
   const songMode = useEngineStore((s) => s.songMode);
@@ -274,9 +275,7 @@ export function SongChain() {
         {arrangeNote && (
           <p className="mt-2 text-[10px] text-soft">{arrangeNote}</p>
         )}
-        {arrangeError && (
-          <p className="mt-2 text-[10px] text-red-400">⚠ {arrangeError}</p>
-        )}
+        {arrangeError && <ErrorChip message={arrangeError} className="mt-2" />}
       </div>
 
       {/* Direct add buttons */}

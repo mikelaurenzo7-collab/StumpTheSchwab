@@ -4,6 +4,7 @@ import { memo, useCallback, useState } from "react";
 import { useEngineStore } from "@/store/engine";
 import type { MixSuggestion } from "@/app/api/mix-doctor/route";
 import { applyMixPatch, type MixPatch } from "@/lib/patchValidation";
+import { ErrorChip } from "./ErrorChip";
 
 // ── Snapshot builder ─────────────────────────────────────────────────────────
 // Collects the current mix state into the compact JSON that the route expects.
@@ -204,11 +205,7 @@ export const MixDoctorPanel = memo(function MixDoctorPanel({
         )}
       </div>
 
-      {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] text-red-400">
-          {error}
-        </div>
-      )}
+      {error && <ErrorChip message={error} />}
 
       {/* Suggestion cards */}
       {visible && visible.length === 0 && (

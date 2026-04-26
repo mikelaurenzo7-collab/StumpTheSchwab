@@ -13,6 +13,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useEngineStore } from "@/store/engine";
 import type { TrackSound } from "@/lib/sounds";
+import { ErrorChip } from "./ErrorChip";
 
 type SynthType = TrackSound["synth"];
 
@@ -285,9 +286,7 @@ export function SoundEditor({ trackId, onClose, onTrigger }: { trackId: number; 
                   ) : "Generate"}
                 </button>
               </div>
-              {designError && (
-                <p className="text-[10px] text-red-400">{designError}</p>
-              )}
+              {designError && <ErrorChip message={designError} />}
               {designExplanation && (
                 <p className="text-[11px] leading-relaxed text-soft">{designExplanation}</p>
               )}
