@@ -1,7 +1,9 @@
 "use client";
 
-import { useEngineStore, PATTERN_LABELS } from "@/store/engine";
+import { useEngineStore, PATTERN_LABELS, type GeneratedBeat } from "@/store/engine";
 import { useCallback, useState, type DragEvent, type KeyboardEvent } from "react";
+import type { ArrangeResult } from "@/app/api/arrange/route";
+import { ErrorChip } from "./ErrorChip";
 
 export function SongChain() {
   const songMode = useEngineStore((s) => s.songMode);
@@ -15,9 +17,110 @@ export function SongChain() {
   const clearChain = useEngineStore((s) => s.clearChain);
   const setSongMode = useEngineStore((s) => s.setSongMode);
   const moveChainItem = useEngineStore((s) => s.moveChainItem);
+  const applyBeatToSlot = useEngineStore((s) => s.applyBeatToSlot);
 
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
+
+  // ── AI Arrange state ──────────────────────────────────────────────────────
+  const [arranging, setArranging] = useState(false);
+  const [arrangeError, setArrangeError] = useState<string | null>(null);
+  const [arrangeNote, setArrangeNote] = useState<string | null>(null);
+  const [arrangeDirection, setArrangeDirection] = useState("");
+
+  const handleArrange = useCallback(async () => {
+    if (arranging) return;
+    setArranging(true);
+    setArrangeError(null);
+    setArrangeNote(null);
+    try {
+      const state = useEngineStore.getState();
+      // Build the seed beat from the current pattern (slot A or whichever is active)
+      const trackKeys = ["kick","snare","hihat","openhat","clap","tom","perc","bass"] as const;
+      const tracksObj: Record<string, number[]> = {};
+      const melodicNotes: Record<string, string[]> = { tom: [], perc: [], bass: [] };
+      state.tracks.slice(0, 8).forEach((t, i) => {
+        const key = trackKeys[i];
+        tracksObj[key] = [...t.steps];
+        if (key === "tom" || key === "perc" || key === "bass") {
+          melodicNotes[key] = [...t.notes];
+        }
+      });
+      const seedBeat: GeneratedBeat = {
+        name: state.patterns[state.currentPattern]?.name ?? "Seed",
+        bpm: state.bpm,
+        swing: state.swing,
+        totalSteps: state.totalSteps as 16 | 32,
+        tracks: tracksObj as GeneratedBeat["tracks"],
+        melodicNotes: melodicNotes as GeneratedBeat["melodicNotes"],
+        explanation: "User seed pattern",
+      };
+
+      const res = await fetch("/api/arrange", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          seed: JSON.stringify(seedBeat),
+          totalSteps: state.totalSteps,
+          bpm: state.bpm,
+          description: arrangeDirection.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      const result = json as ArrangeResult;
+
+      // Map the seed to slot 0 (A) and the 7 returned patterns to slots 1..7 (B..H)
+      // The seed itself is already in whatever slot the user is on — preserve it.
+      // We write the new patterns starting at slot 1, so chain index 0 always means
+      // "the seed's slot". Translate Claude's chain (which uses 0=seed, 1..7 = new)
+      // to actual slot indices: 0 → state.currentPattern, 1..7 → 1..7.
+      const seedSlot = state.currentPattern;
+
+      // Apply the 7 new patterns to slots 1..7 (skipping the seed's slot)
+      const targetSlots: number[] = [];
+      let cursor = 0;
+      for (let i = 0; i < 8; i++) {
+        if (i === seedSlot) continue;
+        targetSlots.push(i);
+        if (targetSlots.length === 7) break;
+        cursor++;
+      }
+      void cursor;
+
+      result.patterns.forEach((p, i) => {
+        const slot = targetSlots[i];
+        if (slot === undefined) return;
+        const beat: GeneratedBeat = {
+          name: p.name,
+          bpm: state.bpm,
+          swing: state.swing,
+          totalSteps: state.totalSteps as 16 | 32,
+          tracks: p.tracks as GeneratedBeat["tracks"],
+          melodicNotes: p.melodicNotes as GeneratedBeat["melodicNotes"],
+          explanation: p.explanation,
+        };
+        applyBeatToSlot(slot, beat);
+      });
+
+      // Translate Claude's chain (0=seed, 1..7 = new patterns in order) to slot indices
+      const slotForChainIndex = (idx: number): number => {
+        if (idx === 0) return seedSlot;
+        const ti = idx - 1;
+        return targetSlots[ti] ?? seedSlot;
+      };
+      const realChain = result.chain.map(slotForChainIndex);
+      clearChain();
+      realChain.forEach((slot) => addToChain(slot));
+      setSongMode(true);
+      setArrangeNote(result.explanation);
+      setArrangeDirection("");
+    } catch (err) {
+      setArrangeError(err instanceof Error ? err.message : "Arrange failed");
+    } finally {
+      setArranging(false);
+    }
+  }, [arranging, arrangeDirection, applyBeatToSlot, addToChain, clearChain, setSongMode]);
 
   const handleToggle = useCallback(() => setSongMode(!songMode), [songMode, setSongMode]);
 
@@ -143,6 +246,36 @@ export function SongChain() {
         >
           Add current pattern {PATTERN_LABELS[currentPattern]}
         </button>
+      </div>
+
+      {/* ── AI Arrange ─────────────────────────────────────── */}
+      <div className="rounded-lg border border-accent/30 bg-accent/5 p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent">✨ AI Arrange</span>
+          <span className="text-[9px] text-muted">From {PATTERN_LABELS[currentPattern]}</span>
+        </div>
+        <p className="mb-2 text-[10px] text-muted">
+          Generate intro/verse/build/drop/break/fill/outro from your current pattern, then auto-fill the chain.
+        </p>
+        <input
+          type="text"
+          value={arrangeDirection}
+          onChange={(e) => setArrangeDirection(e.target.value)}
+          placeholder="Optional direction… (e.g. moody, dramatic drop)"
+          disabled={arranging}
+          className="mb-2 w-full rounded-md border border-border bg-surface-2 px-2 py-1.5 text-[11px] text-foreground placeholder:text-muted focus:border-accent focus:outline-none disabled:opacity-50"
+        />
+        <button
+          onClick={handleArrange}
+          disabled={arranging}
+          className="button-primary w-full rounded-md px-3 py-2 text-[10px] font-bold uppercase tracking-wider disabled:opacity-50"
+        >
+          {arranging ? "Arranging…" : "Arrange Song"}
+        </button>
+        {arrangeNote && (
+          <p className="mt-2 text-[10px] text-soft">{arrangeNote}</p>
+        )}
+        {arrangeError && <ErrorChip message={arrangeError} className="mt-2" />}
       </div>
 
       {/* Direct add buttons */}

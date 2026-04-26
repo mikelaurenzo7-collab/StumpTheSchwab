@@ -29,6 +29,8 @@ interface TrackFXChain {
 
 interface MasterChain {
   gain: Tone.Gain;
+  tape: Tone.Distortion;
+  widener: Tone.StereoWidener;
   eq: Tone.EQ3;
   compressor: Tone.Compressor;
   limiter: Tone.Limiter;
@@ -227,6 +229,9 @@ function routeModLfo(
 
 function createMasterChain(): MasterChain {
   const master = useEngineStore.getState().master;
+  // Order: gain → tape (warmth) → widener (M/S width) → eq → comp → limiter → out.
+  // Tape lives early so its harmonics get shaped by EQ; widener after tape so the
+  // added harmonic content is what we widen, not just the dry signal.
   const limiter = new Tone.Limiter(master.limiterThreshold).toDestination();
   const compressor = new Tone.Compressor({
     threshold: master.compressorThreshold,
@@ -234,19 +239,41 @@ function createMasterChain(): MasterChain {
     attack: master.compressorAttack,
     release: master.compressorRelease,
   }).connect(limiter);
-  // Tone.EQ3 is a 3-band shelf+peak. It's the standard "master tone" tool;
-  // bypass = all bands at 0 dB.
   const eq = new Tone.EQ3({
     low: master.eqOn ? master.eqLow : 0,
     mid: master.eqOn ? master.eqMid : 0,
     high: master.eqOn ? master.eqHigh : 0,
   }).connect(compressor);
-  const gain = new Tone.Gain(master.volume).connect(eq);
-  return { gain, eq, compressor, limiter };
+  // Width: 0 = mono, 0.5 = neutral, 1 = wide. When off we sit at 0.5.
+  const widener = new Tone.StereoWidener({
+    width: master.widthOn ? master.width : 0.5,
+  }).connect(eq);
+  // Tape: drive the distortion gently (cap at 0.4 so even max stays musical).
+  // 2x oversampling avoids the digital alias-hash that makes plug-in distortion
+  // sound brittle on cymbals and hats.
+  const tape = new Tone.Distortion({
+    distortion: master.tapeOn ? master.tapeAmount * 0.4 : 0,
+    wet: master.tapeOn ? 1 : 0,
+    oversample: "2x",
+  }).connect(widener);
+  const gain = new Tone.Gain(master.volume).connect(tape);
+  return { gain, tape, widener, eq, compressor, limiter };
 }
 
 function applyMasterSettings(chain: MasterChain, master: MasterBus) {
   chain.gain.gain.value = master.volume;
+
+  if (master.tapeOn) {
+    chain.tape.distortion = master.tapeAmount * 0.4;
+    chain.tape.wet.value = 1;
+  } else {
+    chain.tape.distortion = 0;
+    chain.tape.wet.value = 0;
+  }
+
+  // Widener exposes width as a single normal-range param (0 mono → 1 wide).
+  // Bypass = sit at 0.5 so the stereo image is left untouched.
+  chain.widener.width.value = master.widthOn ? master.width : 0.5;
 
   if (master.eqOn) {
     chain.eq.low.value = master.eqLow;
@@ -704,6 +731,8 @@ export function useAudioEngine() {
       });
       if (masterChainRef.current) {
         masterChainRef.current.gain.dispose();
+        masterChainRef.current.tape.dispose();
+        masterChainRef.current.widener.dispose();
         masterChainRef.current.eq.dispose();
         masterChainRef.current.compressor.dispose();
         masterChainRef.current.limiter.dispose();
@@ -733,6 +762,37 @@ export function useAudioEngine() {
 
   const getMasterWaveform = useCallback((): Float32Array | null => {
     return masterWaveformRef.current?.getValue() ?? null;
+  }, []);
+
+  // Approximate integrated loudness (LUFS-S) from the smoothed RMS meter.
+  // -1.5 dB offset is a rough K-weighting approximation. Good enough for
+  // Mix Doctor and LoudnessChip targets (±2 dB tolerance).
+  const loudnessRef = useRef(-Infinity);
+  const getMasterLoudness = useCallback((): number => {
+    const db = (() => {
+      const meter = masterMeterRef.current;
+      if (!meter) return -Infinity;
+      const val = meter.getValue();
+      return typeof val === "number" ? val : val[0];
+    })();
+    if (!Number.isFinite(db)) return -Infinity;
+    const prev = loudnessRef.current;
+    const alpha = db > prev ? 0.35 : 0.07;
+    const next = !Number.isFinite(prev) ? db : prev + alpha * (db - prev);
+    loudnessRef.current = next;
+    return next - 1.5;
+  }, []);
+
+  // True peak: max abs sample over the latest waveform buffer.
+  const getMasterTruePeak = useCallback((): number => {
+    const wave = masterWaveformRef.current?.getValue();
+    if (!wave) return -Infinity;
+    let max = 0;
+    for (let i = 0; i < wave.length; i++) {
+      const v = Math.abs(wave[i]);
+      if (v > max) max = v;
+    }
+    return max > 0 ? 20 * Math.log10(max) : -Infinity;
   }, []);
 
   // Live trigger — used by performance keys (Q-I) to play any track on demand,
@@ -772,12 +832,28 @@ export function useAudioEngine() {
     }
   }, []);
 
+  // Allow other parts of the app (Sound Designer preview, Co-Producer) to
+  // request a one-shot trigger without prop-drilling triggerTrack.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onPlay = (e: Event) => {
+      const ev = e as CustomEvent<{ index: number; velocity?: number }>;
+      if (typeof ev.detail?.index === "number") {
+        triggerTrack(ev.detail.index, ev.detail.velocity ?? 1.0);
+      }
+    };
+    window.addEventListener("sts-track-play", onPlay);
+    return () => window.removeEventListener("sts-track-play", onPlay);
+  }, [triggerTrack]);
+
   return {
     initAudio,
     getTrackMeter,
     getMasterMeter,
     getMasterSpectrum,
     getMasterWaveform,
+    getMasterLoudness,
+    getMasterTruePeak,
     triggerTrack,
   };
 }

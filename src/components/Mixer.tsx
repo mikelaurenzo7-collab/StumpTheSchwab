@@ -14,6 +14,8 @@ import {
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SpectrumAnalyzer } from "./SpectrumAnalyzer";
 import { SoundEditor } from "./SoundEditor";
+import { MixDoctorPanel } from "./MixDoctorPanel";
+import { KIT_PACKS } from "@/lib/kitPacks";
 
 // ── Knob-style mini slider ────────────────────────────────────
 function MiniSlider({
@@ -702,12 +704,91 @@ const ChannelStrip = memo(function ChannelStrip({
 });
 
 // ── Master Bus Strip ──────────────────────────────────────────
-function MasterStrip({ getLevel }: { getLevel: () => number }) {
+function MasterStrip({
+  getLevel,
+  getLoudness,
+  getTruePeak,
+  getMasterSpectrum,
+}: {
+  getLevel: () => number;
+  getLoudness: () => number;
+  getTruePeak: () => number;
+  getMasterSpectrum: () => Float32Array | null;
+}) {
   const master = useEngineStore((s) => s.master);
   const setMaster = useEngineStore((s) => s.setMaster);
   const autoMix = useEngineStore((s) => s.autoMix);
 
   const [expanded, setExpanded] = useState(false);
+
+  // ── AI Master state ────────────────────────────────────────────
+  const [mastering, setMastering] = useState(false);
+  const [masterError, setMasterError] = useState<string | null>(null);
+  const [masterNote, setMasterNote] = useState<string | null>(null);
+
+  const runAiMaster = useCallback(async () => {
+    if (mastering) return;
+    setMastering(true);
+    setMasterError(null);
+    setMasterNote(null);
+    try {
+      // Build snapshot: current master + live LUFS/TP + spectrum zones
+      const spectrum = getMasterSpectrum();
+      const lufs = getLoudness();
+      const tp = getTruePeak();
+      const tpDb = tp > 0 ? 20 * Math.log10(tp) : -120;
+
+      // Compute 6-zone energy (same boundaries as X-Ray)
+      const zones = [
+        { name: "sub", lo: 20, hi: 60 },
+        { name: "bass", lo: 60, hi: 250 },
+        { name: "loMid", lo: 250, hi: 500 },
+        { name: "mid", lo: 500, hi: 2000 },
+        { name: "presence", lo: 2000, hi: 6000 },
+        { name: "air", lo: 6000, hi: 20000 },
+      ];
+      const sampleRate = 44100;
+      const zoneEnergies: Record<string, number> = {};
+      if (spectrum) {
+        const n = spectrum.length;
+        for (const z of zones) {
+          const start = Math.max(0, Math.floor((z.lo / (sampleRate / 2)) * n));
+          const end = Math.min(n, Math.ceil((z.hi / (sampleRate / 2)) * n));
+          let sum = 0;
+          for (let i = start; i < end; i++) sum += Math.pow(10, spectrum[i] / 20);
+          zoneEnergies[z.name] = end > start ? sum / (end - start) : 0;
+        }
+      }
+
+      const snapshot = {
+        master,
+        loudness: { lufs, truePeakDb: tpDb },
+        spectrumZones: zoneEnergies,
+        target: master.loudnessTarget,
+      };
+
+      const res = await fetch("/api/master", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ snapshot: JSON.stringify(snapshot) }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+
+      // Apply patches
+      type Patch = { key: string; value: unknown };
+      const patches = (json.patches ?? []) as Patch[];
+      for (const p of patches) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setMaster(p.key as any, p.value as any);
+      }
+      setMasterNote(`${json.explanation}${json.predicted_lufs_change != null ? ` (${json.predicted_lufs_change >= 0 ? "+" : ""}${json.predicted_lufs_change.toFixed(1)} LUFS)` : ""}`);
+    } catch (err) {
+      setMasterError(err instanceof Error ? err.message : "Master failed");
+    } finally {
+      setMastering(false);
+    }
+  }, [mastering, master, setMaster, getLoudness, getTruePeak, getMasterSpectrum]);
 
   return (
     <div className="ml-1 flex flex-col items-center gap-1.5 border-l border-border pl-3">
@@ -726,6 +807,15 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
           title="AI Auto-Mix: Intelligently balance levels, panning, and master FX"
         >
           ✨ Auto-Mix
+        </button>
+
+        <button
+          onClick={runAiMaster}
+          disabled={mastering}
+          className="w-full rounded-lg border border-accent/50 bg-accent/10 px-1 py-1.5 text-[9px] font-bold uppercase tracking-wider text-accent hover:bg-accent/20 disabled:opacity-50"
+          title="AI Master: hit your loudness target with optimal compression, EQ, tape and limiter settings"
+        >
+          {mastering ? "…" : "✦ AI Master"}
         </button>
 
         {/* Master fader + Meter */}
@@ -786,6 +876,27 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
             L
           </button>
         </div>
+        {/* Tape / Width toggles — vibe row */}
+        <div className="flex gap-1">
+          <button
+            onClick={() => setMaster("tapeOn", !master.tapeOn)}
+            className={`h-6 w-6 rounded-lg text-[9px] font-bold transition-colors ${
+              master.tapeOn ? "bg-accent text-white" : "button-secondary"
+            }`}
+            title="Tape — soft-saturation analog warmth"
+          >
+            T
+          </button>
+          <button
+            onClick={() => setMaster("widthOn", !master.widthOn)}
+            className={`h-6 w-6 rounded-lg text-[9px] font-bold transition-colors ${
+              master.widthOn ? "bg-accent text-white" : "button-secondary"
+            }`}
+            title="Stereo Widener — 0=mono · 0.5=neutral · 1=wide"
+          >
+            W
+          </button>
+        </div>
 
         {/* Expand controls */}
         <button
@@ -798,6 +909,17 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
         >
           {expanded ? "HIDE" : "CTRL"}
         </button>
+
+        {/* AI Master feedback */}
+        {(masterNote || masterError) && (
+          <div
+            className={`w-full rounded-md border px-1.5 py-1 text-[8px] leading-tight ${
+              masterError ? "border-red-500/40 bg-red-500/10 text-red-300" : "border-accent/30 bg-accent/5 text-soft"
+            }`}
+          >
+            {masterError ? `⚠ ${masterError}` : masterNote}
+          </div>
+        )}
       </div>
 
       {/* Expanded master controls */}
@@ -902,6 +1024,31 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
               disabled={!master.limiterOn}
             />
           </div>
+
+          {/* Tape & Width */}
+          <div className="flex flex-col gap-1">
+            <span className="text-[9px] text-accent font-bold">VIBE</span>
+            <div className="flex gap-1">
+              <MiniSlider
+                label="Tape"
+                value={master.tapeAmount}
+                min={0}
+                max={1}
+                step={0.01}
+                onChange={(v) => setMaster("tapeAmount", v)}
+                disabled={!master.tapeOn}
+              />
+              <MiniSlider
+                label="Width"
+                value={master.width}
+                min={0}
+                max={1}
+                step={0.01}
+                onChange={(v) => setMaster("width", v)}
+                disabled={!master.widthOn}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -914,11 +1061,15 @@ export function Mixer({
   getMasterMeter,
   getMasterSpectrum,
   getMasterWaveform,
+  getLoudness,
+  getTruePeak,
 }: {
   getTrackMeter: (index: number) => number;
   getMasterMeter: () => number;
   getMasterSpectrum: () => Float32Array | null;
   getMasterWaveform: () => Float32Array | null;
+  getLoudness: () => number;
+  getTruePeak: () => number;
 }) {
   const tracks = useEngineStore((s) => s.tracks);
   const setTrackVolume = useEngineStore((s) => s.setTrackVolume);
@@ -987,6 +1138,12 @@ export function Mixer({
   const [editingSoundId, setEditingSoundId] = useState<number | null>(null);
   const handleEditSound = useCallback((id: number) => setEditingSoundId(id), []);
 
+  const [xrayOn, setXrayOn] = useState(false);
+  const [doctorOpen, setDoctorOpen] = useState(false);
+  const activeKitPackId = useEngineStore((s) => s.activeKitPackId);
+  const loadKitPack = useEngineStore((s) => s.loadKitPack);
+  const [applyKitTempo, setApplyKitTempo] = useState(false);
+
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -1023,21 +1180,96 @@ export function Mixer({
 
   return (
     <div className="px-3 py-3">
-      {/* Master visualizer header — spectrum + oscilloscope */}
-      <div className="mb-3 flex flex-wrap items-center gap-4 rounded-lg border border-border bg-surface-2 px-3 py-2">
-        <div className="flex items-baseline gap-3">
-          <h2 className="text-[13px] font-bold tracking-tight text-foreground">Master</h2>
-          <span className="text-[10px] font-mono text-muted">
-            {tracks.length} ch · {openFX.size} FX
-          </span>
+      {/* Master visualizer header — spectrum + oscilloscope + kit packs */}
+      <div className="mb-3 rounded-lg border border-border bg-surface-2 px-3 py-2">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-baseline gap-3">
+            <h2 className="text-[13px] font-bold tracking-tight text-foreground">Master</h2>
+            <span className="text-[10px] font-mono text-muted">
+              {tracks.length} ch · {openFX.size} FX
+            </span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <SpectrumAnalyzer
+              getSpectrum={getMasterSpectrum}
+              getWaveform={getMasterWaveform}
+              xrayOn={xrayOn}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setXrayOn((v) => !v)}
+            className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+              xrayOn
+                ? "border-accent bg-accent/20 text-accent"
+                : "border-border bg-surface-3 text-muted hover:text-foreground"
+            }`}
+            title="Frequency Zone X-Ray — colour the spectrum by mixing zones (sub/bass/lo-mid/mid/presence/air)"
+          >
+            X-Ray
+          </button>
+          <button
+            type="button"
+            onClick={() => setDoctorOpen((v) => !v)}
+            className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+              doctorOpen
+                ? "border-accent bg-accent/20 text-accent"
+                : "border-border bg-surface-3 text-muted hover:text-foreground"
+            }`}
+            title="AI Mix Doctor — Claude analyses your mix and suggests one-click patches"
+          >
+            ✦ Doctor
+          </button>
         </div>
-        <div className="min-w-0 flex-1">
-        <SpectrumAnalyzer
-          getSpectrum={getMasterSpectrum}
-          getWaveform={getMasterWaveform}
-        />
+        {/* Kit Packs row */}
+        <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
+          <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted">
+            Kit
+          </span>
+          {KIT_PACKS.map((pack) => {
+            const active = activeKitPackId === pack.id;
+            return (
+              <button
+                key={pack.id}
+                type="button"
+                onClick={() => loadKitPack(pack.id, applyKitTempo)}
+                className={`rounded-md border px-2 py-1 text-[10px] font-semibold transition-colors ${
+                  active
+                    ? "border-accent bg-accent/20 text-accent"
+                    : "border-border bg-surface-3 text-soft hover:text-foreground"
+                }`}
+                title={`${pack.vibe} · ${pack.bpm} BPM`}
+              >
+                {pack.name}
+              </button>
+            );
+          })}
+          <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-[10px] text-muted">
+            <input
+              type="checkbox"
+              checked={applyKitTempo}
+              onChange={(e) => setApplyKitTempo(e.target.checked)}
+              className="h-3 w-3 accent-[var(--accent)]"
+            />
+            <span>apply pack tempo</span>
+          </label>
         </div>
       </div>
+
+      {/* Mix Doctor panel */}
+      {doctorOpen && (
+        <div className="mb-3 rounded-lg border border-border bg-surface-2 px-3 py-3">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-[11px] font-bold text-accent">✦ Mix Doctor</span>
+            <span className="text-[10px] text-muted">Claude analyses your mix and proposes one-click fixes</span>
+          </div>
+          <MixDoctorPanel
+            getMasterSpectrum={getMasterSpectrum}
+            getLoudness={getLoudness}
+            getTruePeak={getTruePeak}
+          />
+        </div>
+      )}
 
       <div className="panel-soft rounded-xl p-3">
         <div className="flex items-start gap-3 overflow-x-auto pb-1 [scroll-snap-type:x_mandatory]">
@@ -1071,7 +1303,12 @@ export function Mixer({
         ))}
 
         {/* Master bus */}
-          <MasterStrip getLevel={getMasterMeter} />
+          <MasterStrip
+            getLevel={getMasterMeter}
+            getLoudness={getLoudness}
+            getTruePeak={getTruePeak}
+            getMasterSpectrum={getMasterSpectrum}
+          />
         </div>
       </div>
 
@@ -1086,7 +1323,16 @@ export function Mixer({
 
       {/* Sound Editor modal — per-track synth params + voice swap */}
       {editingSoundId !== null && (
-        <SoundEditor trackId={editingSoundId} onClose={() => setEditingSoundId(null)} />
+        <SoundEditor
+          trackId={editingSoundId}
+          onClose={() => setEditingSoundId(null)}
+          onTrigger={() => {
+            // Preview the sound immediately after AI design applies
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("sts-track-play", { detail: { index: editingSoundId } }));
+            }
+          }}
+        />
       )}
     </div>
   );

@@ -12,6 +12,8 @@ import { GroovePanel } from "@/components/GroovePanel";
 import { AutomationEditor } from "@/components/AutomationEditor";
 import { PerformanceMode } from "@/components/PerformanceMode";
 import { SampleBrowser } from "@/components/SampleBrowser";
+import { CoproducerPanel } from "@/components/CoproducerPanel";
+import { CoverSongModal } from "@/components/CoverSongModal";
 import { StatusBar } from "@/components/StatusBar";
 import { CommandPalette } from "@/components/CommandPalette";
 import { useAudioEngine } from "@/lib/useAudioEngine";
@@ -25,6 +27,7 @@ const TABS = [
   { id: "automation", label: "Auto" },
   { id: "performance", label: "Perf" },
   { id: "samples", label: "Samples" },
+  { id: "ai", label: "AI" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -36,6 +39,8 @@ export default function DAW() {
     getMasterMeter,
     getMasterSpectrum,
     getMasterWaveform,
+    getMasterLoudness,
+    getMasterTruePeak,
     triggerTrack,
   } = useAudioEngine();
   useKeyboardShortcuts(initAudio, triggerTrack);
@@ -43,6 +48,7 @@ export default function DAW() {
   const { lastSaved, recoverAutosave, clearAutosave } = useAutoSave();
   const [mixerOpen, setMixerOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<TabId>("arrange");
+  const [coverOpen, setCoverOpen] = useState(false);
   const [recoveryBanner, setRecoveryBanner] = useState(() => {
     if (typeof window === "undefined") return false;
     try {
@@ -170,6 +176,21 @@ export default function DAW() {
           {sidebarTab === "automation" && <AutomationEditor />}
           {sidebarTab === "performance" && <PerformanceMode />}
           {sidebarTab === "samples" && <SampleBrowser />}
+          {sidebarTab === "ai" && (
+            <div className="flex min-h-0 flex-1 flex-col gap-2">
+              <button
+                onClick={() => setCoverOpen(true)}
+                className="flex items-center justify-between rounded-lg border border-accent/30 bg-accent/5 px-3 py-2.5 text-left text-[11px] hover:bg-accent/10"
+              >
+                <div>
+                  <div className="font-semibold text-accent">📥 Cover a Song</div>
+                  <div className="text-[10px] text-muted">Drop in audio → remix-ready arrangement</div>
+                </div>
+                <span className="text-[14px] text-accent">›</span>
+              </button>
+              <CoproducerPanel />
+            </div>
+          )}
         </aside>
       </main>
 
@@ -207,6 +228,8 @@ export default function DAW() {
               getMasterMeter={getMasterMeter}
               getMasterSpectrum={getMasterSpectrum}
               getMasterWaveform={getMasterWaveform}
+              getLoudness={getMasterLoudness}
+              getTruePeak={getMasterTruePeak}
             />
           </div>
         )}
@@ -214,9 +237,10 @@ export default function DAW() {
 
       <HelpOverlay />
       <GeneratorModal />
+      <CoverSongModal open={coverOpen} onClose={() => setCoverOpen(false)} />
       <CommandPalette onInit={initAudio} />
 
-      <StatusBar getMasterMeter={getMasterMeter} />
+      <StatusBar getMasterMeter={getMasterMeter} getMasterWaveform={getMasterWaveform} />
 
       <style jsx global>{`
         .kbd {

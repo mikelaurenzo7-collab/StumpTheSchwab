@@ -7,6 +7,34 @@ import {
 } from "@/store/engine";
 import { useUiStore } from "@/store/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { analyzeReference, type ReferenceDescriptor } from "@/lib/refAnalyzer";
+import { buildFingerprintContext, recordAcceptedBeat } from "@/lib/styleFingerprint";
+
+// ── Voice-to-Beat helpers ─────────────────────────────────────────────────────
+
+function buildVoiceHint(d: ReferenceDescriptor): string {
+  const parts: string[] = [];
+  if (d.estimatedBpm) parts.push(`~${d.estimatedBpm} BPM`);
+
+  const zones = d.zones;
+  const entries: Array<[keyof typeof zones, number]> = [
+    ["sub", zones.sub], ["bass", zones.bass], ["loMid", zones.loMid],
+    ["mid", zones.mid], ["presence", zones.presence], ["air", zones.air],
+  ];
+  entries.sort((a, b) => b[1] - a[1]);
+  const labelMap: Record<keyof typeof zones, string> = {
+    sub: "sub-heavy", bass: "bass-forward", loMid: "warm",
+    mid: "mid-focused", presence: "snappy", air: "bright",
+  };
+  parts.push(`${labelMap[entries[0][0]]}, ${labelMap[entries[1][0]]}`);
+
+  // Energy contour: rising vs flat
+  const env = d.envelope;
+  if (env.q4 > env.q1 * 1.3) parts.push("building");
+  else if (env.q1 > env.q4 * 1.3) parts.push("decaying");
+
+  return `Voice cue: ${parts.join(", ")}`;
+}
 
 const SUGGESTIONS = [
   "Moody trap beat at 140 with sparse hi-hats",
@@ -401,6 +429,62 @@ export function GeneratorModal() {
     }
   }, []);
 
+  // ── Voice-to-Beat (Hum it) ──────────────────────────────────────────────
+  const [humming, setHumming] = useState<"idle" | "recording" | "analyzing">("idle");
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recorderChunksRef = useRef<Blob[]>([]);
+
+  const handleHum = useCallback(async () => {
+    if (humming !== "idle" || loading) return;
+    try {
+      if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+        setError("Microphone is not available in this browser.");
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      recorderRef.current = mr;
+      recorderChunksRef.current = [];
+
+      mr.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) recorderChunksRef.current.push(e.data);
+      };
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setHumming("analyzing");
+        try {
+          const blob = new Blob(recorderChunksRef.current, { type: mr.mimeType || "audio/webm" });
+          if (blob.size === 0) {
+            setError("No audio captured. Try again.");
+            return;
+          }
+          const file = new File([blob], "hum.webm", { type: blob.type });
+          const descriptor = await analyzeReference(file);
+          const hint = buildVoiceHint(descriptor);
+          setDescription((prev) => (prev.trim() ? `${hint}. ${prev}` : hint));
+          setError(null);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Couldn't analyze the recording.");
+        } finally {
+          setHumming("idle");
+          recorderRef.current = null;
+        }
+      };
+      mr.start();
+      setHumming("recording");
+
+      // Auto-stop after 4 seconds (a 4-bar capture at 120 BPM = 8s, so 4s gives ~2 bars)
+      window.setTimeout(() => {
+        if (recorderRef.current && recorderRef.current.state === "recording") {
+          recorderRef.current.stop();
+        }
+      }, 4000);
+    } catch (err) {
+      setHumming("idle");
+      setError(err instanceof Error ? err.message : "Microphone access denied.");
+    }
+  }, [humming, loading]);
+
   const handleGenerate = useCallback(
     async (opts: {
       prompt: string;
@@ -419,9 +503,11 @@ export function GeneratorModal() {
       abortRef.current = ac;
 
       try {
+        const fingerprint = buildFingerprintContext();
         const body: Record<string, unknown> = {
           description: text,
           target: opts.target,
+          ...(fingerprint ? { styleFingerprint: fingerprint } : {}),
         };
         if (opts.refine) {
           const snapshot = snapshotCurrentBeat();
@@ -464,6 +550,7 @@ export function GeneratorModal() {
         };
 
         applyGeneratedBeat(beat);
+        recordAcceptedBeat(beat);
         const cached = (data.usage?.cache_read_input_tokens ?? 0) > 0;
         setHistory((current) => [entry, ...current].slice(0, MAX_HISTORY));
         setLastResult({
@@ -606,13 +693,29 @@ export function GeneratorModal() {
                   <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted">
                     Target the move
                   </div>
-                  <button
-                    onClick={() => handleSurprise()}
-                    disabled={loading}
-                    className="button-secondary rounded-full px-3 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-accent hover:bg-accent hover:text-white disabled:opacity-40"
-                  >
-                    Surprise me
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={handleHum}
+                      disabled={loading || humming !== "idle"}
+                      title="Hum or beatbox a 4-second cue — Claude will use the BPM and tonal balance to seed the prompt."
+                      className={`rounded-full px-3 py-1 text-[9px] font-bold uppercase tracking-[0.18em] transition-colors disabled:opacity-40 ${
+                        humming === "recording"
+                          ? "animate-pulse bg-red-500 text-white"
+                          : humming === "analyzing"
+                          ? "bg-accent/30 text-accent"
+                          : "button-secondary text-accent hover:bg-accent hover:text-white"
+                      }`}
+                    >
+                      {humming === "recording" ? "● Recording…" : humming === "analyzing" ? "Analyzing…" : "🎤 Hum it"}
+                    </button>
+                    <button
+                      onClick={() => handleSurprise()}
+                      disabled={loading}
+                      className="button-secondary rounded-full px-3 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-accent hover:bg-accent hover:text-white disabled:opacity-40"
+                    >
+                      Surprise me
+                    </button>
+                  </div>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                   {TARGET_OPTIONS.map((option) => (

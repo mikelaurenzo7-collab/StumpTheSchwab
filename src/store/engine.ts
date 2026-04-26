@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { DEFAULT_KIT, type TrackSound } from "@/lib/sounds";
 import type { PatternPreset } from "@/lib/presets";
+import { findKitPack } from "@/lib/kitPacks";
 
 let _checkpoint: (() => void) | null = null;
 export function _setCheckpoint(fn: () => void) { _checkpoint = fn; }
@@ -70,7 +71,32 @@ export interface MasterBus {
   eqLow: number;   // dB, -24..+24
   eqMid: number;   // dB
   eqHigh: number;  // dB
+  // Tape-style saturation — soft clipping on the master bus. Adds harmonic
+  // content and glues the mix without the "loudness war" smash. We model it
+  // as a Tone.Distortion driven gently (max 0..0.4) so even at 1.0 it stays
+  // musical rather than fuzz-pedal aggressive.
+  tapeOn: boolean;
+  tapeAmount: number; // 0..1
+  // Stereo widener via Tone.StereoWidener. 0 = mono, 0.5 = neutral, 1 = wide.
+  // Useful for adding depth to drum-only loops or narrowing for mono-safety.
+  widthOn: boolean;
+  width: number; // 0..1
+  // Loudness target (LUFS-S verdict). Drives the LoudnessChip readout —
+  // does not auto-adjust gain; this is a meter, not a maximizer.
+  loudnessTarget: LoudnessTarget;
 }
+
+export type LoudnessTarget = "off" | "spotify" | "apple" | "youtube" | "club";
+
+// Integrated loudness targets per platform (LUFS-S approx). Sources:
+// Spotify -14 LUFS, Apple Music -16 LUFS (loudness normalization),
+// YouTube -14 LUFS, Club masters typically -8 to -6 LUFS for energy.
+export const LOUDNESS_TARGETS: Record<Exclude<LoudnessTarget, "off">, { lufs: number; label: string; tp: number }> = {
+  spotify: { lufs: -14, label: "Spotify", tp: -1 },
+  apple:   { lufs: -16, label: "Apple",   tp: -1 },
+  youtube: { lufs: -14, label: "YouTube", tp: -1 },
+  club:    { lufs: -8,  label: "Club",    tp: -0.3 },
+};
 
 export interface Track {
   id: number;
@@ -202,6 +228,17 @@ export interface GeneratedBeat {
   explanation: string;
 }
 
+// ── Cover Song apply input — built by CoverSongModal from /api/cover result ────
+export interface ApplyCoverInput {
+  bpm: number;
+  swing: number;
+  totalSteps: 16 | 32;
+  kitPackId: string | null;       // skip kit swap if null
+  patternBeats: Array<{ slot: number; beat: GeneratedBeat }>;
+  chain: number[];
+  sampleLoads: Array<{ trackId: number; url: string; name: string }>;
+}
+
 export interface EngineState {
   bpm: number;
   swing: number;
@@ -280,6 +317,8 @@ export interface EngineState {
   renamePattern: (index: number, name: string) => void;
   euclideanFill: (trackId: number, hits: number, rotation: number) => void;
   applyGeneratedBeat: (beat: GeneratedBeat) => void;
+  applyBeatToSlot: (slotIndex: number, beat: GeneratedBeat) => void;
+  applyCoverSong: (input: ApplyCoverInput) => void;
 
   copyTrackSteps: (trackId: number) => void;
   pasteTrackSteps: (trackId: number) => void;
@@ -293,6 +332,11 @@ export interface EngineState {
   setTrackSoundOptions: (trackId: number, options: Record<string, unknown>) => void;
   setTrackSynthType: (trackId: number, synth: TrackSound["synth"]) => void;
   resetTrackSound: (trackId: number) => void;
+  // Whole-kit swap — applies a KitPack across the first 8 tracks. Patterns,
+  // melodic notes, FX and mixer state stay intact; only the synth voicing
+  // changes per slot. Optionally pulls in the pack's recommended bpm/swing.
+  loadKitPack: (id: string, applyTempo?: boolean) => void;
+  activeKitPackId: string | null;
 
   setNoteLength: (trackId: number, length: number) => void;
   setStepNudge: (trackId: number, step: number, nudge: number) => void;
@@ -414,6 +458,11 @@ const DEFAULT_MASTER: MasterBus = {
   eqLow: 0,
   eqMid: 0,
   eqHigh: 0,
+  tapeOn: false,
+  tapeAmount: 0.35,
+  widthOn: false,
+  width: 0.5,
+  loudnessTarget: "spotify",
 };
 
 export const VELOCITY_LEVELS = [1.0, 0.75, 0.5, 0.25] as const;
@@ -1149,6 +1198,148 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
     });
   },
 
+  // Apply an AI-generated beat to a specific pattern slot WITHOUT touching
+  // the live tracks or current pattern. Used by the AI Song Builder to bulk
+  // fill slots B–H from a single arrange call.
+  applyBeatToSlot: (slotIndex, beat) => {
+    pushHistory();
+    set((state) => {
+      if (slotIndex < 0 || slotIndex >= MAX_PATTERNS) return state;
+      const total = state.totalSteps;
+      const trackCount = state.tracks.length;
+
+      const clampVel = (v: unknown): number => {
+        const n = typeof v === "number" ? v : 0;
+        return Math.max(0, Math.min(1, n));
+      };
+      const padArr = <T,>(src: T[] | undefined, length: number, fill: T): T[] =>
+        Array.from({ length }, (_, i) => (src && src[i] !== undefined ? src[i] : fill));
+
+      const newSteps = Array.from({ length: trackCount }, (_, i) => {
+        const key = GENERATED_TRACK_KEYS[i];
+        if (!key) return Array(total).fill(0);
+        return padArr(beat.tracks[key], total, 0).map(clampVel);
+      });
+      const newNotes = Array.from({ length: trackCount }, (_, i) => {
+        const key = GENERATED_TRACK_KEYS[i];
+        if (!key) return Array(total).fill("");
+        const isMelodic = key === "tom" || key === "perc" || key === "bass";
+        const notesRaw = isMelodic
+          ? beat.melodicNotes[key as "tom" | "perc" | "bass"]
+          : undefined;
+        return padArr<string>(notesRaw, total, "").map((n) =>
+          typeof n === "string" ? n : ""
+        );
+      });
+
+      const updatedPatterns = state.patterns.map((p, i) =>
+        i === slotIndex
+          ? {
+              ...p,
+              name: (beat.name || PATTERN_LABELS[slotIndex]).slice(0, 16),
+              steps: newSteps,
+              notes: newNotes,
+              probabilities: Array.from({ length: trackCount }, () => Array(total).fill(1.0)),
+              nudge: Array.from({ length: trackCount }, () => Array(total).fill(0)),
+            }
+          : p
+      );
+
+      return { patterns: updatedPatterns };
+    });
+  },
+
+  // Cover Song apply — single Zustand action so the whole import is one undo
+  // step. Sets transport, swaps kit, fills pattern slots, sets chain, loads
+  // sample audio onto the chosen tracks, enables song mode.
+  applyCoverSong: (input) => {
+    pushHistory();
+    const total = input.totalSteps;
+
+    // Set transport first so kit pack BPM doesn't override our chosen BPM
+    set({
+      bpm: Math.max(30, Math.min(300, Math.round(input.bpm))),
+      swing: Math.max(0, Math.min(0.6, input.swing)),
+      totalSteps: total,
+    });
+
+    // Swap kit if a pack was suggested (don't apply pack tempo — we already set it)
+    if (input.kitPackId) {
+      const pack = findKitPack(input.kitPackId);
+      if (pack) {
+        set((state) => ({
+          activeKitPackId: pack.id,
+          tracks: state.tracks.map((t, i) => {
+            const ps = pack.sounds[i];
+            if (!ps) return t;
+            return { ...t, sound: { ...ps }, customSampleUrl: null, customSampleName: null };
+          }),
+        }));
+      }
+    }
+
+    // Fill pattern slots
+    const clampVel = (v: unknown): number => {
+      const n = typeof v === "number" ? v : 0;
+      return Math.max(0, Math.min(1, n));
+    };
+    const padArr = <T,>(src: T[] | undefined, length: number, fill: T): T[] =>
+      Array.from({ length }, (_, i) => (src && src[i] !== undefined ? src[i] : fill));
+
+    set((state) => {
+      const trackCount = state.tracks.length;
+      const updatedPatterns = state.patterns.map((p, slotIdx) => {
+        const entry = input.patternBeats.find((pb) => pb.slot === slotIdx);
+        if (!entry) {
+          // Resize to new total to keep playback consistent
+          return {
+            ...p,
+            steps: p.steps.map((row) => Array(total).fill(0).map((_, j) => row[j] ?? 0)),
+            notes: p.notes.map((row) => Array(total).fill("").map((_, j) => row[j] ?? "")),
+            probabilities: p.probabilities.map((row) => Array(total).fill(1.0).map((_, j) => row[j] ?? 1.0)),
+            nudge: p.nudge.map((row) => Array(total).fill(0).map((_, j) => row[j] ?? 0)),
+          };
+        }
+        const beat = entry.beat;
+        const newSteps = Array.from({ length: trackCount }, (_, i) => {
+          const key = GENERATED_TRACK_KEYS[i];
+          if (!key) return Array(total).fill(0);
+          return padArr(beat.tracks[key], total, 0).map(clampVel);
+        });
+        const newNotes = Array.from({ length: trackCount }, (_, i) => {
+          const key = GENERATED_TRACK_KEYS[i];
+          if (!key) return Array(total).fill("");
+          const isMelodic = key === "tom" || key === "perc" || key === "bass";
+          const notesRaw = isMelodic
+            ? beat.melodicNotes[key as "tom" | "perc" | "bass"]
+            : undefined;
+          return padArr<string>(notesRaw, total, "").map((n) => (typeof n === "string" ? n : ""));
+        });
+        return {
+          ...p,
+          name: (beat.name || PATTERN_LABELS[slotIdx]).slice(0, 16),
+          steps: newSteps,
+          notes: newNotes,
+          probabilities: Array.from({ length: trackCount }, () => Array(total).fill(1.0)),
+          nudge: Array.from({ length: trackCount }, () => Array(total).fill(0)),
+        };
+      });
+      return { patterns: updatedPatterns };
+    });
+
+    // Load sample audio onto chosen tracks
+    set((state) => ({
+      tracks: state.tracks.map((t, i) => {
+        const load = input.sampleLoads.find((s) => s.trackId === i);
+        if (!load) return t;
+        return { ...t, customSampleUrl: load.url, customSampleName: load.name };
+      }),
+    }));
+
+    // Set chain + enable song mode
+    set({ chain: input.chain, chainPosition: 0, songMode: true });
+  },
+
   switchPatternSilent: (index) => {
     set((state) => {
       if (index === state.currentPattern || index < 0 || index >= MAX_PATTERNS) return state;
@@ -1193,6 +1384,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
           ? { ...t, sound: { ...t.sound, options: { ...(t.sound.options ?? {}), ...options } } }
           : t
       ),
+      activeKitPackId: null,
     }));
   },
 
@@ -1202,6 +1394,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
       tracks: state.tracks.map((t) =>
         t.id === trackId ? { ...t, sound: { ...t.sound, synth, options: {} } } : t
       ),
+      activeKitPackId: null,
     }));
   },
 
@@ -1215,6 +1408,25 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         if (!def) return t;
         return { ...t, sound: { ...def } };
       }),
+      activeKitPackId: null,
+    }));
+  },
+
+  activeKitPackId: null,
+
+  loadKitPack: (id, applyTempo = false) => {
+    const pack = findKitPack(id);
+    if (!pack) return;
+    pushHistory();
+    set((state) => ({
+      tracks: state.tracks.map((t, idx) => {
+        const slot = pack.sounds[idx];
+        if (!slot) return t; // out-of-pack tracks (e.g. mic) untouched
+        return { ...t, sound: { ...slot }, customSampleUrl: null, customSampleName: null };
+      }),
+      bpm: applyTempo ? pack.bpm : state.bpm,
+      swing: applyTempo ? pack.swing : state.swing,
+      activeKitPackId: id,
     }));
   },
 

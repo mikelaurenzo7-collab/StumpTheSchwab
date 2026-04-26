@@ -32,63 +32,22 @@ function createOfflineSynth(sound: TrackSound): SynthNode {
       return new Tone.FMSynth(opts as ConstructorParameters<typeof Tone.FMSynth>[0]);
     case "monosynth":
       return new Tone.MonoSynth(opts as ConstructorParameters<typeof Tone.MonoSynth>[0]);
+    case "mic":
+      // Live mode uses Tone.UserMedia (mic input). Offline render can't
+      // capture mic — but if the user has saved a recording it will have
+      // been loaded as a sample and the sampler branch above takes over.
+      // For an empty mic slot, return a silent placeholder so steps don't
+      // trigger an audible Tone.Synth fallback.
+      console.warn("[export] mic track without a recording — exporting as silent.");
+      return new Tone.Synth({ volume: -Infinity });
     case "synth":
     default:
       return new Tone.Synth(opts as ConstructorParameters<typeof Tone.Synth>[0]);
   }
 }
 
-function encodeWAV(buffer: AudioBuffer): Blob {
-  const numChannels = buffer.numberOfChannels;
-  const sampleRate = buffer.sampleRate;
-  const format = 1; // PCM
-  const bitsPerSample = 16;
-  const bytesPerSample = bitsPerSample / 8;
-  const blockAlign = numChannels * bytesPerSample;
-  const dataLength = buffer.length * blockAlign;
-  const headerLength = 44;
-  const totalLength = headerLength + dataLength;
-
-  const arrayBuffer = new ArrayBuffer(totalLength);
-  const view = new DataView(arrayBuffer);
-
-  function writeString(offset: number, str: string) {
-    for (let i = 0; i < str.length; i++) {
-      view.setUint8(offset + i, str.charCodeAt(i));
-    }
-  }
-
-  writeString(0, "RIFF");
-  view.setUint32(4, totalLength - 8, true);
-  writeString(8, "WAVE");
-  writeString(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, format, true);
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * blockAlign, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, bitsPerSample, true);
-  writeString(36, "data");
-  view.setUint32(40, dataLength, true);
-
-  const channels: Float32Array[] = [];
-  for (let ch = 0; ch < numChannels; ch++) {
-    channels.push(buffer.getChannelData(ch));
-  }
-
-  let offset = 44;
-  for (let i = 0; i < buffer.length; i++) {
-    for (let ch = 0; ch < numChannels; ch++) {
-      const sample = Math.max(-1, Math.min(1, channels[ch][i]));
-      const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
-      view.setInt16(offset, intSample, true);
-      offset += 2;
-    }
-  }
-
-  return new Blob([arrayBuffer], { type: "audio/wav" });
-}
+// WAV encoding lives in wavEncoder.ts so songAnalyzer (Cover Song) can share it.
+import { encodeWAV } from "./wavEncoder";
 
 type PatternRenderData = {
   steps: number[][];
@@ -465,8 +424,16 @@ function createOfflineMasterOutput(master: MasterBus, applyMasterProcessing: boo
     mid: master.eqOn ? master.eqMid : 0,
     high: master.eqOn ? master.eqHigh : 0,
   }).connect(compressor);
+  const widener = new Tone.StereoWidener({
+    width: master.widthOn ? master.width : 0.5,
+  }).connect(masterEq);
+  const tape = new Tone.Distortion({
+    distortion: master.tapeOn ? master.tapeAmount * 0.4 : 0,
+    wet: master.tapeOn ? 1 : 0,
+    oversample: "2x",
+  }).connect(widener);
 
-  return new Tone.Gain(master.volume).connect(masterEq);
+  return new Tone.Gain(master.volume).connect(tape);
 }
 
 async function renderOfflineAudio(

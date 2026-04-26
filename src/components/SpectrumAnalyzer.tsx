@@ -13,14 +13,47 @@ function logBinIndex(x: number, binCount: number, sampleRate: number): number {
   return Math.max(0, Math.min(binCount - 1, idx));
 }
 
+// Producer-vocab frequency zones. Boundaries are textbook mixing splits —
+// when the X-ray overlay is on, bars get tinted by zone and lo/hi guides are
+// drawn so the eye learns where energy lives. This is the teaching surface.
+const ZONES: { short: string; lo: number; hi: number; color: string; rgba: string }[] = [
+  { short: "SUB",  lo: 20,    hi: 60,    color: "#7c3aed", rgba: "rgba(124,58,237,0.55)" },
+  { short: "BASS", lo: 60,    hi: 250,   color: "#6366f1", rgba: "rgba(99,102,241,0.55)" },
+  { short: "LOMID",lo: 250,   hi: 500,   color: "#06b6d4", rgba: "rgba(6,182,212,0.55)"  },
+  { short: "MID",  lo: 500,   hi: 2000,  color: "#22c55e", rgba: "rgba(34,197,94,0.55)"  },
+  { short: "PRES", lo: 2000,  hi: 6000,  color: "#f59e0b", rgba: "rgba(245,158,11,0.55)" },
+  { short: "AIR",  lo: 6000,  hi: 20000, color: "#ec4899", rgba: "rgba(236,72,153,0.55)" },
+];
+
+function hzForX(x: number): number {
+  const minHz = 30;
+  const maxHz = 22050;
+  return minHz * Math.pow(maxHz / minHz, x);
+}
+
+function xForHz(hz: number): number {
+  const minHz = 30;
+  const maxHz = 22050;
+  return Math.log(hz / minHz) / Math.log(maxHz / minHz);
+}
+
+function zoneIndexForHz(hz: number): number {
+  for (let i = 0; i < ZONES.length; i++) {
+    if (hz < ZONES[i].hi) return i;
+  }
+  return ZONES.length - 1;
+}
+
 export const SpectrumAnalyzer = memo(function SpectrumAnalyzer({
   getSpectrum,
   getWaveform,
   height = 64,
+  xrayOn = false,
 }: {
   getSpectrum: () => Float32Array | null;
   getWaveform: () => Float32Array | null;
   height?: number;
+  xrayOn?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Per-bar peak hold so loud transients leave a visible afterimage that
@@ -60,6 +93,34 @@ export const SpectrumAnalyzer = memo(function SpectrumAnalyzer({
       const spectrum = getSpectrum();
       const waveform = getWaveform();
 
+      // ── Zone bands (X-Ray overlay) ────────────────────────
+      // Vertical guide lines at zone boundaries + a thin label strip along
+      // the top. Drawn before the spectrum so bars sit on top.
+      if (xrayOn) {
+        ctx.fillStyle = "rgba(15, 14, 23, 0.0)";
+        for (let z = 0; z < ZONES.length; z++) {
+          const zone = ZONES[z];
+          const xLo = xForHz(zone.lo) * w;
+          const xHi = xForHz(zone.hi) * w;
+          // Faint band fill so the zone is visible at rest.
+          ctx.fillStyle = zone.rgba.replace("0.55", "0.06");
+          ctx.fillRect(xLo, 0, Math.max(1, xHi - xLo), h);
+          // Boundary line.
+          ctx.strokeStyle = "rgba(255,255,255,0.06)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(xHi, 0);
+          ctx.lineTo(xHi, h);
+          ctx.stroke();
+          // Label.
+          ctx.fillStyle = zone.color;
+          ctx.font = "9px ui-monospace, monospace";
+          ctx.textBaseline = "top";
+          const labelX = xLo + (xHi - xLo) / 2 - ctx.measureText(zone.short).width / 2;
+          ctx.fillText(zone.short, labelX, 2);
+        }
+      }
+
       // ── Spectrum bars (log freq axis, dB on y) ────────────
       if (spectrum) {
         const binCount = spectrum.length;
@@ -95,16 +156,26 @@ export const SpectrumAnalyzer = memo(function SpectrumAnalyzer({
           const barH = norm * h;
           const x = i * barWidth;
 
-          // Vertical gradient — body of the bar
-          const grad = ctx.createLinearGradient(0, h - barH, 0, h);
-          grad.addColorStop(0, "rgba(167, 139, 250, 0.95)");
-          grad.addColorStop(1, "rgba(139, 92, 246, 0.4)");
-          ctx.fillStyle = grad;
+          // In X-Ray mode tint the bar by its dominant frequency zone so the
+          // user can see at a glance which zones are eating headroom.
+          if (xrayOn) {
+            const centreHz = hzForX((i + 0.5) / barCount);
+            const zone = ZONES[zoneIndexForHz(centreHz)];
+            const grad = ctx.createLinearGradient(0, h - barH, 0, h);
+            grad.addColorStop(0, zone.rgba.replace("0.55", "0.95"));
+            grad.addColorStop(1, zone.rgba.replace("0.55", "0.35"));
+            ctx.fillStyle = grad;
+          } else {
+            const grad = ctx.createLinearGradient(0, h - barH, 0, h);
+            grad.addColorStop(0, "rgba(167, 139, 250, 0.95)");
+            grad.addColorStop(1, "rgba(139, 92, 246, 0.4)");
+            ctx.fillStyle = grad;
+          }
           ctx.fillRect(x + 0.5, h - barH, Math.max(1, barWidth - 1), barH);
 
           // Peak cap — single pixel marker that decays
+          ctx.fillStyle = xrayOn ? "rgba(255,255,255,0.85)" : "rgba(232, 121, 249, 0.9)";
           const peakY = h - peaks[i] * h;
-          ctx.fillStyle = "rgba(232, 121, 249, 0.9)";
           ctx.fillRect(x + 0.5, peakY, Math.max(1, barWidth - 1), 1.5);
         }
       }
@@ -113,7 +184,7 @@ export const SpectrumAnalyzer = memo(function SpectrumAnalyzer({
       if (waveform) {
         const len = waveform.length;
         ctx.beginPath();
-        ctx.strokeStyle = "rgba(232, 121, 249, 0.7)";
+        ctx.strokeStyle = xrayOn ? "rgba(255,255,255,0.45)" : "rgba(232, 121, 249, 0.7)";
         ctx.lineWidth = 1;
         for (let i = 0; i < len; i++) {
           const x = (i / (len - 1)) * w;
@@ -132,11 +203,12 @@ export const SpectrumAnalyzer = memo(function SpectrumAnalyzer({
       cancelAnimationFrame(raf);
       ro.disconnect();
     };
-  }, [getSpectrum, getWaveform]);
+  }, [getSpectrum, getWaveform, xrayOn]);
 
   return (
     <canvas
       ref={canvasRef}
+      data-sts-canvas="master-spectrum"
       style={{ height: `${height}px` }}
       className="w-full block bg-surface-2 rounded"
     />
