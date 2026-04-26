@@ -164,7 +164,7 @@ input[type="range"] {
 }
 .scene-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
   gap: 0.8rem;
 }
 .scene-card {
@@ -275,7 +275,7 @@ input[type="range"] {
 
 @media (max-width: 1050px) {
   .hero-panel, .brand-block { align-items: flex-start; flex-direction: column; }
-  .command-strip, .scene-grid, .studio-grid { grid-template-columns: 1fr; }
+  .command-strip, .studio-grid { grid-template-columns: 1fr; }
   .step-numbers { display: none; }
   .track-row { grid-template-columns: 1fr; }
 }

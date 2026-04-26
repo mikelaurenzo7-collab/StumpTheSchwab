@@ -101,6 +101,14 @@ function makePattern(track: Track, density: number, gravity: number) {
   });
 }
 
+function makeScenePattern(track: Track, preset: ScenePreset, trackIndex: number) {
+  return makePattern(track, preset.density, preset.macros.gravity).map((active, index) => {
+    if (preset.emphasis.includes(track.voice) && index % 4 === 0) return true;
+    if (preset.macros.fracture > FRACTURE_SCENE_THRESHOLD && (index + trackIndex) % FRACTURE_SCENE_INTERVAL === 0) return !active;
+    return active;
+  });
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
@@ -278,15 +286,15 @@ export default function Home() {
     setBpm(preset.bpm);
     setDensity(preset.density);
     setMacros(preset.macros);
-    setTracks((current) => current.map((track) => ({
-      ...track,
-      level: clamp(track.level + (preset.emphasis.includes(track.voice) ? EMPHASIS_BOOST : BACKGROUND_DIP), MIN_TRACK_LEVEL, 1),
-      pattern: makePattern(track, preset.density, preset.macros.gravity).map((active, index) => {
-        if (preset.emphasis.includes(track.voice) && index % 4 === 0) return true;
-        if (preset.macros.fracture > FRACTURE_SCENE_THRESHOLD && (index + track.hue) % FRACTURE_SCENE_INTERVAL === 0) return !active;
-        return active;
-      }),
-    })));
+    setTracks((current) => current.map((track, trackIndex) => {
+      const baseline = initialTracks.find((initialTrack) => initialTrack.id === track.id)?.level ?? track.level;
+
+      return {
+        ...track,
+        level: clamp(baseline + (preset.emphasis.includes(track.voice) ? EMPHASIS_BOOST : BACKGROUND_DIP), MIN_TRACK_LEVEL, 1),
+        pattern: makeScenePattern(track, preset, trackIndex),
+      };
+    }));
   };
 
   const mutate = () => {
