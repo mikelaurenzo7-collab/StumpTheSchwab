@@ -119,11 +119,14 @@ function estimateBpm(mono: Float32Array, sr: number): number | null {
   let bestLag = -1;
   let bestScore = 0;
 
+  // Score every candidate lag and remember the table for later half/double check
+  const scoreAt: number[] = new Array(maxLag + 1).fill(0);
   for (let lag = minLag; lag <= maxLag; lag++) {
     let score = 0;
     const count = nFrames - lag;
     for (let i = 0; i < count; i++) score += onset[i] * onset[i + lag];
     score /= count;
+    scoreAt[lag] = score;
     if (score > bestScore) {
       bestScore = score;
       bestLag = lag;
@@ -131,6 +134,28 @@ function estimateBpm(mono: Float32Array, sr: number): number | null {
   }
 
   if (bestLag <= 0) return null;
+
+  // Half / double tempo correction. Onset autocorrelation often locks onto
+  // 2× the true tempo on busy hat patterns and ½× on sparse-kick lofi. If
+  // the doubled or halved candidate scores well (≥0.7× the best) AND lands
+  // in the 80-160 BPM "musical comfort zone" while the current pick does
+  // not, swap to the alternate.
+  const inComfort = (bpm: number) => bpm >= 80 && bpm <= 160;
+  const bpmAt = (lag: number) => Math.round(fps * 60 / lag);
+  const currentBpm = bpmAt(bestLag);
+
+  if (!inComfort(currentBpm)) {
+    const halfLag = bestLag * 2; // half tempo
+    const doubleLag = Math.round(bestLag / 2); // double tempo
+    const candidates: Array<{ lag: number; bpm: number; score: number }> = [];
+    if (halfLag <= maxLag) candidates.push({ lag: halfLag, bpm: bpmAt(halfLag), score: scoreAt[halfLag] });
+    if (doubleLag >= minLag) candidates.push({ lag: doubleLag, bpm: bpmAt(doubleLag), score: scoreAt[doubleLag] });
+    const swap = candidates
+      .filter((c) => inComfort(c.bpm) && c.score >= 0.7 * bestScore)
+      .sort((a, b) => b.score - a.score)[0];
+    if (swap) bestLag = swap.lag;
+  }
+
   return Math.round(fps * 60 / bestLag);
 }
 
