@@ -228,6 +228,17 @@ export interface GeneratedBeat {
   explanation: string;
 }
 
+// ── Cover Song apply input — built by CoverSongModal from /api/cover result ────
+export interface ApplyCoverInput {
+  bpm: number;
+  swing: number;
+  totalSteps: 16 | 32;
+  kitPackId: string | null;       // skip kit swap if null
+  patternBeats: Array<{ slot: number; beat: GeneratedBeat }>;
+  chain: number[];
+  sampleLoads: Array<{ trackId: number; url: string; name: string }>;
+}
+
 export interface EngineState {
   bpm: number;
   swing: number;
@@ -307,6 +318,7 @@ export interface EngineState {
   euclideanFill: (trackId: number, hits: number, rotation: number) => void;
   applyGeneratedBeat: (beat: GeneratedBeat) => void;
   applyBeatToSlot: (slotIndex: number, beat: GeneratedBeat) => void;
+  applyCoverSong: (input: ApplyCoverInput) => void;
 
   copyTrackSteps: (trackId: number) => void;
   pasteTrackSteps: (trackId: number) => void;
@@ -1235,6 +1247,97 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
 
       return { patterns: updatedPatterns };
     });
+  },
+
+  // Cover Song apply — single Zustand action so the whole import is one undo
+  // step. Sets transport, swaps kit, fills pattern slots, sets chain, loads
+  // sample audio onto the chosen tracks, enables song mode.
+  applyCoverSong: (input) => {
+    pushHistory();
+    const total = input.totalSteps;
+
+    // Set transport first so kit pack BPM doesn't override our chosen BPM
+    set({
+      bpm: Math.max(30, Math.min(300, Math.round(input.bpm))),
+      swing: Math.max(0, Math.min(0.6, input.swing)),
+      totalSteps: total,
+    });
+
+    // Swap kit if a pack was suggested (don't apply pack tempo — we already set it)
+    if (input.kitPackId) {
+      const pack = findKitPack(input.kitPackId);
+      if (pack) {
+        set((state) => ({
+          activeKitPackId: pack.id,
+          tracks: state.tracks.map((t, i) => {
+            const ps = pack.sounds[i];
+            if (!ps) return t;
+            return { ...t, sound: { ...ps }, customSampleUrl: null, customSampleName: null };
+          }),
+        }));
+      }
+    }
+
+    // Fill pattern slots
+    const clampVel = (v: unknown): number => {
+      const n = typeof v === "number" ? v : 0;
+      return Math.max(0, Math.min(1, n));
+    };
+    const padArr = <T,>(src: T[] | undefined, length: number, fill: T): T[] =>
+      Array.from({ length }, (_, i) => (src && src[i] !== undefined ? src[i] : fill));
+
+    set((state) => {
+      const trackCount = state.tracks.length;
+      const updatedPatterns = state.patterns.map((p, slotIdx) => {
+        const entry = input.patternBeats.find((pb) => pb.slot === slotIdx);
+        if (!entry) {
+          // Resize to new total to keep playback consistent
+          return {
+            ...p,
+            steps: p.steps.map((row) => Array(total).fill(0).map((_, j) => row[j] ?? 0)),
+            notes: p.notes.map((row) => Array(total).fill("").map((_, j) => row[j] ?? "")),
+            probabilities: p.probabilities.map((row) => Array(total).fill(1.0).map((_, j) => row[j] ?? 1.0)),
+            nudge: p.nudge.map((row) => Array(total).fill(0).map((_, j) => row[j] ?? 0)),
+          };
+        }
+        const beat = entry.beat;
+        const newSteps = Array.from({ length: trackCount }, (_, i) => {
+          const key = GENERATED_TRACK_KEYS[i];
+          if (!key) return Array(total).fill(0);
+          return padArr(beat.tracks[key], total, 0).map(clampVel);
+        });
+        const newNotes = Array.from({ length: trackCount }, (_, i) => {
+          const key = GENERATED_TRACK_KEYS[i];
+          if (!key) return Array(total).fill("");
+          const isMelodic = key === "tom" || key === "perc" || key === "bass";
+          const notesRaw = isMelodic
+            ? beat.melodicNotes[key as "tom" | "perc" | "bass"]
+            : undefined;
+          return padArr<string>(notesRaw, total, "").map((n) => (typeof n === "string" ? n : ""));
+        });
+        return {
+          ...p,
+          name: (beat.name || PATTERN_LABELS[slotIdx]).slice(0, 16),
+          steps: newSteps,
+          notes: newNotes,
+          probabilities: Array.from({ length: trackCount }, () => Array(total).fill(1.0)),
+          nudge: Array.from({ length: trackCount }, () => Array(total).fill(0)),
+        };
+      });
+      return { patterns: updatedPatterns };
+    });
+
+    // Load sample audio onto chosen tracks
+    set((state) => ({
+      tracks: state.tracks.map((t, i) => {
+        const load = input.sampleLoads.find((s) => s.trackId === i);
+        if (!load) return t;
+        return { ...t, customSampleUrl: load.url, customSampleName: load.name };
+      }),
+    }));
+
+    // Set chain + enable song mode
+    set({ chain: input.chain, chainPosition: 0, songMode: true });
   },
 
   switchPatternSilent: (index) => {
