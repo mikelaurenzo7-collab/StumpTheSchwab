@@ -127,7 +127,7 @@ export function HelpOverlay() {
               </div>
 
               <div className="panel-soft rounded-lg p-3 text-[11px] leading-relaxed text-muted">
-                Double-click or right-click a lit step for micro edits. Ctrl or Cmd click cycles chance. Drag across the grid to paint rhythm quickly.
+                Double-click or right-click a lit step for micro edits. Ctrl or ⌘ click cycles chance. Drag across the grid to paint rhythm quickly.
               </div>
             </div>
           </aside>

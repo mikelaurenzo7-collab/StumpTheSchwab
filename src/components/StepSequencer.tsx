@@ -10,6 +10,7 @@ import { StepDetailPopover } from "@/components/StepDetailPopover";
 // at a time, app-wide.
 type PaintMode = "paint" | "erase" | null;
 const paintState: { mode: PaintMode } = { mode: null };
+const SINGLE_CLICK_COMMIT_DELAY_MS = 180;
 
 const velLabel = (v: number) =>
   v >= 1 ? "Full" : v >= 0.75 ? "High" : v >= 0.5 ? "Med" : "Soft";
@@ -88,7 +89,7 @@ const StepCell = memo(function StepCell({
         singleClickTimer.current = window.setTimeout(() => {
           onErase();
           singleClickTimer.current = null;
-        }, 180);
+        }, SINGLE_CLICK_COMMIT_DELAY_MS);
       }}
       onMouseEnter={() => {
         if (paintState.mode === "paint" && !active) {
