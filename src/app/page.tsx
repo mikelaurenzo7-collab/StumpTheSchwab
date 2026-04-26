@@ -327,7 +327,12 @@ function BrandMark() {
 function SectionHeader({ eyebrow, title, id }: { eyebrow: string; title: string; id?: string }) {
   return (
     <div className="mb-2 flex items-baseline justify-between">
-      <h2 id={id} className="text-[13px] font-bold tracking-tight text-foreground">{title}</h2>
+      <h2
+        {...(id ? { id } : {})}
+        className="text-[13px] font-bold tracking-tight text-foreground"
+      >
+        {title}
+      </h2>
       <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted">
         {eyebrow}
       </span>
