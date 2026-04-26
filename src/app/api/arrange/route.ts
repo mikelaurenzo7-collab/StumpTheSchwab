@@ -49,6 +49,7 @@ const MELODIC_KEYS = ["tom","perc","bass"] as const;
 const BEATS_PER_BAR = 4;
 const PATTERN_NAME_MAX_LENGTH = 16;
 const MAX_CHAIN_LENGTH = 16;
+const ARRANGE_CHAIN_SLOT_COUNT = SECTION_ROLES.length + 1; // seed slot + 7 arranged sections
 
 const arrangeSongTool: Anthropic.Tool = {
   name: "arrange_song",
@@ -323,7 +324,7 @@ function normalizeArrangeResult(input: ArrangeResult, totalSteps: number): Arran
       explanation: pattern.explanation || `${SECTION_ROLES[index]} variation.`,
     })),
     chain: input.chain
-      .filter((idx) => Number.isInteger(idx) && idx >= 0 && idx <= SECTION_ROLES.length)
+      .filter((idx) => Number.isInteger(idx) && idx >= 0 && idx < ARRANGE_CHAIN_SLOT_COUNT)
       .slice(0, MAX_CHAIN_LENGTH),
     explanation: input.explanation || "Arrangement generated.",
   };
