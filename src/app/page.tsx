@@ -41,11 +41,11 @@ type AudioWindow = Window &
   };
 
 const STEPS = 16;
-const EMPHASIS_BOOST = 0.12;
-const BACKGROUND_DIP = -0.08;
-const MIN_AUDIBLE_TRACK_LEVEL = 0.18;
-const FRACTURE_SCENE_THRESHOLD = 55;
-const FRACTURE_SCENE_INTERVAL = 5;
+const EMPHASIS_BOOST = 0.12; // Give scene-focus voices a noticeable push without clipping the balance.
+const BACKGROUND_DIP = -0.08; // Pull non-focus voices back just enough to create space.
+const MIN_AUDIBLE_TRACK_LEVEL = 0.18; // Keep every lane present after aggressive transformations.
+const FRACTURE_SCENE_THRESHOLD = 55; // Only highly fractured scenes should invert extra steps.
+const FRACTURE_SCENE_INTERVAL = 5; // Flip every fifth slot for a repeatable broken-grid feel.
 const FALLBACK_DIRECTIVE = "Design a session that feels alive before the first plugin loads.";
 const REGENERATE_DIRECTIVE = "A newly generated world, ready to be sculpted into the hook.";
 const DEFAULT_SPOTLIGHT = { name: "Pulse Engine", voice: "kick" as const, score: 0 };
@@ -165,7 +165,11 @@ function getMoveLevelDelta(voice: Track["voice"], move: PerformanceMove["id"]) {
     return voice === "kick" || voice === "bass" ? 0.1 : -0.03;
   }
 
-  return voice === "hat" || voice === "snare" || voice === "pluck" ? 0.05 : -0.01; // glitch
+  if (move === "glitch") {
+    return voice === "hat" || voice === "snare" || voice === "pluck" ? 0.05 : -0.01;
+  }
+
+  return -0.01;
 }
 
 function getMoveDensityDelta(move: PerformanceMove["id"]) {
@@ -460,11 +464,16 @@ export default function Home() {
     return Math.round((active / (tracks.length * STEPS)) * 100);
   }, [tracks]);
 
+  const macroPressure = useMemo(() => {
+    return Math.round((macros.bloom + macros.gravity + macros.shimmer + macros.fracture) / 4);
+  }, [macros]);
+
   const spotlight = useMemo(() => {
+    const defaultSpotlight = tracks[0] ? { name: tracks[0].name, voice: tracks[0].voice, score: 0 } : DEFAULT_SPOTLIGHT;
     return tracks.reduce((leader, track) => {
       const score = track.pattern.filter(Boolean).length * track.level;
       return score > leader.score ? { name: track.name, voice: track.voice, score } : leader;
-    }, { name: tracks[0]?.name ?? DEFAULT_SPOTLIGHT.name, voice: tracks[0]?.voice ?? DEFAULT_SPOTLIGHT.voice, score: 0 });
+    }, defaultSpotlight);
   }, [tracks]);
 
   return (
@@ -551,7 +560,7 @@ export default function Home() {
           </div>
           <div>
             <span>Macro pressure</span>
-            <strong>{Math.round((macros.bloom + macros.gravity + macros.shimmer + macros.fracture) / 4)}%</strong>
+            <strong>{macroPressure}%</strong>
           </div>
         </div>
       </section>
