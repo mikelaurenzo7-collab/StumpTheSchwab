@@ -34,6 +34,12 @@ type AudioWindow = Window &
   };
 
 const STEPS = 16;
+const EMPHASIS_BOOST = 0.12;
+const BACKGROUND_DIP = -0.08;
+const MIN_TRACK_LEVEL = 0.18;
+const FRACTURE_SCENE_THRESHOLD = 55;
+const FRACTURE_SCENE_INTERVAL = 5;
+const GENERATED_DIRECTIVE = "A newly generated world, ready to be sculpted into the hook.";
 const initialTracks: Track[] = [
   { id: "pulse", name: "Pulse Engine", voice: "kick", hue: 270, level: 0.92, pitch: 46, pattern: [true, false, false, false, true, false, false, true, true, false, false, false, true, false, true, false] },
   { id: "glass", name: "Glass Impact", voice: "snare", hue: 318, level: 0.76, pitch: 188, pattern: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, true] },
@@ -262,7 +268,7 @@ export default function Home() {
   const regenerate = () => {
     const names = ["Nebula Breaks", "Quantum Bounce", "Chrome Ritual", "Zero-G Garage", "Solar Drill", "Dream Collider"];
     setScene(names[Math.floor(Math.random() * names.length)]);
-    setDirective("A newly generated world, ready to be sculpted into the hook.");
+    setDirective(GENERATED_DIRECTIVE);
     setTracks((current) => current.map((track) => ({ ...track, pattern: makePattern(track, density, macros.gravity) })));
   };
 
@@ -274,10 +280,10 @@ export default function Home() {
     setMacros(preset.macros);
     setTracks((current) => current.map((track) => ({
       ...track,
-      level: clamp(track.level + (preset.emphasis.includes(track.voice) ? 0.12 : -0.08), 0.18, 1),
+      level: clamp(track.level + (preset.emphasis.includes(track.voice) ? EMPHASIS_BOOST : BACKGROUND_DIP), MIN_TRACK_LEVEL, 1),
       pattern: makePattern(track, preset.density, preset.macros.gravity).map((active, index) => {
         if (preset.emphasis.includes(track.voice) && index % 4 === 0) return true;
-        if (preset.macros.fracture > 55 && (index + track.hue) % 5 === 0) return !active;
+        if (preset.macros.fracture > FRACTURE_SCENE_THRESHOLD && (index + track.hue) % FRACTURE_SCENE_INTERVAL === 0) return !active;
         return active;
       }),
     })));
