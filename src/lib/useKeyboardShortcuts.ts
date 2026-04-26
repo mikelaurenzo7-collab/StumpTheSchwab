@@ -114,7 +114,7 @@ export function useKeyboardShortcuts(
           break;
         }
 
-        // 1-8: Switch patterns
+        // 1-8: Switch patterns / Shift+1-8: Trigger scenes in performance mode
         case "Digit1":
         case "Digit2":
         case "Digit3":
@@ -124,9 +124,23 @@ export function useKeyboardShortcuts(
         case "Digit7":
         case "Digit8": {
           if (e.metaKey || e.ctrlKey || e.altKey) break;
-          const idx = parseInt(e.code.replace("Digit", "")) - 1;
-          if (idx >= 0 && idx < MAX_PATTERNS) {
-            state.setCurrentPattern(idx);
+          const digitIdx = parseInt(e.code.replace("Digit", "")) - 1;
+          if (e.shiftKey && state.performanceMode) {
+            // Shift+1-8: toggle scene by index in performance mode
+            const scene = state.scenes[digitIdx];
+            if (scene) {
+              e.preventDefault();
+              if (state.activeScenes.has(scene.id)) {
+                state.stopScene(scene.id);
+              } else {
+                state.triggerScene(scene.id);
+              }
+            }
+          } else if (!e.shiftKey) {
+            // Plain 1-8: switch pattern
+            if (digitIdx >= 0 && digitIdx < MAX_PATTERNS) {
+              state.setCurrentPattern(digitIdx);
+            }
           }
           break;
         }

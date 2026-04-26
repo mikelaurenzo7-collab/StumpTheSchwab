@@ -71,10 +71,7 @@ export function SampleBrowser() {
   };
 
   const handleLoadSample = (sampleId: string) => {
-    if (selectedTrack === null) {
-      alert("Please select a track first");
-      return;
-    }
+    if (selectedTrack === null) return;
     loadSampleFromLibrary(selectedTrack, sampleId);
   };
 
@@ -395,6 +392,7 @@ export function SampleBrowser() {
                 <button
                   onClick={() => handleLoadSample(sample.id)}
                   disabled={selectedTrack === null}
+                  title={selectedTrack === null ? "Select a target track above before loading" : `Load into track ${selectedTrack + 1}`}
                   className={`rounded px-3 py-1.5 text-xs font-medium ${
                     selectedTrack === null
                       ? "cursor-not-allowed bg-surface-3 text-white/30"

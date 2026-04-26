@@ -56,6 +56,7 @@ const SHORTCUTS: ShortcutGroup[] = [
     items: [
       { keys: ["Q", "W", "E", "R"], label: "Trigger tracks 1–4" },
       { keys: ["T", "Y", "U", "I"], label: "Trigger tracks 5–8" },
+      { keys: ["⇧1", "–", "⇧8"], label: "Trigger scenes 1–8 (Perf Mode)" },
     ],
   },
   {

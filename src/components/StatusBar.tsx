@@ -109,6 +109,8 @@ export function StatusBar({ getMasterMeter, getMasterWaveform }: StatusBarProps)
           ? "text-foreground"
           : "text-muted";
 
+  const clipping = peakHold > -1;
+
   const peakLabel = !Number.isFinite(peakDb) ? "—∞" : `${peakDb.toFixed(1)}`;
   const holdLabel = !Number.isFinite(peakHold) ? "—∞" : `${peakHold.toFixed(1)}`;
 
@@ -175,7 +177,7 @@ export function StatusBar({ getMasterMeter, getMasterWaveform }: StatusBarProps)
         <div className="flex items-center gap-2">
           <span className="text-soft">PEAK</span>
           <PeakMeter db={peakDb} />
-          <span className={`tabular-nums ${peakColor}`}>{peakLabel}</span>
+          <span className={`tabular-nums ${peakColor}${clipping ? " animate-clip-pulse" : ""}`}>{peakLabel}</span>
           <span className="text-muted/70">/ hold {holdLabel}</span>
         </div>
         <button

@@ -336,3 +336,13 @@ input[type="checkbox"] {
 .border-accent { border-color: var(--accent); }
 
 .bg-background-2 { background-color: var(--background-2); }
+
+/* ─── Clip-pulse animation (StatusBar peak clipping) ─────────── */
+@keyframes clip-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+.animate-clip-pulse {
+  animation: clip-pulse 0.5s ease-in-out infinite;
+}
