@@ -39,7 +39,7 @@ const TABS = [
   { id: "arrange-ai",   label: "Arr+",    icon: "arrange-ai" },
   { id: "performance",  label: "Perf",    icon: "perf" },
   { id: "samples",      label: "Smpl",    icon: "samples" },
-  { id: "ai",           label: "AI",      icon: "ai" },
+  { id: "ai",           label: "Coproducer", icon: "ai" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -94,7 +94,8 @@ export default function DAW() {
     setRecoveryBanner(false);
   }, [clearAutosave]);
 
-  const activeTab = TABS.find((t) => t.id === sidebarTab) ?? TABS[0];
+  const activeTabIndex = TABS.findIndex((t) => t.id === sidebarTab);
+  const activeTab = TABS[activeTabIndex] ?? TABS[0];
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
@@ -205,7 +206,7 @@ export default function DAW() {
                 </div>
               </div>
               <span className="rounded-full border border-border bg-surface-3 px-2 py-0.5 font-mono text-[9px] tracking-wider text-muted">
-                {String(TABS.findIndex((t) => t.id === activeTab.id) + 1).padStart(2, "0")} / {String(TABS.length).padStart(2, "0")}
+                {String((activeTabIndex < 0 ? 0 : activeTabIndex) + 1).padStart(2, "0")} / {String(TABS.length).padStart(2, "0")}
               </span>
             </div>
 

@@ -203,7 +203,7 @@ button:disabled { cursor: not-allowed; }
 .button-primary {
   position: relative;
   background: var(--aurora);
-  background-size: 180% 180%;
+  background-size: 200% 100%;
   background-position: 0% 50%;
   color: #fff;
   border-color: rgba(0, 0, 0, 0.35);
@@ -455,7 +455,7 @@ input[type="checkbox"] { accent-color: var(--accent); }
 .sts-tab.is-active {
   color: #fff;
   background: var(--aurora);
-  background-size: 180% 180%;
+  background-size: 200% 100%;
   background-position: 30% 50%;
   border-color: rgba(0, 0, 0, 0.35);
   box-shadow:
@@ -621,7 +621,7 @@ input[type="checkbox"] { accent-color: var(--accent); }
 /* Brand mark — animated aurora gradient, always alive */
 .sts-brand-aurora {
   background: var(--aurora);
-  background-size: 220% 220%;
+  background-size: 200% 100%;
   animation: sts-aurora-spin 8s linear infinite;
 }
 
