@@ -32,6 +32,14 @@ function createOfflineSynth(sound: TrackSound): SynthNode {
       return new Tone.FMSynth(opts as ConstructorParameters<typeof Tone.FMSynth>[0]);
     case "monosynth":
       return new Tone.MonoSynth(opts as ConstructorParameters<typeof Tone.MonoSynth>[0]);
+    case "mic":
+      // Live mode uses Tone.UserMedia (mic input). Offline render can't
+      // capture mic — but if the user has saved a recording it will have
+      // been loaded as a sample and the sampler branch above takes over.
+      // For an empty mic slot, return a silent placeholder so steps don't
+      // trigger an audible Tone.Synth fallback.
+      console.warn("[export] mic track without a recording — exporting as silent.");
+      return new Tone.Synth({ volume: -Infinity });
     case "synth":
     default:
       return new Tone.Synth(opts as ConstructorParameters<typeof Tone.Synth>[0]);
