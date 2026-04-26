@@ -1,81 +1,132 @@
 @import "tailwindcss";
 
-/* ─────────────────────────────────────────────────────────────
-   StumpTheSchwab — UI design tokens
-   Calmer, sharper, more "studio gear" than "marketing splash."
-   Charcoal base, warm-amber primary, mint secondary, subtle borders.
-   ───────────────────────────────────────────────────────────── */
+/* ──────────────────────────────────────────────────────────────
+   StumpTheSchwab — "Aurora Deck"
+   A modern studio aesthetic.
+
+   Deep oil-slick canvas, electric violet → hot pink signature
+   gradient, frosted-glass surfaces, hairline borders with a
+   whisper of color, refined typography, audio-reactive accents.
+
+   The token names are stable so every existing component picks
+   up the new look automatically. Hardcoded amber text on accent
+   buttons (#1a1408) still reads well on the new violet — no
+   per-component churn required.
+   ────────────────────────────────────────────────────────────── */
 :root {
-  --background: #0a0a0c;
-  --background-2: #0f0f12;
-  --foreground: #e9e9ec;
-  --surface: #141418;
-  --surface-2: #1a1a20;
-  --surface-3: #22232a;
-  --border: #2a2b33;
-  --border-strong: #3a3b45;
+  /* Canvas — true near-black with a faint blue undertone */
+  --background:    #06070b;
+  --background-2:  #0b0c12;
+  --foreground:    #ededf3;
 
-  /* Primary action: warm amber — feels like a backlit hardware LED */
-  --accent: #f5a524;
-  --accent-hover: #ffc870;
-  --accent-dim: #8c5d10;
+  --surface:       #11131a;
+  --surface-2:     #181a23;
+  --surface-3:     #232634;
 
-  /* Secondary / cool: mint */
-  --cyan: #4ade9b;
+  --border:        #262936;
+  --border-strong: #3a3e50;
+
+  /* Signature: electric violet, with hot-pink hover and a deep dim */
+  --accent:        #a855f7;
+  --accent-hover:  #c084fc;
+  --accent-dim:    #5b21b6;
+
+  /* Companion accents used in gradients & highlights */
+  --accent-2:      #ec4899;  /* hot pink */
+  --accent-3:      #f97316;  /* coral — used for "hot" / clipping */
+
+  /* Cool counterpart */
+  --cyan:          #22d3ee;
 
   /* Status */
-  --success: #34d399;
-  --warning: #fbbf24;
-  --danger: #ef4444;
+  --success:       #10b981;
+  --warning:       #f59e0b;
+  --danger:        #f43f5e;
 
   /* Neutral text levels */
-  --muted: #8a8a93;
-  --foreground-soft: #c8c8cf;
+  --muted:         #7a7d8c;
+  --foreground-soft: #c2c4d0;
 
-  --glow: rgba(245, 165, 36, 0.22);
-  --shadow-soft: 0 1px 0 rgba(255, 255, 255, 0.03), 0 8px 24px rgba(0, 0, 0, 0.4);
-  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 48px rgba(0, 0, 0, 0.55);
-  --shadow-pop: 0 30px 80px rgba(0, 0, 0, 0.65);
-  --shadow-cyan-soft: 0 1px 0 rgba(255, 255, 255, 0.03), 0 10px 28px rgba(74, 222, 155, 0.06);
-  --shadow-accent-soft: 0 1px 0 rgba(255, 255, 255, 0.03), 0 10px 28px rgba(245, 165, 36, 0.10);
-  --ring-strong: rgba(245, 165, 36, 0.55);
+  /* Glow & shadows */
+  --glow:                rgba(168, 85, 247, 0.32);
+  --glow-pink:           rgba(236, 72, 153, 0.28);
+  --shadow-soft:         0 1px 0 rgba(255, 255, 255, 0.03), 0 6px 20px rgba(0, 0, 0, 0.45);
+  --shadow-panel:        0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 48px rgba(0, 0, 0, 0.6);
+  --shadow-pop:          0 30px 80px rgba(0, 0, 0, 0.7);
+  --shadow-cyan-soft:    0 1px 0 rgba(255, 255, 255, 0.03), 0 10px 28px rgba(34, 211, 238, 0.07);
+  --shadow-accent-soft:  0 1px 0 rgba(255, 255, 255, 0.03), 0 12px 32px rgba(168, 85, 247, 0.18);
+  --ring-strong:         rgba(168, 85, 247, 0.55);
+
+  /* Signature aurora gradient — used on the brand mark, primary
+     buttons, accent rules, and active tab pills */
+  --aurora: linear-gradient(
+    115deg,
+    #7c3aed 0%,
+    #a855f7 28%,
+    #ec4899 62%,
+    #f97316 100%
+  );
+  --aurora-soft: linear-gradient(
+    115deg,
+    rgba(124, 58, 237, 0.22) 0%,
+    rgba(168, 85, 247, 0.20) 28%,
+    rgba(236, 72, 153, 0.18) 62%,
+    rgba(249, 115, 22, 0.16) 100%
+  );
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-surface: var(--surface);
-  --color-surface-2: var(--surface-2);
-  --color-surface-3: var(--surface-3);
-  --color-border: var(--border);
-  --color-accent: var(--accent);
+  --color-surface:    var(--surface);
+  --color-surface-2:  var(--surface-2);
+  --color-surface-3:  var(--surface-3);
+  --color-border:     var(--border);
+  --color-accent:     var(--accent);
   --color-accent-hover: var(--accent-hover);
-  --color-accent-dim: var(--accent-dim);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-danger: var(--danger);
-  --color-muted: var(--muted);
-  --color-glow: var(--glow);
-  --color-cyan: var(--cyan);
+  --color-accent-dim:  var(--accent-dim);
+  --color-accent-2:    var(--accent-2);
+  --color-success:    var(--success);
+  --color-warning:    var(--warning);
+  --color-danger:     var(--danger);
+  --color-muted:      var(--muted);
+  --color-glow:       var(--glow);
+  --color-cyan:       var(--cyan);
   --font-sans: "Inter", "SF Pro Text", "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", "IBM Plex Mono", "Cascadia Code", ui-monospace, monospace;
 }
 
-/* ─── Body / global ──────────────────────────────────────────── */
+/* ─── Body / global ─────────────────────────────────────────── */
+html, body { background: var(--background); }
+
 body {
-  background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-  font-feature-settings: "ss01", "cv11";
+  font-feature-settings: "ss01", "cv11", "ss03";
   letter-spacing: -0.005em;
   min-height: 100dvh;
   color-scheme: dark;
-  /* Subtle vignette only — no grid spam, no rainbow gradients */
+  /* Living aurora at the edges — present but never shouty. The
+     `.sts-aurora-bg` element on top of body intensifies on play. */
   background-image:
-    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(245, 165, 36, 0.05), transparent 60%),
-    radial-gradient(ellipse 60% 50% at 50% 110%, rgba(74, 222, 155, 0.03), transparent 55%);
+    radial-gradient(ellipse 90% 55% at 12% -8%,  rgba(168, 85, 247, 0.18), transparent 62%),
+    radial-gradient(ellipse 70% 45% at 92% -4%,  rgba(236, 72, 153, 0.14), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 50% 110%, rgba(34, 211, 238,  0.07), transparent 55%);
   background-attachment: fixed;
 }
+
+/* Subtle film-grain so deep blacks don't band on cheap displays. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+body > * { position: relative; z-index: 1; }
 
 button,
 input,
@@ -83,34 +134,44 @@ select,
 textarea {
   font: inherit;
   transition:
-    border-color 140ms ease,
-    background-color 140ms ease,
-    color 140ms ease,
-    box-shadow 140ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
     transform 140ms ease,
     opacity 140ms ease;
 }
 
-button {
-  cursor: pointer;
-  letter-spacing: 0.01em;
-}
-
-button:disabled {
-  cursor: not-allowed;
-}
+button { cursor: pointer; letter-spacing: 0.01em; }
+button:disabled { cursor: not-allowed; }
 
 ::selection {
-  background: rgba(245, 165, 36, 0.32);
-  color: white;
+  background: rgba(168, 85, 247, 0.42);
+  color: #fff;
 }
 
-/* ─── Surfaces ───────────────────────────────────────────────── */
+/* ─── Surfaces ──────────────────────────────────────────────── */
 .panel {
   position: relative;
   border: 1px solid var(--border);
-  background: var(--surface);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0) 40%),
+    var(--surface);
   box-shadow: var(--shadow-panel);
+}
+.panel::before {
+  /* Whisper of color on the top edge — feels like backlit acrylic */
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(168, 85, 247, 0.35) 35%,
+    rgba(236, 72, 153, 0.30) 65%,
+    transparent 100%);
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 .panel-soft {
@@ -123,11 +184,13 @@ button:disabled {
 .glass-control {
   position: relative;
   border: 1px solid var(--border);
-  background: var(--background-2);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  background: rgba(17, 19, 26, 0.72);
+  backdrop-filter: blur(8px) saturate(1.1);
+  -webkit-backdrop-filter: blur(8px) saturate(1.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
-/* ─── Buttons ────────────────────────────────────────────────── */
+/* ─── Buttons ───────────────────────────────────────────────── */
 .button-primary,
 .button-secondary,
 .button-ghost,
@@ -138,101 +201,89 @@ button:disabled {
 }
 
 .button-primary {
-  background: var(--accent);
-  color: #1a1408;
-  border-color: rgba(0, 0, 0, 0.25);
+  position: relative;
+  background: var(--aurora);
+  background-size: 180% 180%;
+  background-position: 0% 50%;
+  color: #fff;
+  border-color: rgba(0, 0, 0, 0.35);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
-    0 8px 20px rgba(245, 165, 36, 0.18);
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.30),
+    0 8px 24px rgba(168, 85, 247, 0.28),
+    0 2px 8px rgba(236, 72, 153, 0.18);
   font-weight: 700;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
 }
-
 .button-primary:hover:not(:disabled) {
-  background: var(--accent-hover);
+  background-position: 100% 50%;
   transform: translateY(-1px);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
-    0 12px 28px rgba(245, 165, 36, 0.28);
+    inset 0 -1px 0 rgba(0, 0, 0, 0.28),
+    0 14px 32px rgba(168, 85, 247, 0.40),
+    0 4px 12px rgba(236, 72, 153, 0.28);
 }
-
 .button-primary:active:not(:disabled) {
   transform: translateY(0);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    inset 0 2px 4px rgba(0, 0, 0, 0.25);
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 2px 6px rgba(0, 0, 0, 0.30);
 }
 
 .button-secondary {
   background: var(--surface-3);
   color: var(--foreground-soft);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
-
 .button-secondary:hover:not(:disabled) {
-  background: #2c2d36;
+  background: #2c2f3e;
   border-color: var(--border-strong);
   color: var(--foreground);
 }
-
-.button-secondary:active:not(:disabled) {
-  background: #1c1d24;
-}
+.button-secondary:active:not(:disabled) { background: #1d2030; }
 
 .button-ghost {
   background: transparent;
   color: var(--muted);
   border-color: transparent;
 }
-
 .button-ghost:hover:not(:disabled) {
   color: var(--foreground);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.05);
 }
 
-/* ─── Inputs / Selects ───────────────────────────────────────── */
+/* ─── Inputs / Selects ──────────────────────────────────────── */
 .control-input,
 .control-select,
 .control-textarea {
   background: var(--background-2);
   color: var(--foreground);
-  box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.35);
 }
-
 .control-input:hover:not(:disabled),
 .control-select:hover:not(:disabled),
 .control-textarea:hover:not(:disabled) {
   border-color: var(--border-strong);
 }
-
 .control-input::placeholder,
-.control-textarea::placeholder {
-  color: var(--muted);
-}
+.control-textarea::placeholder { color: var(--muted); }
 
-/* ─── Pills / badges ─────────────────────────────────────────── */
+/* ─── Pills / badges ────────────────────────────────────────── */
 .pill-badge {
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--foreground-soft);
 }
 
-.shadow-cyan-soft {
-  box-shadow: var(--shadow-cyan-soft);
-}
+.shadow-cyan-soft   { box-shadow: var(--shadow-cyan-soft); }
+.shadow-accent-soft { box-shadow: var(--shadow-accent-soft); }
 
-.shadow-accent-soft {
-  box-shadow: var(--shadow-accent-soft);
-}
-
-/* ─── States ─────────────────────────────────────────────────── */
+/* ─── States ────────────────────────────────────────────────── */
 button:disabled,
 input:disabled,
 select:disabled,
-textarea:disabled {
-  opacity: 0.4;
-}
+textarea:disabled { opacity: 0.4; }
 
 button:focus-visible,
 input:focus-visible,
@@ -240,27 +291,22 @@ select:focus-visible,
 textarea:focus-visible {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(245, 165, 36, 0.3);
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.42);
 }
 
-/* ─── Scrollbars (minimal) ───────────────────────────────────── */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+/* ─── Scrollbars (minimal, Aurora-tinted hover) ─────────────── */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 999px;
   border: 2px solid var(--background);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--border-strong);
+  background: linear-gradient(180deg, var(--accent), var(--accent-2));
 }
 
-/* ─── Range inputs (sliders) ─────────────────────────────────── */
+/* ─── Range inputs (sliders) ────────────────────────────────── */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
@@ -276,19 +322,17 @@ input[type="range"]::-webkit-slider-track {
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 14px; height: 14px;
   border-radius: 50%;
   background: var(--accent);
   margin-top: -6px;
   border: 1px solid rgba(0, 0, 0, 0.4);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    0 2px 6px rgba(0, 0, 0, 0.4);
+    0 0 0 3px rgba(168, 85, 247, 0.12),
+    0 2px 6px rgba(0, 0, 0, 0.5);
 }
-input[type="range"]::-webkit-slider-thumb:hover {
-  background: var(--accent-hover);
-}
+input[type="range"]::-webkit-slider-thumb:hover { background: var(--accent-hover); }
 input[type="range"]::-moz-range-track {
   background: var(--background-2);
   height: 4px;
@@ -296,91 +340,192 @@ input[type="range"]::-moz-range-track {
   border: 1px solid var(--border);
 }
 input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 14px; height: 14px;
   border: 1px solid rgba(0, 0, 0, 0.4);
   border-radius: 50%;
   background: var(--accent);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    0 2px 6px rgba(0, 0, 0, 0.4);
+    0 2px 6px rgba(0, 0, 0, 0.5);
 }
 
-/* ─── Checkbox accent ────────────────────────────────────────── */
-input[type="checkbox"] {
-  accent-color: var(--accent);
-}
+/* ─── Checkbox accent ───────────────────────────────────────── */
+input[type="checkbox"] { accent-color: var(--accent); }
 
-/* ─── Text & color utility shims (keep components working) ───── */
-.text-muted { color: var(--muted); }
-.text-soft { color: var(--foreground-soft); }
-.text-cyan { color: var(--cyan); }
-.text-accent { color: var(--accent); }
+/* ─── Text & color utility shims (keep components working) ──── */
+.text-muted        { color: var(--muted); }
+.text-soft         { color: var(--foreground-soft); }
+.text-cyan         { color: var(--cyan); }
+.text-accent       { color: var(--accent); }
 .text-accent-hover { color: var(--accent-hover); }
-.text-success { color: var(--success); }
-.text-warning { color: var(--warning); }
-.text-danger { color: var(--danger); }
+.text-accent-2     { color: var(--accent-2); }
+.text-success      { color: var(--success); }
+.text-warning      { color: var(--warning); }
+.text-danger       { color: var(--danger); }
 
-.bg-accent { background-color: var(--accent); }
+.bg-accent     { background-color: var(--accent); }
 .bg-accent-dim { background-color: var(--accent-dim); }
-.bg-cyan { background-color: var(--cyan); }
-.bg-success { background-color: var(--success); }
-.bg-warning { background-color: var(--warning); }
-.bg-danger { background-color: var(--danger); }
-.bg-surface { background-color: var(--surface); }
-.bg-surface-2 { background-color: var(--surface-2); }
-.bg-surface-3 { background-color: var(--surface-3); }
+.bg-accent-2   { background-color: var(--accent-2); }
+.bg-cyan       { background-color: var(--cyan); }
+.bg-success    { background-color: var(--success); }
+.bg-warning    { background-color: var(--warning); }
+.bg-danger     { background-color: var(--danger); }
+.bg-surface    { background-color: var(--surface); }
+.bg-surface-2  { background-color: var(--surface-2); }
+.bg-surface-3  { background-color: var(--surface-3); }
 
-.border-border { border-color: var(--border); }
+.border-border        { border-color: var(--border); }
 .border-border-strong { border-color: var(--border-strong); }
-.border-accent { border-color: var(--accent); }
+.border-accent        { border-color: var(--accent); }
 
 .bg-background-2 { background-color: var(--background-2); }
 
-/* ─── Clip-pulse animation (StatusBar peak clipping) ─────────── */
-@keyframes clip-pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.45; }
+/* ─── Aurora utilities ──────────────────────────────────────── */
+.bg-aurora      { background-image: var(--aurora); }
+.bg-aurora-soft { background-image: var(--aurora-soft); }
+.text-aurora {
+  background-image: var(--aurora);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.border-aurora {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    var(--aurora) border-box;
 }
 
-.animate-clip-pulse {
-  animation: clip-pulse 0.5s ease-in-out infinite;
+/* Animated aurora bar — used under the header to show the app
+   is "alive". Subtle when idle, brighter when playing. */
+.sts-aurora-line {
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(168, 85, 247, 0.55) 15%,
+    rgba(236, 72, 153, 0.55) 50%,
+    rgba(249, 115, 22, 0.45) 80%,
+    transparent 100%);
+  background-size: 220% 100%;
+  animation: sts-aurora-drift 12s ease-in-out infinite;
+  opacity: 0.55;
 }
+.sts-aurora-line.is-playing {
+  height: 2px;
+  opacity: 1;
+  animation-duration: 4.5s;
+  filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.55));
+}
+
+@keyframes sts-aurora-drift {
+  0%, 100% { background-position:   0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+/* Segmented sidebar tab control */
+.sts-tabbar {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0) 40%),
+    var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+.sts-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 7px;
+  padding: 6px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  border: 1px solid transparent;
+  background: transparent;
+  transition: color 150ms ease, background-color 150ms ease, transform 150ms ease, box-shadow 200ms ease;
+}
+.sts-tab:hover { color: var(--foreground); background: var(--surface-3); }
+.sts-tab.is-active {
+  color: #fff;
+  background: var(--aurora);
+  background-size: 180% 180%;
+  background-position: 30% 50%;
+  border-color: rgba(0, 0, 0, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+    0 6px 18px rgba(168, 85, 247, 0.32);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+}
+.sts-tab .sts-tab-icon { width: 12px; height: 12px; opacity: 0.9; }
+
+/* Section header rule */
+.sts-section-rule {
+  display: inline-block;
+  width: 14px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--aurora);
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+/* ─── Clip-pulse animation (StatusBar peak clipping) ────────── */
+@keyframes clip-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+.animate-clip-pulse { animation: clip-pulse 0.5s ease-in-out infinite; }
 
 /* ─── Audio-Reactive UI — the interface breathes with the music ── */
 @keyframes sts-breathe {
-  0%, 100% { opacity: 0.6; }
+  0%, 100% { opacity: 0.65; }
   50%      { opacity: 1; }
 }
 
 @keyframes sts-glow-pulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(245, 165, 36, 0.1); }
-  50%      { box-shadow: 0 0 20px rgba(245, 165, 36, 0.25); }
+  0%, 100% { box-shadow: 0 0 10px rgba(168, 85, 247, 0.18); }
+  50%      { box-shadow: 0 0 24px rgba(236, 72, 153, 0.32); }
 }
 
 @keyframes sts-step-flash {
-  0%  { transform: scale(1.15); filter: brightness(1.4); }
-  100%{ transform: scale(1); filter: brightness(1); }
+  0%   { transform: scale(1.18); filter: brightness(1.5); }
+  100% { transform: scale(1);    filter: brightness(1); }
+}
+
+@keyframes sts-aurora-spin {
+  0%   { background-position:   0% 50%; }
+  100% { background-position: 200% 50%; }
 }
 
 /* Playing state — transport, active pattern, current step */
-.sts-is-playing {
-  animation: sts-glow-pulse 1.2s ease-in-out infinite;
-}
+.sts-is-playing { animation: sts-glow-pulse 1.2s ease-in-out infinite; }
 
 /* Step flash on trigger */
-.sts-step-flash {
-  animation: sts-step-flash 120ms ease-out;
-}
+.sts-step-flash { animation: sts-step-flash 120ms ease-out; }
 
 /* Beat-synced accent on the brand mark */
-.sts-brand-breathe {
-  animation: sts-breathe 0.5s ease-in-out infinite;
+.sts-brand-breathe { animation: sts-breathe 0.5s ease-in-out infinite; }
+
+/* Brand mark — animated aurora gradient, always alive */
+.sts-brand-aurora {
+  background: var(--aurora);
+  background-size: 220% 220%;
+  animation: sts-aurora-spin 8s linear infinite;
 }
 
 /* Master bus glow when loud */
 .sts-master-hot {
-  box-shadow: 0 0 24px rgba(245, 165, 36, 0.15), inset 0 0 12px rgba(245, 165, 36, 0.05);
+  box-shadow:
+    0 0 28px rgba(168, 85, 247, 0.22),
+    inset 0 0 14px rgba(236, 72, 153, 0.08);
   transition: box-shadow 200ms ease;
 }
 
@@ -388,4 +533,12 @@ input[type="checkbox"] {
 .sts-track-solo-glow {
   filter: drop-shadow(0 0 6px currentColor);
   transition: filter 150ms ease;
+}
+
+/* Reduced motion — calm everything down */
+@media (prefers-reduced-motion: reduce) {
+  .sts-aurora-line,
+  .sts-brand-aurora,
+  .sts-is-playing,
+  .sts-brand-breathe { animation: none !important; }
 }
