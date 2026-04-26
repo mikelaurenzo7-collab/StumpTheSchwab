@@ -18,12 +18,14 @@ import { StatusBar } from "@/components/StatusBar";
 import { PatternMatrix } from "@/components/PatternMatrix";
 import { FillEnginePanel } from "@/components/FillEnginePanel";
 import { AutoMixPanel } from "@/components/AutoMixPanel";
+import { ArrangementPanel } from "@/components/ArrangementPanel";
 import { CommandPalette } from "@/components/CommandPalette";
 import { MidiPanel } from "@/components/MidiPanel";
 import { useAudioEngine } from "@/lib/useAudioEngine";
 import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
 import { useMidi } from "@/lib/useMidi";
 import { useAutoSave } from "@/lib/useAutoSave";
+import { useEngineStore } from "@/store/engine";
 import { useUiStore } from "@/store/ui";
 import "@/store/history";
 
@@ -34,6 +36,7 @@ const TABS = [
   { id: "automation", label: "Auto" },
   { id: "fill", label: "Fill" },
   { id: "mix", label: "Mix" },
+  { id: "arrange-ai", label: "Arrange+" },
   { id: "performance", label: "Perf" },
   { id: "samples", label: "Samples" },
   { id: "ai", label: "AI" },
@@ -59,6 +62,7 @@ export default function DAW() {
   const [mixerOpen, setMixerOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<TabId>("matrix");
   const [coverOpen, setCoverOpen] = useState(false);
+  const playbackState = useEngineStore((s) => s.playbackState);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -104,7 +108,7 @@ export default function DAW() {
 
       <header className="flex items-center gap-3 border-b border-border bg-surface px-3 py-1.5">
         <div className="flex items-center gap-2">
-          <BrandMark />
+          <BrandMark isPlaying={playbackState === "playing"} />
           <div className="leading-tight">
             <div className="text-[12px] font-bold tracking-tight text-foreground">StumpTheSchwab</div>
             <div className="text-[9px] font-medium uppercase tracking-[0.18em] text-muted">Studio</div>
@@ -171,6 +175,13 @@ export default function DAW() {
             </div>
           )}
 
+          {sidebarTab === "arrange-ai" && (
+            <div className="panel rounded-lg p-3">
+              <SectionHeader eyebrow="Smart" title="Arrangement AI" />
+              <ArrangementPanel />
+            </div>
+          )}
+
           {sidebarTab === "performance" && <PerformanceMode />}
           {sidebarTab === "samples" && <SampleBrowser />}
           {sidebarTab === "ai" && (
@@ -191,7 +202,7 @@ export default function DAW() {
         </aside>
       </main>
 
-      <footer className="border-t border-border bg-surface">
+      <footer className={`border-t border-border bg-surface ${playbackState === "playing" && mixerOpen ? "sts-master-hot" : ""}`}>
         <button
           onClick={() => setMixerOpen((open) => !open)}
           className="flex w-full items-center justify-between px-3 py-1 text-left transition-colors hover:bg-surface-2"
@@ -263,9 +274,9 @@ function QuickStartPanel() {
   );
 }
 
-function BrandMark() {
+function BrandMark({ isPlaying }: { isPlaying?: boolean }) {
   return (
-    <div className="relative flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-accent to-[#c97e08] shadow-[inset_0_1px_0_rgba(255,255,255,0.4),0_4px_10px_rgba(245,165,36,0.3)]">
+    <div className={`relative flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-accent to-[#c97e08] shadow-[inset_0_1px_0_rgba(255,255,255,0.4),0_4px_10px_rgba(245,165,36,0.3)] ${isPlaying ? "sts-brand-breathe" : ""}`}>
       <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5" aria-hidden="true">
         <path d="M3 5c0-1.5 1.5-2 3-2s2 1 2 1M3 11c0 1.5 1.5 2 3 2s7-1 7-3-3-2-5-2" stroke="#1a1408" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>

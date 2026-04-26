@@ -346,3 +346,46 @@ input[type="checkbox"] {
 .animate-clip-pulse {
   animation: clip-pulse 0.5s ease-in-out infinite;
 }
+
+/* ─── Audio-Reactive UI — the interface breathes with the music ── */
+@keyframes sts-breathe {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
+}
+
+@keyframes sts-glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(245, 165, 36, 0.1); }
+  50%      { box-shadow: 0 0 20px rgba(245, 165, 36, 0.25); }
+}
+
+@keyframes sts-step-flash {
+  0%  { transform: scale(1.15); filter: brightness(1.4); }
+  100%{ transform: scale(1); filter: brightness(1); }
+}
+
+/* Playing state — transport, active pattern, current step */
+.sts-is-playing {
+  animation: sts-glow-pulse 1.2s ease-in-out infinite;
+}
+
+/* Step flash on trigger */
+.sts-step-flash {
+  animation: sts-step-flash 120ms ease-out;
+}
+
+/* Beat-synced accent on the brand mark */
+.sts-brand-breathe {
+  animation: sts-breathe 0.5s ease-in-out infinite;
+}
+
+/* Master bus glow when loud */
+.sts-master-hot {
+  box-shadow: 0 0 24px rgba(245, 165, 36, 0.15), inset 0 0 12px rgba(245, 165, 36, 0.05);
+  transition: box-shadow 200ms ease;
+}
+
+/* Track color glow on solo */
+.sts-track-solo-glow {
+  filter: drop-shadow(0 0 6px currentColor);
+  transition: filter 150ms ease;
+}

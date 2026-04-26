@@ -703,12 +703,32 @@ const ChannelStrip = memo(function ChannelStrip({
 });
 
 // ── Master Bus Strip ──────────────────────────────────────────
-function MasterStrip({ getLevel }: { getLevel: () => number }) {
+function MasterStrip({ getLevel, getLoudness, getTruePeak }: { getLevel: () => number; getLoudness?: () => number; getTruePeak?: () => number }) {
   const master = useEngineStore((s) => s.master);
   const setMaster = useEngineStore((s) => s.setMaster);
   const autoMix = useEngineStore((s) => s.autoMix);
 
   const [expanded, setExpanded] = useState(false);
+
+  // LUFS + TruePeak live readout
+  const [lufs, setLufs] = useState(-Infinity);
+  const [truePeak, setTruePeak] = useState(-Infinity);
+  useEffect(() => {
+    let raf = 0;
+    let last = 0;
+    const tick = (t: number) => {
+      raf = requestAnimationFrame(tick);
+      if (t - last < 200) return; // 5fps for text readouts
+      last = t;
+      if (getLoudness) setLufs(getLoudness());
+      if (getTruePeak) setTruePeak(getTruePeak());
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [getLoudness, getTruePeak]);
+
+  const lufsColor = lufs > -8 ? "text-red-400" : lufs > -14 ? "text-amber-300" : "text-emerald-400";
+  const tpColor = truePeak > -1 ? "text-red-400" : truePeak > -3 ? "text-amber-300" : "text-emerald-400";
 
   return (
     <div className="ml-1 flex flex-col items-center gap-1.5 border-l border-border pl-3">
@@ -750,6 +770,22 @@ function MasterStrip({ getLevel }: { getLevel: () => number }) {
             ? "-\u221E"
             : `${(20 * Math.log10(master.volume)).toFixed(1)}`}dB
         </span>
+
+        {/* LUFS + TruePeak readout — pro mastering meters */}
+        <div className="flex w-full flex-col items-center gap-0.5 rounded-md border border-border bg-background-2 px-1.5 py-1.5">
+          <div className="flex w-full items-center justify-between">
+            <span className="text-[7px] uppercase tracking-wider text-muted">LUFS</span>
+            <span className={`text-[9px] font-mono font-bold ${lufsColor}`}>
+              {!Number.isFinite(lufs) ? "—∞" : `${lufs.toFixed(1)}`}
+            </span>
+          </div>
+          <div className="flex w-full items-center justify-between">
+            <span className="text-[7px] uppercase tracking-wider text-muted">TP</span>
+            <span className={`text-[9px] font-mono font-bold ${tpColor}`}>
+              {!Number.isFinite(truePeak) ? "—∞" : `${truePeak.toFixed(1)}`}dB
+            </span>
+          </div>
+        </div>
 
         {/* EQ / Comp / Limiter toggles */}
         <div className="flex gap-1">
@@ -915,11 +951,15 @@ export function Mixer({
   getMasterMeter,
   getMasterSpectrum,
   getMasterWaveform,
+  getLoudness,
+  getTruePeak,
 }: {
   getTrackMeter: (index: number) => number;
   getMasterMeter: () => number;
   getMasterSpectrum: () => Float32Array | null;
   getMasterWaveform: () => Float32Array | null;
+  getLoudness?: () => number;
+  getTruePeak?: () => number;
 }) {
   const tracks = useEngineStore((s) => s.tracks);
   const setTrackVolume = useEngineStore((s) => s.setTrackVolume);
@@ -1094,7 +1134,7 @@ export function Mixer({
         ))}
 
         {/* Master bus */}
-          <MasterStrip getLevel={getMasterMeter} />
+          <MasterStrip getLevel={getMasterMeter} getLoudness={getLoudness} getTruePeak={getTruePeak} />
         </div>
       </div>
 

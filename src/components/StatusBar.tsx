@@ -8,6 +8,7 @@ import type { MidiStatus } from "@/lib/useMidi";
 
 interface StatusBarProps {
   getMasterMeter: () => number;
+  getMasterWaveform?: () => Float32Array | null;
   midiStatus?: MidiStatus;
 }
 
