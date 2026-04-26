@@ -32,6 +32,10 @@ AVAILABLE SYNTH TYPES AND THEIR TONE.JS CONSTRUCTOR OPTIONS:
 "monosynth" — Tone.MonoSynth (bass, leads with filter envelope)
   options keys: oscillator.type, envelope.attack/.decay/.sustain/.release, filter.Q (0–20), filter.type ("lowpass"|"highpass"|"bandpass"), filter.rolloff (-12|-24|-48), filterEnvelope.attack/.decay/.sustain/.release, filterEnvelope.baseFrequency (20–4000 Hz), filterEnvelope.octaves (0–6)
 
+UNIVERSAL VOICE OPTIONS (apply to any oscillator-based voice — synth/am/fm/monosynth/membrane):
+  • detune (cents, -100..+100): pitch offset; small values (±5..±15) for warmth, larger for layered character
+  • portamento (seconds, 0..0.5; ignored on membrane): glide time between consecutive notes — essential for legato monosynth basslines
+
 NOTE CONVENTIONS:
   Drums/noise: use the default note (kick: "C1", snare: "16n", hihat: "C6", etc.)
   Melodic synths: choose note from the track's typical range
@@ -138,7 +142,9 @@ export async function POST(req: NextRequest) {
     const response = await client.messages.create({
       model: "claude-opus-4-7",
       max_tokens: 2048,
-      thinking: { type: "adaptive" },
+      // Note: Anthropic forbids `thinking` together with a forced
+      // `tool_choice: { type: "tool", … }`. We force a single tool here, so
+      // thinking is omitted to avoid an HTTP 400.
       output_config: { effort: "low" },
       system: [
         { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },

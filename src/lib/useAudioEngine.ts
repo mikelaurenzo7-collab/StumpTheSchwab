@@ -18,6 +18,8 @@ export type SynthNode =
   | Tone.UserMedia;
 
 interface TrackFXChain {
+  bitCrusher: Tone.BitCrusher;
+  chorus: Tone.Chorus;
   drive: Tone.Distortion;
   filter: Tone.Filter;
   delay: Tone.FeedbackDelay;
@@ -87,9 +89,24 @@ export function triggerSynth(
 }
 
 function createTrackFX(destination: Tone.InputNode): TrackFXChain {
-  // Signal: synth → drive → filter → (dry / delay / reverb sends) → destination
+  // Signal: synth → bitCrusher → chorus → drive → filter → (dry / delay / reverb sends) → destination
+  // The crusher leads the chain so the drive/filter shape its aliased harmonics
+  // rather than introducing them after the fact (this is how classic lo-fi
+  // boxes sound — gritty THEN saturated, not the reverse). Chorus widens the
+  // crushed signal before any drive squashes the stereo image.
+  const bitCrusher = new Tone.BitCrusher(8);
+  bitCrusher.wet.value = 0;
+  const chorus = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.5 });
+  chorus.wet.value = 0;
+  // Tone.Chorus needs its internal LFOs started; otherwise the modulation
+  // is silent. We always start it — when wet=0 it has no audible effect.
+  chorus.start();
+  bitCrusher.connect(chorus);
+
   // Drive shapes harmonics BEFORE the filter so the filter can tame any harshness.
   const drive = new Tone.Distortion({ distortion: 0, wet: 1 });
+  chorus.connect(drive);
+
   const filter = new Tone.Filter({ frequency: 20000, type: "lowpass", Q: 1 });
   drive.connect(filter);
 
@@ -116,10 +133,31 @@ function createTrackFX(destination: Tone.InputNode): TrackFXChain {
   delayGain.connect(destination as unknown as Tone.ToneAudioNode);
   reverbGain.connect(destination as unknown as Tone.ToneAudioNode);
 
-  return { drive, filter, delay, reverb, delayGain, reverbGain, dryGain };
+  return { bitCrusher, chorus, drive, filter, delay, reverb, delayGain, reverbGain, dryGain };
 }
 
 function applyTrackFX(fx: TrackFXChain, effects: TrackEffects) {
+  // Bit crusher — bits Param controls the quantizer. wet handles dry/wet mix
+  // so even at 1 bit a low wet keeps the original signal dominant.
+  if (effects.bitCrushOn) {
+    // Clamp to Tone's documented 1..16 range. Lower = grittier.
+    const bits = Math.max(1, Math.min(16, Math.round(effects.bitCrushBits)));
+    fx.bitCrusher.bits.value = bits;
+    fx.bitCrusher.wet.value = effects.bitCrushWet;
+  } else {
+    fx.bitCrusher.wet.value = 0;
+  }
+
+  // Chorus — frequency is the LFO rate; depth widens the modulation. wet mixes
+  // dry centre against the modulated stereo split.
+  if (effects.chorusOn) {
+    fx.chorus.frequency.value = effects.chorusRate;
+    fx.chorus.depth = effects.chorusDepth;
+    fx.chorus.wet.value = effects.chorusWet;
+  } else {
+    fx.chorus.wet.value = 0;
+  }
+
   // Drive — Tone.Distortion's `distortion` is 0..1; combined with oversampling
   // it gives a clean tape-saturation feel at low values and a meaty crunch high.
   if (effects.driveOn) {
@@ -380,7 +418,7 @@ export function useAudioEngine() {
       } else {
         synth = createSynth(track.sound);
       }
-      synth.connect(fx.drive);
+      synth.connect(fx.bitCrusher);
 
       // Per-track auto-pan LFO. Always connected to panner.pan; AudioParams
       // sum input signals with the param's intrinsic value, so the LFO
@@ -505,14 +543,14 @@ export function useAudioEngine() {
           const sampler = new Tone.Sampler({
             urls: { [track.sound.note]: curr },
             onload: () => {
-              sampler.connect(fx.drive);
+              sampler.connect(fx.bitCrusher);
               synthsRef.current[i] = sampler;
               oldSynth?.dispose();
             },
           });
         } else {
           const synth = createSynth(track.sound);
-          synth.connect(fx.drive);
+          synth.connect(fx.bitCrusher);
           synthsRef.current[i] = synth;
           oldSynth?.dispose();
         }
@@ -545,7 +583,7 @@ export function useAudioEngine() {
         // If the synth voice type changed, we must recreate.
         if (!prev || prev.synth !== curr.synth) {
           const synth = createSynth(curr);
-          synth.connect(fx.drive);
+          synth.connect(fx.bitCrusher);
           synthsRef.current[i] = synth;
           oldSynth?.dispose();
           return;
@@ -559,7 +597,7 @@ export function useAudioEngine() {
           } catch {
             // Fallback: rebuild
             const synth = createSynth(curr);
-            synth.connect(fx.drive);
+            synth.connect(fx.bitCrusher);
             synthsRef.current[i] = synth;
             oldSynth.dispose();
           }
@@ -721,6 +759,8 @@ export function useAudioEngine() {
       masterFFTRef.current?.dispose();
       masterWaveformRef.current?.dispose();
       fxChainsRef.current.forEach((fx) => {
+        fx.bitCrusher.dispose();
+        fx.chorus.dispose();
         fx.drive.dispose();
         fx.filter.dispose();
         fx.delay.dispose();

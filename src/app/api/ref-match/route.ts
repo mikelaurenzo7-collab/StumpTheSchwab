@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
     const response = await client.messages.create({
       model: "claude-opus-4-7",
       max_tokens: 2048,
-      thinking: { type: "adaptive" },
+      // Anthropic forbids `thinking` with a forced `tool_choice: { type: "tool" }`.
       output_config: { effort: "low" },
       system: [
         { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },

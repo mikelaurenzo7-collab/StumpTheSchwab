@@ -46,7 +46,9 @@ function MiniSlider({
         ? `${value.toFixed(2)}`
         : unit === "dB"
           ? `${value.toFixed(0)}`
-          : `${Math.round(value * 100)}%`;
+          : unit === "bits"
+            ? `${Math.round(value)}`
+            : `${Math.round(value * 100)}%`;
 
   return (
     <div className={`flex flex-col items-center gap-0.5 ${disabled ? "opacity-30" : ""}`}>
@@ -63,7 +65,7 @@ function MiniSlider({
       />
       <span className="text-[8px] font-mono text-muted">
         {displayValue}
-        {unit === "Hz" ? "Hz" : unit === "s" ? "s" : unit === "dB" ? "dB" : ""}
+        {unit === "Hz" ? "Hz" : unit === "s" ? "s" : unit === "dB" ? "dB" : unit === "bits" ? "" : ""}
       </span>
     </div>
   );
@@ -208,6 +210,71 @@ const TrackFXPanel = memo(function TrackFXPanel({
             step={0.01}
             onChange={(v) => set("delayWet", v)}
             disabled={!effects.delayOn}
+          />
+        </div>
+      </div>
+
+      {/* Bit Crusher — quantizer-based grit. Lower bits = harsher 8-bit
+          aliasing; wet handles dry/wet so the effect can sit subtly in front
+          of the drive stage. */}
+      <div className="flex flex-col gap-1">
+        <FXToggle label="BIT" active={effects.bitCrushOn} onClick={() => set("bitCrushOn", !effects.bitCrushOn)} />
+        <div className="flex gap-1">
+          <MiniSlider
+            label="Bits"
+            value={effects.bitCrushBits}
+            min={1}
+            max={16}
+            step={1}
+            onChange={(v) => set("bitCrushBits", v)}
+            unit="bits"
+            disabled={!effects.bitCrushOn}
+          />
+          <MiniSlider
+            label="Wet"
+            value={effects.bitCrushWet}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={(v) => set("bitCrushWet", v)}
+            disabled={!effects.bitCrushOn}
+          />
+        </div>
+      </div>
+
+      {/* Chorus — stereo twin-LFO modulated delay. Adds depth, shimmer, and
+          width to held melodic content (pads, rhodes, bass). Subtle wet (0.2)
+          glues a dry mono synth into a stereo space. */}
+      <div className="flex flex-col gap-1">
+        <FXToggle label="CHO" active={effects.chorusOn} onClick={() => set("chorusOn", !effects.chorusOn)} />
+        <div className="flex gap-1">
+          <MiniSlider
+            label="Rate"
+            value={effects.chorusRate}
+            min={0.05}
+            max={8}
+            step={0.05}
+            onChange={(v) => set("chorusRate", v)}
+            unit="Hz"
+            disabled={!effects.chorusOn}
+          />
+          <MiniSlider
+            label="Depth"
+            value={effects.chorusDepth}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={(v) => set("chorusDepth", v)}
+            disabled={!effects.chorusOn}
+          />
+          <MiniSlider
+            label="Wet"
+            value={effects.chorusWet}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={(v) => set("chorusWet", v)}
+            disabled={!effects.chorusOn}
           />
         </div>
       </div>
