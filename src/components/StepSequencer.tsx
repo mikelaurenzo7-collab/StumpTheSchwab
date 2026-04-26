@@ -44,11 +44,11 @@ const StepCell = memo(function StepCell({
   onCtrlClick: () => void;
   beatStart: boolean;
 }) {
-  const singleClickTimer = useRef<number | null>(null);
-  const clearSingleClickTimer = useCallback(() => {
-    if (singleClickTimer.current !== null) {
-      window.clearTimeout(singleClickTimer.current);
-      singleClickTimer.current = null;
+  const singleClickEraseTimer = useRef<number | null>(null);
+  const clearSingleClickEraseTimer = useCallback(() => {
+    if (singleClickEraseTimer.current !== null) {
+      window.clearTimeout(singleClickEraseTimer.current);
+      singleClickEraseTimer.current = null;
     }
   }, []);
   const active = velocity > 0;
@@ -60,15 +60,15 @@ const StepCell = memo(function StepCell({
   }
 
   useEffect(() => {
-    return clearSingleClickTimer;
-  }, [clearSingleClickTimer]);
+    return clearSingleClickEraseTimer;
+  }, [clearSingleClickEraseTimer]);
 
   return (
     <button
       onMouseDown={(e) => {
         if (e.button !== 0) return;
         if (e.detail > 1) {
-          clearSingleClickTimer();
+          clearSingleClickEraseTimer();
           paintState.mode = null;
           return;
         }
@@ -85,10 +85,10 @@ const StepCell = memo(function StepCell({
       }}
       onClick={(e) => {
         if (!active || e.ctrlKey || e.metaKey || e.detail > 1) return;
-        clearSingleClickTimer();
-        singleClickTimer.current = window.setTimeout(() => {
+        clearSingleClickEraseTimer();
+        singleClickEraseTimer.current = window.setTimeout(() => {
           onErase();
-          singleClickTimer.current = null;
+          singleClickEraseTimer.current = null;
         }, SINGLE_CLICK_COMMIT_DELAY_MS);
       }}
       onMouseEnter={() => {
@@ -105,7 +105,7 @@ const StepCell = memo(function StepCell({
       }}
       onDoubleClick={(e) => {
         e.preventDefault();
-        clearSingleClickTimer();
+        clearSingleClickEraseTimer();
         const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
         onOpenDetail(rect);
       }}

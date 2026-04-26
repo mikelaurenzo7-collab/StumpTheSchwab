@@ -266,12 +266,14 @@ export default function DAW() {
 }
 
 function QuickStartPanel() {
+  const headingId = "quick-start-heading";
+
   return (
     <section
-      aria-label="Start here: make a beat in 3 moves"
+      aria-labelledby={headingId}
       className="panel rounded-lg border-accent/35 p-3 shadow-accent-soft"
     >
-      <SectionHeader eyebrow="Start here" title="Make a beat in 3 moves" />
+      <SectionHeader id={headingId} eyebrow="Start here" title="Make a beat in 3 moves" />
       <ol className="mt-2 space-y-2 text-[12px] text-soft">
         <li className="flex gap-2">
           <span className="text-accent">1</span>
@@ -322,10 +324,10 @@ function BrandMark() {
 }
 
 // ─── Compact section header ────────────────────────────────────
-function SectionHeader({ eyebrow, title }: { eyebrow: string; title: string }) {
+function SectionHeader({ eyebrow, title, id }: { eyebrow: string; title: string; id?: string }) {
   return (
     <div className="mb-2 flex items-baseline justify-between">
-      <h2 className="text-[13px] font-bold tracking-tight text-foreground">{title}</h2>
+      <h2 id={id} className="text-[13px] font-bold tracking-tight text-foreground">{title}</h2>
       <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted">
         {eyebrow}
       </span>
