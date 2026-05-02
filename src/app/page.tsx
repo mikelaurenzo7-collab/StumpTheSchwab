@@ -118,7 +118,12 @@ const BACKBEAT       = [false,false,false,false, true,false,false,false, false,f
 const BACKBEAT_GHOST = [false,false,false,false, true,false,false,true,  false,false,false,false, true,false,false,true];
 const HAT_EIGHTHS    = [true,false,true,false, true,false,true,false, true,false,true,false, true,false,true,false];
 const HAT_SIXTEENTHS = Array.from({ length: 16 }, () => true);
-const PAD_HOLD       = [true,false,false,false, true,false,false,false, true,false,false,false, true,false,false,false];
+// Single attack at step 0 — the chord rings for `1n` (one full measure) and
+// gets cleanly re-attacked at the start of the next bar when the progression
+// advances. Quarter-note re-triggering used to stack 4 overlapping voices per
+// measure on a PolySynth(maxPolyphony 5), starving voices and fighting the
+// pad's 0.95s attack — same envelope, much cleaner stack.
+const PAD_HOLD       = [true, ...Array.from({ length: 15 }, () => false)];
 const PAD_ONCE       = [true, ...Array.from({ length: 15 }, () => false)];
 const BASS_DOWNBEATS = [true,false,false,false, true,false,false,false, true,false,false,false, true,false,false,false];
 const BASS_SYNCO     = [true,false,false,true,  false,false,true,false, false,true,false,false, true,false,false,true];
@@ -478,6 +483,23 @@ function resetSectionState(graph: AudioGraph, time: number) {
   graph.chain.riserGain.gain.setValueAtTime(0, time);
 }
 
+// Bass note length scales with the gap to the next hit. Returns Tone.js time
+// notation: "16n" (sixteenth), "8n" (eighth), "4n" (quarter). Short when the
+// next 16th is also active (staccato — makes room), default 8n with one rest
+// after, quarter when the line opens up. The bass breathes with the pattern
+// instead of stamping the same 8n on every step.
+function bassNoteDuration(pat: boolean[], stepIdx: number): string {
+  let rests = 0;
+  for (let i = 1; i <= 4; i++) {
+    const next = (stepIdx + i) % 16;
+    if (pat[next]) break;
+    rests++;
+  }
+  if (rests === 0) return "16n";
+  if (rests === 1) return "8n";
+  return "4n";
+}
+
 // Per-step velocity envelope by voice — the "groove" that separates a real
 // drum part from a click-track. Multiplied against the track-level fader.
 function stepAccent(voice: Voice, stepIdx: number): number {
@@ -510,6 +532,7 @@ function applyVoiceTrigger(
   stepIdx: number,
   harmonyMeasure: number,
   isImpact = false,
+  pattern?: boolean[],
 ) {
   const { voices, chain } = graph;
   const baseVel = clamp(track.level, 0.05, 1);
@@ -536,10 +559,21 @@ function applyVoiceTrigger(
       voices.snareCrack.triggerAttackRelease("32n", time, velocity * 0.85);
       return;
     case "hat": {
-      const pan = hatState.count % 2 === 0 ? -0.32 : 0.32;
-      voices.hatPanner.pan.setValueAtTime(pan, time);
+      // Softer alternating pan (±0.24 vs the old ±0.32) plus a small
+      // deterministic drift so the hat line doesn't lock into a hard
+      // metronomic L/R bounce.
+      const panBase = hatState.count % 2 === 0 ? -0.24 : 0.24;
+      const panDrift = (((hatState.count * 0.317) % 1) - 0.5) * 0.12;
+      voices.hatPanner.pan.setValueAtTime(panBase + panDrift, time);
+      // Cycle through 4 close hat pitches + ±8% velocity wobble so consecutive
+      // hits aren't byte-identical. Reads as a shaken hi-hat, not a sample
+      // stamped on every 16th. Deterministic on count → still bit-reproducible
+      // for offline render.
+      const HAT_PITCHES = ["C6", "C#6", "B5", "D6"];
+      const note = HAT_PITCHES[hatState.count % HAT_PITCHES.length];
+      const velWobble = 0.92 + ((hatState.count * 0.137) % 1) * 0.16;
       hatState.count += 1;
-      voices.hat.triggerAttackRelease("C6", "32n", time, velocity * 0.7);
+      voices.hat.triggerAttackRelease(note, "32n", time, velocity * 0.7 * velWobble);
       return;
     }
     case "bass": {
@@ -550,8 +584,9 @@ function applyVoiceTrigger(
       if (role === "third") note = tones[1] ?? tones[0];
       else if (role === "fifth") note = tones[2] ?? tones[0];
       else if (role === "octave") note = Tone.Frequency(tones[0]).transpose(12).toNote();
-      voices.bass.triggerAttackRelease(note, "8n", time, velocity);
-      voices.bassSub.triggerAttackRelease(note, "8n", time, velocity * 0.7);
+      const dur = pattern ? bassNoteDuration(pattern, stepIdx) : "8n";
+      voices.bass.triggerAttackRelease(note, dur, time, velocity);
+      voices.bassSub.triggerAttackRelease(note, dur, time, velocity * 0.7);
       return;
     }
     case "pluck": {
@@ -559,7 +594,10 @@ function applyVoiceTrigger(
       const tones = chordNotes(song, chord, 4);
       const motif = song.pluckMotif[stepIdx];
       const note = motif == null ? tones[0] : (tones[motif % tones.length] ?? tones[0]);
-      voices.pluck.triggerAttackRelease(note, "16n", time, velocity);
+      // Deterministic ±6% velocity wobble keyed on step + bar so the same
+      // motif never plays twice with the exact same dynamics.
+      const wobble = 0.94 + (((stepIdx * 31 + harmonyMeasure * 7) % 13) / 13) * 0.12;
+      voices.pluck.triggerAttackRelease(note, "16n", time, velocity * wobble);
       return;
     }
     case "pad": {
@@ -761,7 +799,10 @@ export default function Home() {
     const chain = chainRef.current;
     const sends = sendsRef.current;
     if (!voices || !chain || !sends) return;
-    applyVoiceTrigger({ voices, chain, sends }, songRef.current, hatCountRef.current, track, time, stepIdx, harmonyMeasure);
+    applyVoiceTrigger(
+      { voices, chain, sends }, songRef.current, hatCountRef.current,
+      track, time, stepIdx, harmonyMeasure, false, track.pattern,
+    );
   }, []);
 
   useEffect(() => {
@@ -796,6 +837,20 @@ export default function Home() {
   useEffect(() => {
     Tone.getTransport().bpm.value = bpm;
   }, [bpm]);
+
+  // Spacebar toggles play/pause. Ignored when typing in the compose textarea
+  // (or any other text input) so prompts can contain spaces.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      e.preventDefault();
+      void ensureAudio().then(() => setPlaying((p) => !p));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [ensureAudio]);
 
   useEffect(() => {
     const transport = Tone.getTransport();
@@ -851,6 +906,7 @@ export default function Home() {
             applyVoiceTrigger(
               graph, songRef.current, hatCountRef.current,
               track, time, loc.stepInMeasure, loc.measureInSong, impactThisHit,
+              pat,
             );
           }
         });
@@ -981,6 +1037,7 @@ export default function Home() {
                 applyVoiceTrigger(
                   graph, songSnapshot, hatState, track,
                   time, loc.stepInMeasure, loc.measureInSong, impactThisHit,
+                  pat,
                 );
               }
             });
@@ -1375,7 +1432,8 @@ export default function Home() {
         <button
           className={`dock-play ${playing ? "is-playing" : ""}`}
           onClick={launch}
-          aria-label={playing ? "Pause engine" : "Start engine"}
+          aria-label={playing ? "Pause engine (space)" : "Start engine (space)"}
+          title="Space"
         >
           <span className="dock-play-icon">{playing ? "❚❚" : "▶"}</span>
           <span className="dock-play-label">{playing ? "pause" : "ignite"}</span>
