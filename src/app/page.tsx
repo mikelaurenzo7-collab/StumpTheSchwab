@@ -109,6 +109,114 @@ function buildSong(name: string): Song {
   };
 }
 
+type Voice = Track["voice"];
+type SectionVoiceConfig = { active: boolean; pattern?: boolean[] };
+type Section = { name: string; measures: number; voices: Record<Voice, SectionVoiceConfig> };
+
+const FOUR_ON_FLOOR  = [true,false,false,false, true,false,false,false, true,false,false,false, true,false,false,false];
+const BACKBEAT       = [false,false,false,false, true,false,false,false, false,false,false,false, true,false,false,false];
+const BACKBEAT_GHOST = [false,false,false,false, true,false,false,true,  false,false,false,false, true,false,false,true];
+const HAT_EIGHTHS    = [true,false,true,false, true,false,true,false, true,false,true,false, true,false,true,false];
+const HAT_SIXTEENTHS = Array.from({ length: 16 }, () => true);
+const PAD_HOLD       = [true,false,false,false, true,false,false,false, true,false,false,false, true,false,false,false];
+const PAD_ONCE       = [true, ...Array.from({ length: 15 }, () => false)];
+const BASS_DOWNBEATS = [true,false,false,false, true,false,false,false, true,false,false,false, true,false,false,false];
+const BASS_SYNCO     = [true,false,false,true,  false,false,true,false, false,true,false,false, true,false,false,true];
+const BASS_PUMP      = [true,false,true,false,  true,false,true,false,  true,false,true,false,  true,false,true,false];
+const PLUCK_INTRO    = [true,false,false,true,  false,false,true,false, false,false,true,false, false,true,false,false];
+const PLUCK_VERSE    = [true,false,true,false,  true,true,false,true,   false,true,false,true,  false,true,false,false];
+const PLUCK_BREAK    = [true,false,false,false, true,false,false,false, true,false,false,false, false,false,true,false];
+
+const ARRANGEMENT: Section[] = [
+  { name: "intro",  measures: 4,
+    voices: {
+      kick: { active: false }, snare: { active: false }, hat: { active: false },
+      bass: { active: false },
+      pluck: { active: true, pattern: PLUCK_INTRO },
+      pad:   { active: true, pattern: PAD_ONCE },
+    } },
+  { name: "verse",  measures: 8,
+    voices: {
+      kick:  { active: true, pattern: FOUR_ON_FLOOR },
+      snare: { active: true, pattern: BACKBEAT },
+      hat:   { active: true, pattern: HAT_EIGHTHS },
+      bass:  { active: true, pattern: BASS_DOWNBEATS },
+      pluck: { active: true, pattern: PLUCK_VERSE },
+      pad:   { active: false },
+    } },
+  { name: "build",  measures: 4,
+    voices: {
+      kick:  { active: true, pattern: FOUR_ON_FLOOR },
+      snare: { active: true, pattern: BACKBEAT_GHOST },
+      hat:   { active: true, pattern: HAT_SIXTEENTHS },
+      bass:  { active: false },
+      pluck: { active: true, pattern: PLUCK_VERSE },
+      pad:   { active: true, pattern: PAD_HOLD },
+    } },
+  { name: "drop",   measures: 16,
+    voices: {
+      kick:  { active: true, pattern: FOUR_ON_FLOOR },
+      snare: { active: true, pattern: BACKBEAT },
+      hat:   { active: true, pattern: HAT_EIGHTHS },
+      bass:  { active: true, pattern: BASS_PUMP },
+      pluck: { active: true, pattern: PLUCK_VERSE },
+      pad:   { active: true, pattern: PAD_HOLD },
+    } },
+  { name: "break",  measures: 4,
+    voices: {
+      kick: { active: false }, snare: { active: false }, hat: { active: false },
+      bass: { active: false },
+      pluck: { active: true, pattern: PLUCK_BREAK },
+      pad:   { active: true, pattern: PAD_ONCE },
+    } },
+  { name: "drop 2", measures: 8,
+    voices: {
+      kick:  { active: true, pattern: FOUR_ON_FLOOR },
+      snare: { active: true, pattern: BACKBEAT_GHOST },
+      hat:   { active: true, pattern: HAT_SIXTEENTHS },
+      bass:  { active: true, pattern: BASS_SYNCO },
+      pluck: { active: true, pattern: PLUCK_VERSE },
+      pad:   { active: true, pattern: PAD_HOLD },
+    } },
+  { name: "outro",  measures: 4,
+    voices: {
+      kick: { active: false }, snare: { active: false }, hat: { active: false },
+      bass: { active: false },
+      pluck: { active: true, pattern: PLUCK_INTRO },
+      pad:   { active: true, pattern: PAD_ONCE },
+    } },
+];
+
+const SONG_TOTAL_MEASURES = ARRANGEMENT.reduce((s, sec) => s + sec.measures, 0);
+const SONG_TOTAL_STEPS = SONG_TOTAL_MEASURES * 16;
+
+type SongLocation = {
+  section: Section;
+  sectionIndex: number;
+  measureInSong: number;
+  measureInSection: number;
+  stepInMeasure: number;
+};
+
+function locateInSong(globalStep: number): SongLocation {
+  const stepInMeasure = globalStep % 16;
+  const measureInSong = Math.floor(globalStep / 16);
+  let counter = 0;
+  for (let i = 0; i < ARRANGEMENT.length; i++) {
+    const section = ARRANGEMENT[i];
+    if (measureInSong < counter + section.measures) {
+      return {
+        section, sectionIndex: i, measureInSong,
+        measureInSection: measureInSong - counter,
+        stepInMeasure,
+      };
+    }
+    counter += section.measures;
+  }
+  const last = ARRANGEMENT[ARRANGEMENT.length - 1];
+  return { section: last, sectionIndex: ARRANGEMENT.length - 1, measureInSong, measureInSection: 0, stepInMeasure };
+}
+
 function chordNotes(song: Song, chord: Chord, octave: number): string[] {
   const tonicMidi = Tone.Frequency(`${song.key}${octave}`).toMidi();
   const rootSemis = MODE_INTERVALS[song.mode][(chord.degree - 1) % 7];
@@ -118,9 +226,8 @@ function chordNotes(song: Song, chord: Chord, octave: number): string[] {
   );
 }
 
-function activeChord(song: Song, step: number): Chord {
-  const measure = Math.floor(step / 4) % song.progression.length;
-  return song.progression[measure];
+function activeChord(song: Song, measure: number): Chord {
+  return song.progression[measure % song.progression.length];
 }
 
 const REVERB_SEND_BASE: Record<string, number> = {
@@ -256,8 +363,12 @@ export default function Home() {
   const [swing, setSwing] = useState(0.16);
   const [density, setDensity] = useState(62);
   const [song, setSong] = useState<Song>(() => buildSong("Nebula Breaks"));
+  const [songMode, setSongMode] = useState(false);
+  const [songProgress, setSongProgress] = useState(0);
   const [macros, setMacros] = useState<Macro>({ bloom: 72, gravity: 44, shimmer: 63, fracture: 28 });
   const songRef = useRef(song);
+  const songCursorRef = useRef(0);
+  const measureRef = useRef(0);
   const voicesRef = useRef<VoiceBundle | null>(null);
   const chainRef = useRef<MasterChain | null>(null);
   const sendsRef = useRef<Sends | null>(null);
@@ -267,8 +378,16 @@ export default function Home() {
 
   useEffect(() => { tracksRef.current = tracks; }, [tracks]);
   useEffect(() => { macrosRef.current = macros; }, [macros]);
-  useEffect(() => { stepRef.current = step; }, [step]);
   useEffect(() => { songRef.current = song; }, [song]);
+
+  const toggleSongMode = () => {
+    songCursorRef.current = 0;
+    measureRef.current = 0;
+    stepRef.current = 0;
+    setSongProgress(0);
+    setStep(0);
+    setSongMode((v) => !v);
+  };
 
   const ensureAudio = useCallback(async () => {
     await Tone.start();
@@ -392,7 +511,7 @@ export default function Home() {
     });
   }, []);
 
-  const triggerVoice = useCallback((track: Track, time: number, stepIdx: number) => {
+  const triggerVoice = useCallback((track: Track, time: number, stepIdx: number, harmonyMeasure: number) => {
     const voices = voicesRef.current;
     if (!voices) return;
 
@@ -412,7 +531,7 @@ export default function Home() {
         voices.hat.triggerAttackRelease("C6", "32n", time, velocity * 0.7);
         return;
       case "bass": {
-        const chord = activeChord(song, stepIdx);
+        const chord = activeChord(song, harmonyMeasure);
         const tones = chordNotes(song, chord, 1);
         const role = song.bassMotif[stepIdx];
         let note = tones[0];
@@ -424,7 +543,7 @@ export default function Home() {
         return;
       }
       case "pluck": {
-        const chord = activeChord(song, stepIdx);
+        const chord = activeChord(song, harmonyMeasure);
         const tones = chordNotes(song, chord, 4);
         const motif = song.pluckMotif[stepIdx];
         const note = motif == null ? tones[0] : (tones[motif % tones.length] ?? tones[0]);
@@ -432,20 +551,13 @@ export default function Home() {
         return;
       }
       case "pad": {
-        const chord = activeChord(song, stepIdx);
+        const chord = activeChord(song, harmonyMeasure);
         const tones = chordNotes(song, chord, 3);
         voices.pad.triggerAttackRelease(tones, "1n", time, velocity);
         return;
       }
     }
   }, []);
-
-  const pulse = useCallback((nextStep: number, time: number) => {
-    if (!voicesRef.current) return;
-    tracksRef.current.forEach((track) => {
-      if (track.pattern[nextStep]) triggerVoice(track, time, nextStep);
-    });
-  }, [triggerVoice]);
 
   useEffect(() => {
     const chain = chainRef.current;
@@ -489,19 +601,51 @@ export default function Home() {
   useEffect(() => {
     if (!playing) return;
     const transport = Tone.getTransport();
-    let cursor = stepRef.current;
     const id = transport.scheduleRepeat((time) => {
-      const current = cursor;
-      pulse(current, time);
-      Tone.getDraw().schedule(() => setStep(current), time);
-      cursor = (current + 1) % STEPS;
+      if (!voicesRef.current) return;
+      if (songMode) {
+        const cursor = songCursorRef.current;
+        if (cursor >= SONG_TOTAL_STEPS) {
+          songCursorRef.current = 0;
+          measureRef.current = 0;
+          Tone.getDraw().schedule(() => {
+            setPlaying(false);
+            setSongProgress(0);
+          }, time);
+          return;
+        }
+        const loc = locateInSong(cursor);
+        tracksRef.current.forEach((track) => {
+          const cfg = loc.section.voices[track.voice];
+          if (!cfg.active) return;
+          const pat = cfg.pattern ?? track.pattern;
+          if (pat[loc.stepInMeasure]) {
+            triggerVoice(track, time, loc.stepInMeasure, loc.measureInSong);
+          }
+        });
+        Tone.getDraw().schedule(() => {
+          setStep(loc.stepInMeasure);
+          setSongProgress(cursor);
+        }, time);
+        songCursorRef.current = cursor + 1;
+      } else {
+        const cursor = stepRef.current;
+        const measure = measureRef.current;
+        tracksRef.current.forEach((track) => {
+          if (track.pattern[cursor]) triggerVoice(track, time, cursor, measure);
+        });
+        Tone.getDraw().schedule(() => setStep(cursor), time);
+        const next = (cursor + 1) % STEPS;
+        stepRef.current = next;
+        if (next === 0) measureRef.current = measure + 1;
+      }
     }, "16n");
     transport.start();
     return () => {
       transport.clear(id);
       transport.stop();
     };
-  }, [playing, pulse]);
+  }, [playing, songMode, triggerVoice]);
 
   const launch = async () => {
     await ensureAudio();
@@ -543,12 +687,26 @@ export default function Home() {
   const playheadPoint = polar(RING_RADII[0] + 16, step);
   const trail = [1, 2, 3].map((offset) => polar(RING_RADII[0] + 16, (step - offset + STEPS) % STEPS));
 
-  const currentChord = activeChord(song, step);
+  const currentLocation = useMemo(() => locateInSong(songProgress), [songProgress]);
+  const harmonyMeasure = songMode ? currentLocation.measureInSong : 0;
+  const currentChord = activeChord(song, harmonyMeasure);
   const QUALITY_SUFFIX: Record<ChordQuality, string> = {
     maj: "", min: "m", dim: "°", maj7: "Δ7", min7: "m7", dom7: "7", sus2: "sus2", sus4: "sus4",
   };
   const chordRootName = chordNotes(song, currentChord, 3)[0].replace(/-?\d+$/, "");
   const chordLabel = `${chordRootName}${QUALITY_SUFFIX[currentChord.quality]}`;
+
+  const effectivePatternFor = (track: Track): boolean[] => {
+    if (!songMode) return track.pattern;
+    const cfg = currentLocation.section.voices[track.voice];
+    if (!cfg.active) return Array.from({ length: STEPS }, () => false);
+    return cfg.pattern ?? track.pattern;
+  };
+
+  const isVoiceActive = (track: Track): boolean => {
+    if (!songMode) return true;
+    return currentLocation.section.voices[track.voice].active;
+  };
 
   return (
     <main className="cosmos">
@@ -582,19 +740,54 @@ export default function Home() {
             <span className="dot" />
             <strong>{playing ? "live" : "armed"}</strong>
           </div>
+          <button
+            type="button"
+            className={`mode-toggle ${songMode ? "is-song" : ""}`}
+            onClick={toggleSongMode}
+            aria-pressed={songMode}
+          >
+            <span>{songMode ? "song" : "loop"}</span>
+            <em>{songMode ? "arrangement" : "16-step ring"}</em>
+          </button>
         </div>
       </header>
+
+      {songMode && (
+        <nav className="song-form" aria-label="Song arrangement">
+          {ARRANGEMENT.map((section, i) => {
+            const isActive = i === currentLocation.sectionIndex;
+            const isPast = i < currentLocation.sectionIndex;
+            return (
+              <div
+                key={`${section.name}-${i}`}
+                className={`form-block ${isActive ? "active" : ""} ${isPast ? "past" : ""}`}
+                style={{ flexGrow: section.measures }}
+                aria-current={isActive ? "step" : undefined}
+              >
+                <span>{section.name}</span>
+                <em>
+                  {isActive
+                    ? `${currentLocation.measureInSection + 1}/${section.measures}`
+                    : `${section.measures}m`}
+                </em>
+              </div>
+            );
+          })}
+        </nav>
+      )}
 
       <section className="cosmos-stage">
         <aside className="rack rack-left">
           <p className="rack-tag">channels / 06</p>
           <div className="strip-stack">
             {tracks.map((track) => {
-              const firing = playing && step !== null && track.pattern[step];
+              const pat = effectivePatternFor(track);
+              const muted = !isVoiceActive(track);
+              const firing = playing && pat[step] && !muted;
               return (
                 <div
                   key={track.id}
-                  className={`strip ${firing ? "is-firing" : ""}`}
+                  className={`strip ${firing ? "is-firing" : ""} ${muted ? "is-muted" : ""}`}
                   style={{ "--strip-hue": track.hue } as React.CSSProperties}
                 >
                   <div className="strip-head">
@@ -688,19 +881,21 @@ export default function Home() {
               />
               <circle cx={playheadPoint.x} cy={playheadPoint.y} r="6" className="playhead-tip" />
 
-              {tracks.map((track, trackIndex) =>
-                track.pattern.map((active, stepIndex) => {
+              {tracks.map((track, trackIndex) => {
+                const pat = effectivePatternFor(track);
+                const muted = !isVoiceActive(track);
+                return pat.map((active, stepIndex) => {
                   const point = polar(RING_RADII[trackIndex], stepIndex);
                   const isCurrent = stepIndex === step;
-                  const firing = isCurrent && active;
+                  const firing = isCurrent && active && !muted;
                   return (
-                    <g key={`${track.id}-${stepIndex}`} className={`step-node ${active ? "is-on" : ""} ${isCurrent ? "is-current" : ""} ${firing ? "is-firing" : ""}`}>
+                    <g key={`${track.id}-${stepIndex}`} className={`step-node ${active ? "is-on" : ""} ${isCurrent ? "is-current" : ""} ${firing ? "is-firing" : ""} ${muted ? "is-muted" : ""}`}>
                       <circle
                         cx={point.x}
                         cy={point.y}
                         r={STEP_RADIUS + 6}
                         className="step-halo"
-                        style={{ fill: `hsla(${track.hue}, 90%, 62%, 0.22)` }}
+                        style={{ fill: `hsla(${track.hue}, 90%, 62%, ${muted ? 0.04 : 0.22})` }}
                       />
                       <circle
                         cx={point.x}
@@ -708,17 +903,18 @@ export default function Home() {
                         r={STEP_RADIUS}
                         className="step-cell"
                         style={{
-                          fill: active ? `hsl(${track.hue}, 88%, 62%)` : "rgba(255,255,255,0.05)",
-                          stroke: active
+                          fill: active && !muted ? `hsl(${track.hue}, 88%, 62%)` : "rgba(255,255,255,0.05)",
+                          stroke: active && !muted
                             ? `hsla(${track.hue}, 92%, 78%, 0.85)`
-                            : `hsla(${track.hue}, 70%, 60%, 0.35)`,
+                            : `hsla(${track.hue}, 70%, 60%, ${muted ? 0.12 : 0.35})`,
+                          opacity: muted ? 0.4 : 1,
                         }}
-                        onClick={() => toggleStep(trackIndex, stepIndex)}
+                        onClick={() => !songMode && toggleStep(trackIndex, stepIndex)}
                       />
                     </g>
                   );
-                }),
-              )}
+                });
+              })}
 
               {Array.from({ length: STEPS }, (_, i) => {
                 const point = polar(RING_RADII[0] + 30, i);
@@ -738,9 +934,13 @@ export default function Home() {
             </svg>
 
             <div className="orb-core-text">
-              <span>chord</span>
+              <span>{songMode ? currentLocation.section.name : "chord"}</span>
               <strong>{chordLabel}</strong>
-              <span className="orb-step">step {String(step + 1).padStart(2, "0")} / 16 · {energy}%</span>
+              <span className="orb-step">
+                {songMode
+                  ? `bar ${currentLocation.measureInSong + 1} / ${SONG_TOTAL_MEASURES}`
+                  : `step ${String(step + 1).padStart(2, "0")} / 16 · ${energy}%`}
+              </span>
             </div>
           </div>
         </div>

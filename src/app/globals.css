@@ -211,6 +211,108 @@ input[type="range"] { width: 100%; accent-color: var(--hot); }
   text-transform: uppercase;
 }
 
+.mode-toggle {
+  display: grid;
+  align-content: center;
+  gap: 0.1rem;
+  padding: 0.4rem 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: rgba(255,255,255,0.04);
+  color: inherit;
+  text-align: left;
+  transition: border-color 180ms ease, background 200ms ease, transform 120ms ease;
+}
+.mode-toggle span {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+.mode-toggle em {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mode-toggle:hover { transform: translateY(-1px); border-color: var(--violet); }
+.mode-toggle.is-song {
+  background: linear-gradient(120deg, rgba(139,92,246,0.28), rgba(244,114,182,0.18));
+  border-color: rgba(139,92,246,0.6);
+  box-shadow: 0 0 0 1px rgba(139,92,246,0.2), 0 8px 28px rgba(139,92,246,0.18);
+}
+.mode-toggle.is-song span {
+  background: linear-gradient(120deg, #fff, #c4b5fd);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.song-form {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--panel);
+  backdrop-filter: blur(20px) saturate(1.2);
+  box-shadow: 0 12px 36px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.form-block {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  background: rgba(255,255,255,0.025);
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
+  overflow: hidden;
+}
+.form-block span {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.form-block em {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  color: var(--muted-soft);
+  white-space: nowrap;
+}
+.form-block.past {
+  background: rgba(139,92,246,0.04);
+  border-color: rgba(139,92,246,0.18);
+}
+.form-block.past span { color: rgba(196, 181, 253, 0.55); }
+.form-block.active {
+  background: linear-gradient(120deg, rgba(244,114,182,0.22), rgba(139,92,246,0.18));
+  border-color: rgba(244,114,182,0.55);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06), 0 0 24px rgba(244,114,182,0.18);
+}
+.form-block.active span { color: #fff; font-weight: 800; }
+.form-block.active em { color: rgba(255,255,255,0.75); }
+
+.strip.is-muted {
+  opacity: 0.42;
+  filter: saturate(0.45);
+}
+.strip.is-muted .strip-led { background: rgba(255,255,255,0.08); box-shadow: none; }
+
+.step-node.is-muted .step-cell { cursor: default; }
+
 /* ───────── stage ───────── */
 .cosmos-stage {
   display: grid;
