@@ -40,10 +40,88 @@ const initialTracks: Track[] = [
   { id: "dust", name: "Photon Dust", voice: "hat", glyph: "·", hue: 190, level: 0.58, pitch: 6200, pattern: [true, false, true, false, true, true, true, false, true, false, true, false, true, true, false, true] },
   { id: "sub", name: "Sub Collider", voice: "bass", glyph: "▼", hue: 154, level: 0.84, pitch: 55, pattern: [true, false, false, true, false, false, true, false, false, true, false, false, true, false, false, false] },
   { id: "keys", name: "Neon Keys", voice: "pluck", glyph: "◆", hue: 42, level: 0.64, pitch: 330, pattern: [false, true, false, false, false, true, false, true, false, false, true, false, false, true, false, false] },
-  { id: "aura", name: "Aura Pad", voice: "pad", glyph: "◯", hue: 226, level: 0.52, pitch: 110, pattern: [true, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false] },
+  { id: "aura", name: "Aura Pad", voice: "pad", glyph: "◯", hue: 226, level: 0.52, pitch: 110, pattern: [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false] },
 ];
 
-const scale = [0, 2, 3, 5, 7, 10, 12, 14];
+type Mode = "minor" | "major" | "dorian" | "phrygian" | "mixolydian";
+type ChordQuality = "maj" | "min" | "dim" | "maj7" | "min7" | "dom7" | "sus2" | "sus4";
+type Chord = { degree: number; quality: ChordQuality };
+type BassRole = "root" | "fifth" | "octave" | "third";
+
+type Song = {
+  name: string;
+  key: string;
+  mode: Mode;
+  progression: Chord[];
+  pluckMotif: (number | null)[];
+  bassMotif: BassRole[];
+};
+
+const MODE_INTERVALS: Record<Mode, number[]> = {
+  minor:      [0, 2, 3, 5, 7, 8, 10],
+  major:      [0, 2, 4, 5, 7, 9, 11],
+  dorian:     [0, 2, 3, 5, 7, 9, 10],
+  phrygian:   [0, 1, 3, 5, 7, 8, 10],
+  mixolydian: [0, 2, 4, 5, 7, 9, 10],
+};
+
+const QUALITY_INTERVALS: Record<ChordQuality, number[]> = {
+  maj:  [0, 4, 7],
+  min:  [0, 3, 7],
+  dim:  [0, 3, 6],
+  maj7: [0, 4, 7, 11],
+  min7: [0, 3, 7, 10],
+  dom7: [0, 4, 7, 10],
+  sus2: [0, 2, 7],
+  sus4: [0, 5, 7],
+};
+
+const PLUCK_MOTIFS: (number | null)[][] = [
+  [0, null, 2, null, 1, null, 0, 2,  null, 1, 2, null, 0, null, 2, 1],
+  [0, 2, null, 1, null, 0, 2, null,  1, null, 2, 1, 0, 2, null, 1],
+  [null, 1, 0, null, 2, null, 1, 0,  null, 2, 1, 0, null, 1, 2, null],
+  [0, null, null, 1, 2, null, 0, null, 1, null, 2, 0, null, 1, null, 2],
+  [2, 1, 0, null, 2, 1, 0, null,     2, 1, 0, 2, 1, null, 2, 0],
+];
+
+const BASS_MOTIFS: BassRole[][] = [
+  ["root","root","root","fifth","root","root","octave","root","root","fifth","root","root","root","octave","root","fifth"],
+  ["root","fifth","root","octave","root","fifth","root","octave","root","fifth","root","octave","root","fifth","root","octave"],
+  ["root","root","fifth","root","root","third","fifth","octave","root","root","fifth","root","root","third","fifth","octave"],
+  ["root","octave","root","root","fifth","root","octave","fifth","root","octave","root","root","fifth","root","octave","fifth"],
+];
+
+const SCENE_TEMPLATES: Pick<Song, "name" | "key" | "mode" | "progression">[] = [
+  { name: "Nebula Breaks",  key: "A", mode: "minor",      progression: [{degree:1,quality:"min"},{degree:6,quality:"maj"},{degree:3,quality:"maj"},{degree:7,quality:"maj"}] },
+  { name: "Quantum Bounce", key: "C", mode: "major",      progression: [{degree:1,quality:"maj"},{degree:5,quality:"maj"},{degree:6,quality:"min"},{degree:4,quality:"maj"}] },
+  { name: "Chrome Ritual",  key: "F", mode: "phrygian",   progression: [{degree:1,quality:"min"},{degree:2,quality:"maj"},{degree:1,quality:"min"},{degree:7,quality:"maj"}] },
+  { name: "Zero-G Garage",  key: "G", mode: "minor",      progression: [{degree:1,quality:"min7"},{degree:4,quality:"min7"},{degree:6,quality:"maj7"},{degree:5,quality:"min7"}] },
+  { name: "Solar Drill",    key: "D", mode: "dorian",     progression: [{degree:1,quality:"min7"},{degree:4,quality:"maj7"},{degree:1,quality:"min7"},{degree:5,quality:"min7"}] },
+  { name: "Dream Collider", key: "E", mode: "minor",      progression: [{degree:1,quality:"min"},{degree:7,quality:"maj"},{degree:6,quality:"maj"},{degree:5,quality:"min"}] },
+];
+
+function buildSong(name: string): Song {
+  const tmpl = SCENE_TEMPLATES.find((s) => s.name === name) ?? SCENE_TEMPLATES[0];
+  return {
+    ...tmpl,
+    pluckMotif: PLUCK_MOTIFS[Math.floor(Math.random() * PLUCK_MOTIFS.length)],
+    bassMotif: BASS_MOTIFS[Math.floor(Math.random() * BASS_MOTIFS.length)],
+  };
+}
+
+function chordNotes(song: Song, chord: Chord, octave: number): string[] {
+  const tonicMidi = Tone.Frequency(`${song.key}${octave}`).toMidi();
+  const rootSemis = MODE_INTERVALS[song.mode][(chord.degree - 1) % 7];
+  const rootMidi = tonicMidi + rootSemis;
+  return QUALITY_INTERVALS[chord.quality].map((o) =>
+    Tone.Frequency(rootMidi + o, "midi").toNote(),
+  );
+}
+
+function activeChord(song: Song, step: number): Chord {
+  const measure = Math.floor(step / 4) % song.progression.length;
+  return song.progression[measure];
+}
 
 const REVERB_SEND_BASE: Record<string, number> = {
   pulse: 0.04,
@@ -86,7 +164,8 @@ function makePattern(track: Track, density: number, gravity: number) {
     if (track.voice === "kick") return downbeat || (phase > 0.75 && density > 64);
     if (track.voice === "snare") return step === 4 || step === 12 || (phase > 0.86 && density > 74);
     if (track.voice === "hat") return step % 2 === 0 || phase > 0.38;
-    if (track.voice === "pad") return step === 0 || step === 8 || (phase > 0.92 && density > 80);
+    if (track.voice === "pad") return step % 4 === 0;
+    if (track.voice === "bass") return downbeat || (phase > 0.6 && density > 55);
     return phase + threshold > 1.08;
   });
 }
@@ -176,8 +255,9 @@ export default function Home() {
   const [bpm, setBpm] = useState(126);
   const [swing, setSwing] = useState(0.16);
   const [density, setDensity] = useState(62);
-  const [scene, setScene] = useState("Nebula Breaks");
+  const [song, setSong] = useState<Song>(() => buildSong("Nebula Breaks"));
   const [macros, setMacros] = useState<Macro>({ bloom: 72, gravity: 44, shimmer: 63, fracture: 28 });
+  const songRef = useRef(song);
   const voicesRef = useRef<VoiceBundle | null>(null);
   const chainRef = useRef<MasterChain | null>(null);
   const sendsRef = useRef<Sends | null>(null);
@@ -188,6 +268,7 @@ export default function Home() {
   useEffect(() => { tracksRef.current = tracks; }, [tracks]);
   useEffect(() => { macrosRef.current = macros; }, [macros]);
   useEffect(() => { stepRef.current = step; }, [step]);
+  useEffect(() => { songRef.current = song; }, [song]);
 
   const ensureAudio = useCallback(async () => {
     await Tone.start();
@@ -311,13 +392,11 @@ export default function Home() {
     });
   }, []);
 
-  const triggerVoice = useCallback((track: Track, time: number, index: number) => {
+  const triggerVoice = useCallback((track: Track, time: number, stepIdx: number) => {
     const voices = voicesRef.current;
     if (!voices) return;
 
-    const macro = macrosRef.current;
-    const transposeOffset = Math.round(macro.gravity / 14);
-    const semis = scale[(index + transposeOffset) % scale.length];
+    const song = songRef.current;
     const velocity = clamp(track.level, 0.05, 1);
 
     switch (track.voice) {
@@ -333,21 +412,29 @@ export default function Home() {
         voices.hat.triggerAttackRelease("C6", "32n", time, velocity * 0.7);
         return;
       case "bass": {
-        const note = Tone.Frequency("A1").transpose(semis).toNote();
+        const chord = activeChord(song, stepIdx);
+        const tones = chordNotes(song, chord, 1);
+        const role = song.bassMotif[stepIdx];
+        let note = tones[0];
+        if (role === "third") note = tones[1] ?? tones[0];
+        else if (role === "fifth") note = tones[2] ?? tones[0];
+        else if (role === "octave") note = Tone.Frequency(tones[0]).transpose(12).toNote();
         voices.bass.triggerAttackRelease(note, "8n", time, velocity);
         voices.bassSub.triggerAttackRelease(note, "8n", time, velocity * 0.7);
         return;
       }
       case "pluck": {
-        const note = Tone.Frequency("E4").transpose(semis).toNote();
+        const chord = activeChord(song, stepIdx);
+        const tones = chordNotes(song, chord, 4);
+        const motif = song.pluckMotif[stepIdx];
+        const note = motif == null ? tones[0] : (tones[motif % tones.length] ?? tones[0]);
         voices.pluck.triggerAttackRelease(note, "16n", time, velocity);
         return;
       }
       case "pad": {
-        const root = Tone.Frequency("A3").transpose(semis).toNote();
-        const third = Tone.Frequency("C4").transpose(semis).toNote();
-        const fifth = Tone.Frequency("E4").transpose(semis).toNote();
-        voices.pad.triggerAttackRelease([root, third, fifth], "2n", time, velocity);
+        const chord = activeChord(song, stepIdx);
+        const tones = chordNotes(song, chord, 3);
+        voices.pad.triggerAttackRelease(tones, "1n", time, velocity);
         return;
       }
     }
@@ -355,8 +442,8 @@ export default function Home() {
 
   const pulse = useCallback((nextStep: number, time: number) => {
     if (!voicesRef.current) return;
-    tracksRef.current.forEach((track, index) => {
-      if (track.pattern[nextStep]) triggerVoice(track, time, index + nextStep);
+    tracksRef.current.forEach((track) => {
+      if (track.pattern[nextStep]) triggerVoice(track, time, nextStep);
     });
   }, [triggerVoice]);
 
@@ -382,6 +469,12 @@ export default function Home() {
     chain.distortion.distortion = (macros.fracture / 100) * 0.55;
     chain.distortion.wet.rampTo((macros.fracture / 100) * 0.6, 0.05);
   }, [macros.fracture]);
+
+  useEffect(() => {
+    const voices = voicesRef.current;
+    if (!voices) return;
+    voices.bassSub.volume.rampTo(-16 + (macros.gravity / 100) * 12, 0.05);
+  }, [macros.gravity]);
 
   useEffect(() => {
     Tone.getTransport().bpm.value = bpm;
@@ -416,8 +509,8 @@ export default function Home() {
   };
 
   const regenerate = () => {
-    const names = ["Nebula Breaks", "Quantum Bounce", "Chrome Ritual", "Zero-G Garage", "Solar Drill", "Dream Collider"];
-    setScene(names[Math.floor(Math.random() * names.length)]);
+    const next = SCENE_TEMPLATES[Math.floor(Math.random() * SCENE_TEMPLATES.length)].name;
+    setSong(buildSong(next));
     setTracks((current) => current.map((track) => ({ ...track, pattern: makePattern(track, density, macros.gravity) })));
   };
 
@@ -450,6 +543,13 @@ export default function Home() {
   const playheadPoint = polar(RING_RADII[0] + 16, step);
   const trail = [1, 2, 3].map((offset) => polar(RING_RADII[0] + 16, (step - offset + STEPS) % STEPS));
 
+  const currentChord = activeChord(song, step);
+  const QUALITY_SUFFIX: Record<ChordQuality, string> = {
+    maj: "", min: "m", dim: "°", maj7: "Δ7", min7: "m7", dom7: "7", sus2: "sus2", sus4: "sus4",
+  };
+  const chordRootName = chordNotes(song, currentChord, 3)[0].replace(/-?\d+$/, "");
+  const chordLabel = `${chordRootName}${QUALITY_SUFFIX[currentChord.quality]}`;
+
   return (
     <main className="cosmos">
       <header className="cosmos-head">
@@ -467,8 +567,8 @@ export default function Home() {
         </div>
         <div className="head-readouts">
           <div className="readout">
-            <span>scene</span>
-            <strong>{scene}</strong>
+            <span>scene · {song.key} {song.mode}</span>
+            <strong>{song.name}</strong>
           </div>
           <div className="readout">
             <span>tempo</span>
@@ -638,9 +738,9 @@ export default function Home() {
             </svg>
 
             <div className="orb-core-text">
-              <span>energy</span>
-              <strong>{energy}<em>%</em></strong>
-              <span className="orb-step">step {String(step + 1).padStart(2, "0")} / 16</span>
+              <span>chord</span>
+              <strong>{chordLabel}</strong>
+              <span className="orb-step">step {String(step + 1).padStart(2, "0")} / 16 · {energy}%</span>
             </div>
           </div>
         </div>
