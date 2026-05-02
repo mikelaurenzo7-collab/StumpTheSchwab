@@ -1,11 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 type Track = {
   id: string;
   name: string;
   voice: "kick" | "snare" | "hat" | "bass" | "pluck" | "pad";
+  glyph: string;
   hue: number;
   pattern: boolean[];
   level: number;
@@ -25,13 +33,18 @@ type AudioWindow = Window &
   };
 
 const STEPS = 16;
+const RING_RADII = [292, 256, 220, 184, 148, 112];
+const STEP_RADIUS = 12;
+const ORB_CENTER = 350;
+const ORB_VIEW = 700;
+
 const initialTracks: Track[] = [
-  { id: "pulse", name: "Pulse Engine", voice: "kick", hue: 270, level: 0.92, pitch: 46, pattern: [true, false, false, false, true, false, false, true, true, false, false, false, true, false, true, false] },
-  { id: "glass", name: "Glass Impact", voice: "snare", hue: 318, level: 0.76, pitch: 188, pattern: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, true] },
-  { id: "dust", name: "Photon Dust", voice: "hat", hue: 190, level: 0.58, pitch: 6200, pattern: [true, false, true, false, true, true, true, false, true, false, true, false, true, true, false, true] },
-  { id: "sub", name: "Sub Collider", voice: "bass", hue: 154, level: 0.84, pitch: 55, pattern: [true, false, false, true, false, false, true, false, false, true, false, false, true, false, false, false] },
-  { id: "keys", name: "Neon Keys", voice: "pluck", hue: 42, level: 0.64, pitch: 330, pattern: [false, true, false, false, false, true, false, true, false, false, true, false, false, true, false, false] },
-  { id: "aura", name: "Aura Pad", voice: "pad", hue: 226, level: 0.52, pitch: 110, pattern: [true, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false] },
+  { id: "pulse", name: "Pulse Engine", voice: "kick", glyph: "◉", hue: 270, level: 0.92, pitch: 46, pattern: [true, false, false, false, true, false, false, true, true, false, false, false, true, false, true, false] },
+  { id: "glass", name: "Glass Impact", voice: "snare", glyph: "✦", hue: 318, level: 0.76, pitch: 188, pattern: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, true] },
+  { id: "dust", name: "Photon Dust", voice: "hat", glyph: "·", hue: 190, level: 0.58, pitch: 6200, pattern: [true, false, true, false, true, true, true, false, true, false, true, false, true, true, false, true] },
+  { id: "sub", name: "Sub Collider", voice: "bass", glyph: "▼", hue: 154, level: 0.84, pitch: 55, pattern: [true, false, false, true, false, false, true, false, false, true, false, false, true, false, false, false] },
+  { id: "keys", name: "Neon Keys", voice: "pluck", glyph: "◆", hue: 42, level: 0.64, pitch: 330, pattern: [false, true, false, false, false, true, false, true, false, false, true, false, false, true, false, false] },
+  { id: "aura", name: "Aura Pad", voice: "pad", glyph: "◯", hue: 226, level: 0.52, pitch: 110, pattern: [true, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false] },
 ];
 
 const scale = [0, 2, 3, 5, 7, 10, 12, 14];
@@ -55,6 +68,80 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
+function polar(radius: number, step: number) {
+  const angle = (step / STEPS) * Math.PI * 2 - Math.PI / 2;
+  return {
+    x: ORB_CENTER + radius * Math.cos(angle),
+    y: ORB_CENTER + radius * Math.sin(angle),
+    angle,
+  };
+}
+
+type RotaryProps = {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  hue: number;
+  onChange: (next: number) => void;
+};
+
+function Rotary({ label, value, min, max, hue, onChange }: RotaryProps) {
+  const dragRef = useRef<{ y: number; v: number } | null>(null);
+
+  const handleDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = { y: event.clientY, v: value };
+  };
+
+  const handleMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current) return;
+    const range = max - min;
+    const next = dragRef.current.v + ((dragRef.current.y - event.clientY) / 220) * range;
+    onChange(clamp(next, min, max));
+  };
+
+  const handleUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    dragRef.current = null;
+  };
+
+  const ratio = (value - min) / (max - min);
+  const angle = -135 + ratio * 270;
+  const arcLength = 282;
+  const dash = arcLength * ratio;
+
+  return (
+    <div className="rotary" style={{ "--rot-hue": hue } as React.CSSProperties}>
+      <div
+        className="rotary-body"
+        onPointerDown={handleDown}
+        onPointerMove={handleMove}
+        onPointerUp={handleUp}
+        onPointerCancel={handleUp}
+      >
+        <svg className="rotary-arc" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="50" className="rotary-track" />
+          <circle
+            cx="60"
+            cy="60"
+            r="50"
+            className="rotary-fill"
+            strokeDasharray={`${dash} ${arcLength}`}
+          />
+        </svg>
+        <div className="rotary-cap" style={{ transform: `rotate(${angle}deg)` }}>
+          <span className="rotary-pin" />
+        </div>
+        <strong className="rotary-readout">{Math.round(value)}</strong>
+      </div>
+      <span className="rotary-label">{label}</span>
+    </div>
+  );
+}
+
 export default function Home() {
   const [tracks, setTracks] = useState(initialTracks);
   const [playing, setPlaying] = useState(false);
@@ -71,17 +158,9 @@ export default function Home() {
   const macrosRef = useRef(macros);
   const stepRef = useRef(step);
 
-  useEffect(() => {
-    tracksRef.current = tracks;
-  }, [tracks]);
-
-  useEffect(() => {
-    macrosRef.current = macros;
-  }, [macros]);
-
-  useEffect(() => {
-    stepRef.current = step;
-  }, [step]);
+  useEffect(() => { tracksRef.current = tracks; }, [tracks]);
+  useEffect(() => { macrosRef.current = macros; }, [macros]);
+  useEffect(() => { stepRef.current = step; }, [step]);
 
   const ensureAudio = useCallback(async () => {
     if (!audioRef.current) {
@@ -232,109 +311,283 @@ export default function Home() {
     return Math.round((active / (tracks.length * STEPS)) * 100);
   }, [tracks]);
 
+  const toggleStep = (trackIndex: number, stepIndex: number) => {
+    setTracks((current) =>
+      current.map((track, index) =>
+        index === trackIndex
+          ? { ...track, pattern: track.pattern.map((value, i) => (i === stepIndex ? !value : value)) }
+          : track,
+      ),
+    );
+  };
+
+  const setLevel = (id: string, level: number) => {
+    setTracks((current) => current.map((track) => (track.id === id ? { ...track, level } : track)));
+  };
+
+  const playheadPoint = polar(RING_RADII[0] + 16, step);
+  const trail = [1, 2, 3].map((offset) => polar(RING_RADII[0] + 16, (step - offset + STEPS) % STEPS));
+
   return (
-    <main className="studio-shell">
-      <section className="hero-panel">
-        <div className="brand-block">
-          <div className="orbital-mark" aria-hidden="true"><span /></div>
-          <div>
-            <p className="eyebrow">StumpTheSchwab rebuilt from zero</p>
-            <h1>Future studio for beats, sound design, and impossible textures.</h1>
+    <main className="cosmos">
+      <header className="cosmos-head">
+        <div className="brand-pod">
+          <div className="brand-mark" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="brand-text">
+            <span className="brand-eyebrow">stump · the · schwab</span>
+            <strong className="brand-title">MUSIC OS</strong>
+            <span className="brand-version">v.001 — radial studio</span>
           </div>
         </div>
-        <div className="hero-actions">
-          <button className="primary-action" onClick={launch}>{playing ? "Pause engine" : "Start engine"}</button>
-          <button className="ghost-action" onClick={regenerate}>Generate world</button>
-          <button className="ghost-action" onClick={mutate}>Fracture pattern</button>
+        <div className="head-readouts">
+          <div className="readout">
+            <span>scene</span>
+            <strong>{scene}</strong>
+          </div>
+          <div className="readout">
+            <span>tempo</span>
+            <strong>{bpm}<em>bpm</em></strong>
+          </div>
+          <div className="readout">
+            <span>energy</span>
+            <strong>{energy}<em>%</em></strong>
+          </div>
+          <div className={`readout pill ${playing ? "live" : ""}`}>
+            <span className="dot" />
+            <strong>{playing ? "live" : "armed"}</strong>
+          </div>
         </div>
-      </section>
+      </header>
 
-      <section className="command-strip" aria-label="Session controls">
-        <div>
-          <span>Scene</span>
-          <strong>{scene}</strong>
-        </div>
-        <label>
-          <span>BPM</span>
-          <input type="range" min="72" max="178" value={bpm} onChange={(event) => setBpm(Number(event.target.value))} />
-          <strong>{bpm}</strong>
-        </label>
-        <label>
-          <span>Density</span>
-          <input type="range" min="12" max="96" value={density} onChange={(event) => setDensity(Number(event.target.value))} />
-          <strong>{density}%</strong>
-        </label>
-        <div>
-          <span>Energy</span>
-          <strong>{energy}%</strong>
-        </div>
-      </section>
-
-      <section className="studio-grid">
-        <div className="sequencer-card">
-          <div className="section-heading">
-            <p>Neural sequencer</p>
-            <h2>Six engines, sixteen moments.</h2>
-          </div>
-          <div className="step-numbers" aria-hidden="true">
-            {Array.from({ length: STEPS }, (_, index) => <span key={index}>{index + 1}</span>)}
-          </div>
-          <div className="tracks">
-            {tracks.map((track, trackIndex) => (
-              <div className="track-row" key={track.id} style={{ "--track-hue": track.hue } as React.CSSProperties}>
-                <div className="track-meta">
-                  <strong>{track.name}</strong>
-                  <span>{track.voice}</span>
-                </div>
-                <div className="step-grid">
-                  {track.pattern.map((active, index) => (
-                    <button
-                      aria-label={`${track.name} step ${index + 1}`}
-                      className={`step-cell ${active ? "is-active" : ""} ${step === index ? "is-current" : ""}`}
-                      key={`${track.id}-${index}`}
-                      onClick={() => setTracks((current) => current.map((item, itemIndex) => itemIndex === trackIndex ? { ...item, pattern: item.pattern.map((value, stepIndex) => stepIndex === index ? !value : value) } : item))}
+      <section className="cosmos-stage">
+        <aside className="rack rack-left">
+          <p className="rack-tag">channels / 06</p>
+          <div className="strip-stack">
+            {tracks.map((track) => {
+              const firing = playing && step !== null && track.pattern[step];
+              return (
+                <div
+                  key={track.id}
+                  className={`strip ${firing ? "is-firing" : ""}`}
+                  style={{ "--strip-hue": track.hue } as React.CSSProperties}
+                >
+                  <div className="strip-head">
+                    <span className="strip-glyph">{track.glyph}</span>
+                    <div className="strip-id">
+                      <strong>{track.name}</strong>
+                      <span>{track.voice}</span>
+                    </div>
+                    <span className="strip-led" />
+                  </div>
+                  <div className="strip-fader">
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={track.level}
+                      onChange={(event) => setLevel(track.id, Number(event.target.value))}
                     />
-                  ))}
+                    <span className="strip-level">{Math.round(track.level * 100)}</span>
+                  </div>
                 </div>
-                <label className="mini-fader">
-                  <span>Level</span>
-                  <input type="range" min="0" max="1" step="0.01" value={track.level} onChange={(event) => setTracks((current) => current.map((item) => item.id === track.id ? { ...item, level: Number(event.target.value) } : item))} />
-                </label>
-              </div>
-            ))}
+              );
+            })}
+          </div>
+        </aside>
+
+        <div className="orb">
+          <div className="orb-frame">
+            <svg className="orb-svg" viewBox={`0 0 ${ORB_VIEW} ${ORB_VIEW}`} role="img" aria-label="Radial sequencer">
+              <defs>
+                <radialGradient id="orb-core" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor="rgba(139,92,246,0.55)" />
+                  <stop offset="60%" stopColor="rgba(34,211,238,0.18)" />
+                  <stop offset="100%" stopColor="rgba(2,6,23,0)" />
+                </radialGradient>
+                <linearGradient id="playhead" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="rgba(255,255,255,0)" />
+                  <stop offset="100%" stopColor="rgba(255,255,255,0.95)" />
+                </linearGradient>
+              </defs>
+
+              <circle cx={ORB_CENTER} cy={ORB_CENTER} r="320" className="orb-halo" fill="url(#orb-core)" />
+
+              {RING_RADII.map((radius, ringIndex) => (
+                <circle
+                  key={`guide-${ringIndex}`}
+                  cx={ORB_CENTER}
+                  cy={ORB_CENTER}
+                  r={radius}
+                  className="ring-guide"
+                  style={{ stroke: `hsla(${tracks[ringIndex].hue}, 70%, 60%, 0.18)` }}
+                />
+              ))}
+
+              {Array.from({ length: STEPS }, (_, i) => {
+                const downbeat = i % 4 === 0;
+                const inner = polar(RING_RADII[RING_RADII.length - 1] - 18, i);
+                const outer = polar(RING_RADII[0] + 8, i);
+                return (
+                  <line
+                    key={`spoke-${i}`}
+                    x1={inner.x}
+                    y1={inner.y}
+                    x2={outer.x}
+                    y2={outer.y}
+                    className={`spoke ${downbeat ? "spoke-major" : ""}`}
+                  />
+                );
+              })}
+
+              {trail.map((point, idx) => (
+                <line
+                  key={`trail-${idx}`}
+                  x1={ORB_CENTER}
+                  y1={ORB_CENTER}
+                  x2={point.x}
+                  y2={point.y}
+                  className="playhead-trail"
+                  style={{ opacity: (3 - idx) / 8 }}
+                />
+              ))}
+
+              <line
+                x1={ORB_CENTER}
+                y1={ORB_CENTER}
+                x2={playheadPoint.x}
+                y2={playheadPoint.y}
+                className={`playhead ${playing ? "spinning" : ""}`}
+                stroke="url(#playhead)"
+              />
+              <circle cx={playheadPoint.x} cy={playheadPoint.y} r="6" className="playhead-tip" />
+
+              {tracks.map((track, trackIndex) =>
+                track.pattern.map((active, stepIndex) => {
+                  const point = polar(RING_RADII[trackIndex], stepIndex);
+                  const isCurrent = stepIndex === step;
+                  const firing = isCurrent && active;
+                  return (
+                    <g key={`${track.id}-${stepIndex}`} className={`step-node ${active ? "is-on" : ""} ${isCurrent ? "is-current" : ""} ${firing ? "is-firing" : ""}`}>
+                      <circle
+                        cx={point.x}
+                        cy={point.y}
+                        r={STEP_RADIUS + 6}
+                        className="step-halo"
+                        style={{ fill: `hsla(${track.hue}, 90%, 62%, 0.22)` }}
+                      />
+                      <circle
+                        cx={point.x}
+                        cy={point.y}
+                        r={STEP_RADIUS}
+                        className="step-cell"
+                        style={{
+                          fill: active ? `hsl(${track.hue}, 88%, 62%)` : "rgba(255,255,255,0.05)",
+                          stroke: active
+                            ? `hsla(${track.hue}, 92%, 78%, 0.85)`
+                            : `hsla(${track.hue}, 70%, 60%, 0.35)`,
+                        }}
+                        onClick={() => toggleStep(trackIndex, stepIndex)}
+                      />
+                    </g>
+                  );
+                }),
+              )}
+
+              {Array.from({ length: STEPS }, (_, i) => {
+                const point = polar(RING_RADII[0] + 30, i);
+                return (
+                  <text
+                    key={`num-${i}`}
+                    x={point.x}
+                    y={point.y}
+                    className={`step-number ${i % 4 === 0 ? "step-number-major" : ""}`}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                  >
+                    {String(i + 1).padStart(2, "0")}
+                  </text>
+                );
+              })}
+            </svg>
+
+            <div className="orb-core-text">
+              <span>energy</span>
+              <strong>{energy}<em>%</em></strong>
+              <span className="orb-step">step {String(step + 1).padStart(2, "0")} / 16</span>
+            </div>
           </div>
         </div>
 
-        <aside className="synth-card">
-          <div className="section-heading">
-            <p>Sound design cockpit</p>
-            <h2>Morph the whole machine.</h2>
+        <aside className="rack rack-right">
+          <p className="rack-tag">macro / sound design</p>
+          <div className="rotary-grid">
+            <Rotary label="bloom" hue={270} value={macros.bloom} min={0} max={100}
+              onChange={(v) => setMacros((m) => ({ ...m, bloom: v }))} />
+            <Rotary label="gravity" hue={154} value={macros.gravity} min={0} max={100}
+              onChange={(v) => setMacros((m) => ({ ...m, gravity: v }))} />
+            <Rotary label="shimmer" hue={190} value={macros.shimmer} min={0} max={100}
+              onChange={(v) => setMacros((m) => ({ ...m, shimmer: v }))} />
+            <Rotary label="fracture" hue={318} value={macros.fracture} min={0} max={100}
+              onChange={(v) => setMacros((m) => ({ ...m, fracture: v }))} />
           </div>
-          {(Object.keys(macros) as Array<keyof Macro>).map((key) => (
-            <label className="macro" key={key}>
-              <span>{key}</span>
-              <input type="range" min="0" max="100" value={macros[key]} onChange={(event) => setMacros((current) => ({ ...current, [key]: Number(event.target.value) }))} />
-              <strong>{macros[key]}</strong>
-            </label>
-          ))}
-          <div className="visualizer" aria-label="Generative studio visualizer">
-            {tracks.map((track, index) => (
-              <span
-                key={track.id}
-                style={{
-                  "--track-hue": track.hue,
-                  "--height": `${18 + track.pattern.filter(Boolean).length * 5 + index * 4}%`,
-                } as React.CSSProperties}
-              />
-            ))}
+          <div className="vis-card">
+            <p>spectrum</p>
+            <div className="vis-bars">
+              {tracks.map((track, index) => (
+                <span
+                  key={track.id}
+                  style={{
+                    "--track-hue": track.hue,
+                    "--height": `${20 + track.pattern.filter(Boolean).length * 5 + (track.level * 24)}%`,
+                    animationDelay: `${index * 110}ms`,
+                  } as React.CSSProperties}
+                />
+              ))}
+            </div>
           </div>
-          <div className="ai-card">
-            <p>Creative directive</p>
-            <strong>Design a session that feels alive before the first plugin loads.</strong>
-            <span>Local Web Audio synthesis, generative sequencing, responsive macro control, and a new interface built without the old components.</span>
+          <div className="manifesto">
+            <span>directive</span>
+            <p>Make the session feel alive before the first plugin loads.</p>
           </div>
         </aside>
       </section>
+
+      <footer className="dock">
+        <button
+          className={`dock-play ${playing ? "is-playing" : ""}`}
+          onClick={launch}
+          aria-label={playing ? "Pause engine" : "Start engine"}
+        >
+          <span className="dock-play-icon">{playing ? "❚❚" : "▶"}</span>
+          <span className="dock-play-label">{playing ? "pause" : "ignite"}</span>
+        </button>
+
+        <div className="dock-slider">
+          <span>tempo</span>
+          <input type="range" min="72" max="178" value={bpm} onChange={(e) => setBpm(Number(e.target.value))} />
+          <strong>{bpm}</strong>
+        </div>
+
+        <div className="dock-slider">
+          <span>density</span>
+          <input type="range" min="12" max="96" value={density} onChange={(e) => setDensity(Number(e.target.value))} />
+          <strong>{density}%</strong>
+        </div>
+
+        <button className="dock-action" onClick={regenerate}>
+          <span>generate</span>
+          <em>new world</em>
+        </button>
+        <button className="dock-action variant" onClick={mutate}>
+          <span>fracture</span>
+          <em>shift pattern</em>
+        </button>
+      </footer>
     </main>
   );
 }
