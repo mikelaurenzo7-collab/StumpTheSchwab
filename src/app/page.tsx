@@ -255,6 +255,7 @@ type VoiceBundle = {
 
 type MasterChain = {
   filter: Tone.Filter;
+  sweepFilter: Tone.Filter;
   highpass: Tone.Filter;
   eq: Tone.EQ3;
   distortion: Tone.Distortion;
@@ -264,6 +265,9 @@ type MasterChain = {
   widener: Tone.StereoWidener;
   limiter: Tone.Limiter;
   ducker: Tone.Gain;
+  riserNoise: Tone.Noise;
+  riserFilter: Tone.Filter;
+  riserGain: Tone.Gain;
 };
 
 type Sends = Record<string, Tone.Gain>;
@@ -273,6 +277,9 @@ type HatState = { count: number };
 
 function buildAudioGraph(): AudioGraph {
   const filter = new Tone.Filter({ type: "lowpass", frequency: 18000, Q: 0.55 });
+  // Section sweep filter — automated by section transitions (build sweep, drop reset).
+  // Sits right after the bloom filter so user macro and section automation compose.
+  const sweepFilter = new Tone.Filter({ type: "lowpass", frequency: 18000, Q: 0.4 });
   const highpass = new Tone.Filter({ type: "highpass", frequency: 32, Q: 0.5 });
   const eq = new Tone.EQ3({ low: -1.5, mid: -2, high: 2.5, lowFrequency: 220, highFrequency: 4500 });
   const distortion = new Tone.Distortion({ distortion: 0, wet: 0 });
@@ -280,9 +287,17 @@ function buildAudioGraph(): AudioGraph {
   const widener = new Tone.StereoWidener({ width: 0.55 });
   const limiter = new Tone.Limiter(-0.8);
 
-  filter.chain(highpass, eq, distortion, compressor, widener, limiter, Tone.getDestination());
+  filter.chain(sweepFilter, highpass, eq, distortion, compressor, widener, limiter, Tone.getDestination());
 
   const ducker = new Tone.Gain(1).connect(filter);
+
+  // Pink-noise riser. Continuous noise source ramped via riserGain during build sections.
+  // Goes through the ducker so it pumps in time with the kick on drops.
+  const riserNoise = new Tone.Noise("pink");
+  const riserFilter = new Tone.Filter({ type: "lowpass", frequency: 600, Q: 0.6 });
+  const riserGain = new Tone.Gain(0);
+  riserNoise.chain(riserFilter, riserGain, ducker);
+  riserNoise.start();
   const reverb = new Tone.Reverb({ decay: 2.6, wet: 1, preDelay: 0.025 });
   reverb.connect(compressor);
   const pluckDelay = new Tone.PingPongDelay({ delayTime: "8n.", feedback: 0.32, wet: 0.32 });
@@ -383,7 +398,11 @@ function buildAudioGraph(): AudioGraph {
 
   return {
     voices: { kick, kickClick, snareNoise, snareBody, snareCrack, hat, hatPanner, bass, bassSub, pluck, pad },
-    chain: { filter, highpass, eq, distortion, reverb, pluckDelay, compressor, widener, limiter, ducker },
+    chain: {
+      filter, sweepFilter, highpass, eq, distortion, reverb, pluckDelay,
+      compressor, widener, limiter, ducker,
+      riserNoise, riserFilter, riserGain,
+    },
     sends,
   };
 }
@@ -399,6 +418,51 @@ function applyMacrosInstant(graph: AudioGraph, m: Macro) {
   graph.voices.bassSub.volume.value = -16 + (m.gravity / 100) * 12;
 }
 
+function applySectionTransition(
+  graph: AudioGraph,
+  sectionName: string,
+  sectionMeasures: number,
+  time: number,
+  sixteenthSec: number,
+) {
+  const { sweepFilter, riserGain, riserFilter } = graph.chain;
+  if (sectionName === "build") {
+    const buildSec = sectionMeasures * 16 * sixteenthSec;
+    sweepFilter.frequency.cancelScheduledValues(time);
+    sweepFilter.frequency.setValueAtTime(700, time);
+    sweepFilter.frequency.exponentialRampToValueAtTime(18000, time + buildSec);
+    riserGain.gain.cancelScheduledValues(time);
+    riserGain.gain.setValueAtTime(0.0001, time);
+    riserGain.gain.exponentialRampToValueAtTime(0.22, time + buildSec);
+    riserFilter.frequency.cancelScheduledValues(time);
+    riserFilter.frequency.setValueAtTime(600, time);
+    riserFilter.frequency.exponentialRampToValueAtTime(11000, time + buildSec);
+  } else if (sectionName === "drop" || sectionName === "drop 2") {
+    sweepFilter.frequency.cancelScheduledValues(time);
+    sweepFilter.frequency.setValueAtTime(18000, time);
+    riserGain.gain.cancelScheduledValues(time);
+    riserGain.gain.setValueAtTime(0.22, time);
+    riserGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.05);
+  } else if (sectionName === "break") {
+    sweepFilter.frequency.cancelScheduledValues(time);
+    sweepFilter.frequency.linearRampToValueAtTime(3500, time + 0.4);
+    riserGain.gain.cancelScheduledValues(time);
+    riserGain.gain.setValueAtTime(0, time);
+  } else {
+    sweepFilter.frequency.cancelScheduledValues(time);
+    sweepFilter.frequency.setValueAtTime(18000, time);
+    riserGain.gain.cancelScheduledValues(time);
+    riserGain.gain.setValueAtTime(0, time);
+  }
+}
+
+function resetSectionState(graph: AudioGraph, time: number) {
+  graph.chain.sweepFilter.frequency.cancelScheduledValues(time);
+  graph.chain.sweepFilter.frequency.setValueAtTime(18000, time);
+  graph.chain.riserGain.gain.cancelScheduledValues(time);
+  graph.chain.riserGain.gain.setValueAtTime(0, time);
+}
+
 function applyVoiceTrigger(
   graph: AudioGraph,
   song: Song,
@@ -407,13 +471,20 @@ function applyVoiceTrigger(
   time: number,
   stepIdx: number,
   harmonyMeasure: number,
+  isImpact = false,
 ) {
   const { voices, chain } = graph;
-  const velocity = clamp(track.level, 0.05, 1);
+  const velocity = isImpact ? 1 : clamp(track.level, 0.05, 1);
   switch (track.voice) {
     case "kick":
       voices.kick.triggerAttackRelease("C1", "8n", time, velocity);
       voices.kickClick.triggerAttackRelease("32n", time, velocity * 0.6);
+      if (isImpact) {
+        // Sub-bass boom: the "BWAAAH" at the drop. One octave below normal sub.
+        const chord = activeChord(song, harmonyMeasure);
+        const root = chordNotes(song, chord, 0)[0];
+        voices.bassSub.triggerAttackRelease(root, "2n", time, 1);
+      }
       chain.ducker.gain.cancelScheduledValues(time);
       chain.ducker.gain.setValueAtTime(0.55, time);
       chain.ducker.gain.linearRampToValueAtTime(1, time + 0.18);
@@ -629,7 +700,9 @@ export default function Home() {
     stepRef.current = 0;
     setSongProgress(0);
     setStep(0);
-    setSongMode((v) => !v);
+    const voices = voicesRef.current, chain = chainRef.current, sends = sendsRef.current;
+    if (voices && chain && sends) resetSectionState({ voices, chain, sends }, Tone.now());
+    setSongMode((prev) => !prev);
   };
 
   const ensureAudio = useCallback(async () => {
@@ -706,12 +779,38 @@ export default function Home() {
           return;
         }
         const loc = locateInSong(cursor);
+        const graph = {
+          voices: voicesRef.current,
+          chain: chainRef.current!,
+          sends: sendsRef.current!,
+        };
+        const sixteenthSec = 60 / Tone.getTransport().bpm.value / 4;
+
+        // Section-start transitions (riser, master sweep, etc.) fire on bar 0 step 0.
+        if (loc.measureInSection === 0 && loc.stepInMeasure === 0) {
+          applySectionTransition(graph, loc.section.name, loc.section.measures, time, sixteenthSec);
+        }
+
+        const isLastBuildBar =
+          loc.section.name === "build" && loc.measureInSection === loc.section.measures - 1;
+        const isImpact =
+          (loc.section.name === "drop" || loc.section.name === "drop 2") &&
+          loc.measureInSection === 0 && loc.stepInMeasure === 0;
+
         tracksRef.current.forEach((track) => {
           const cfg = loc.section.voices[track.voice];
           if (!cfg.active) return;
-          const pat = cfg.pattern ?? track.pattern;
+          // Snare-roll override: every 16th in the last bar of the build for the fill.
+          const pat =
+            isLastBuildBar && track.voice === "snare"
+              ? HAT_SIXTEENTHS
+              : cfg.pattern ?? track.pattern;
           if (pat[loc.stepInMeasure]) {
-            triggerVoice(track, time, loc.stepInMeasure, loc.measureInSong);
+            const impactThisHit = isImpact && track.voice === "kick";
+            applyVoiceTrigger(
+              graph, songRef.current, hatCountRef.current,
+              track, time, loc.stepInMeasure, loc.measureInSong, impactThisHit,
+            );
           }
         });
         Tone.getDraw().schedule(() => {
@@ -735,6 +834,8 @@ export default function Home() {
     return () => {
       transport.clear(id);
       transport.stop();
+      const v = voicesRef.current, c = chainRef.current, s = sendsRef.current;
+      if (v && c && s) resetSectionState({ voices: v, chain: c, sends: s }, Tone.now());
     };
   }, [playing, songMode, triggerVoice]);
 
@@ -811,17 +912,35 @@ export default function Home() {
         transport.swingSubdivision = "16n";
 
         const hatState: HatState = { count: 0 };
+        const sixteenthSec = 60 / bpmSnapshot / 4;
 
         for (let cursor = 0; cursor < SONG_TOTAL_STEPS; cursor++) {
           const loc = locateInSong(cursor);
           const stepCursor = cursor;
+          const isLastBuildBar =
+            loc.section.name === "build" && loc.measureInSection === loc.section.measures - 1;
+          const isImpact =
+            (loc.section.name === "drop" || loc.section.name === "drop 2") &&
+            loc.measureInSection === 0 && loc.stepInMeasure === 0;
+          const isSectionStart = loc.measureInSection === 0 && loc.stepInMeasure === 0;
+
           transport.schedule((time) => {
+            if (isSectionStart) {
+              applySectionTransition(graph, loc.section.name, loc.section.measures, time, sixteenthSec);
+            }
             tracksSnapshot.forEach((track) => {
               const cfg = loc.section.voices[track.voice];
               if (!cfg.active) return;
-              const pat = cfg.pattern ?? track.pattern;
+              const pat =
+                isLastBuildBar && track.voice === "snare"
+                  ? HAT_SIXTEENTHS
+                  : cfg.pattern ?? track.pattern;
               if (pat[loc.stepInMeasure]) {
-                applyVoiceTrigger(graph, songSnapshot, hatState, track, time, loc.stepInMeasure, loc.measureInSong);
+                const impactThisHit = isImpact && track.voice === "kick";
+                applyVoiceTrigger(
+                  graph, songSnapshot, hatState, track,
+                  time, loc.stepInMeasure, loc.measureInSong, impactThisHit,
+                );
               }
             });
           }, `0:0:${stepCursor}`);
