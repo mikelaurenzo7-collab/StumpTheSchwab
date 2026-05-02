@@ -244,7 +244,9 @@ type VoiceBundle = {
   kickClick: Tone.NoiseSynth;
   snareNoise: Tone.NoiseSynth;
   snareBody: Tone.Synth;
+  snareCrack: Tone.NoiseSynth;
   hat: Tone.MetalSynth;
+  hatPanner: Tone.Panner;
   bass: Tone.MonoSynth;
   bassSub: Tone.Synth;
   pluck: Tone.PluckSynth;
@@ -253,10 +255,15 @@ type VoiceBundle = {
 
 type MasterChain = {
   filter: Tone.Filter;
+  highpass: Tone.Filter;
+  eq: Tone.EQ3;
   distortion: Tone.Distortion;
   reverb: Tone.Reverb;
+  pluckDelay: Tone.PingPongDelay;
   compressor: Tone.Compressor;
+  widener: Tone.StereoWidener;
   limiter: Tone.Limiter;
+  ducker: Tone.Gain;
 };
 
 type Sends = Record<string, Tone.Gain>;
@@ -369,6 +376,7 @@ export default function Home() {
   const songRef = useRef(song);
   const songCursorRef = useRef(0);
   const measureRef = useRef(0);
+  const hatCountRef = useRef(0);
   const voicesRef = useRef<VoiceBundle | null>(null);
   const chainRef = useRef<MasterChain | null>(null);
   const sendsRef = useRef<Sends | null>(null);
@@ -393,30 +401,46 @@ export default function Home() {
     await Tone.start();
     if (chainRef.current) return;
 
-    const filter = new Tone.Filter({ type: "lowpass", frequency: 18000, Q: 0.6 });
+    // Master chain (post-mix): bloom-cutoff → mud-cut HPF → tonal EQ →
+    // fracture distortion → glue compressor → stereo widener → safety limiter
+    const filter = new Tone.Filter({ type: "lowpass", frequency: 18000, Q: 0.55 });
+    const highpass = new Tone.Filter({ type: "highpass", frequency: 32, Q: 0.5 });
+    const eq = new Tone.EQ3({ low: -1.5, mid: -2, high: 2.5, lowFrequency: 220, highFrequency: 4500 });
     const distortion = new Tone.Distortion({ distortion: 0, wet: 0 });
-    const compressor = new Tone.Compressor({
-      threshold: -16, ratio: 3.6, attack: 0.005, release: 0.12, knee: 6,
-    });
-    const limiter = new Tone.Limiter(-1);
-    const reverb = new Tone.Reverb({ decay: 4.5, wet: 1, preDelay: 0.02 });
+    const compressor = new Tone.Compressor({ threshold: -14, ratio: 3, attack: 0.006, release: 0.18, knee: 8 });
+    const widener = new Tone.StereoWidener({ width: 0.55 });
+    const limiter = new Tone.Limiter(-0.8);
 
-    filter.chain(distortion, compressor, limiter, Tone.getDestination());
+    filter.chain(highpass, eq, distortion, compressor, widener, limiter, Tone.getDestination());
+
+    // Sidechain ducker — non-kick voices route through this so kick hits make space
+    const ducker = new Tone.Gain(1).connect(filter);
+
+    // Reverb (parallel) — shorter, more controlled tail
+    const reverb = new Tone.Reverb({ decay: 2.6, wet: 1, preDelay: 0.025 });
     reverb.connect(compressor);
+
+    // 1/8-dotted ping-pong delay for pluck; outputs join the dry chain
+    const pluckDelay = new Tone.PingPongDelay({ delayTime: "8n.", feedback: 0.32, wet: 0.32 });
+    pluckDelay.connect(filter);
 
     const sends: Sends = {};
     Object.entries(REVERB_SEND_BASE).forEach(([id, base]) => {
       sends[id] = new Tone.Gain(base).connect(reverb);
     });
 
-    const fan = (id: string): Tone.InputNode[] => [filter, sends[id]];
+    // kick/click bypass the ducker so they don't duck themselves;
+    // everything else feeds through the ducker into the dry chain.
+    const dryDest = (id: string): Tone.InputNode => (id === "pulse" ? filter : ducker);
+    const fan = (id: string): Tone.InputNode[] => [dryDest(id), sends[id]];
 
+    // ── KICK ─────────────────────────────────────────────────
     const kick = new Tone.MembraneSynth({
-      pitchDecay: 0.045,
-      octaves: 6,
+      pitchDecay: 0.05,
+      octaves: 5,
       oscillator: { type: "sine" },
-      envelope: { attack: 0.001, decay: 0.45, sustain: 0.005, release: 0.6 },
-      volume: -2,
+      envelope: { attack: 0.001, decay: 0.55, sustain: 0.005, release: 0.7 },
+      volume: -3,
     });
     kick.fan(...fan("pulse"));
 
@@ -428,78 +452,96 @@ export default function Home() {
       volume: -22,
     }).connect(kickClickHpf);
 
+    // ── SNARE ────────────────────────────────────────────────
     const snareBpf = new Tone.Filter({ type: "bandpass", frequency: 2400, Q: 1.4 });
     snareBpf.fan(...fan("glass"));
     const snareNoise = new Tone.NoiseSynth({
       noise: { type: "white" },
       envelope: { attack: 0.001, decay: 0.18, sustain: 0 },
-      volume: -10,
+      volume: -11,
     }).connect(snareBpf);
     const snareBody = new Tone.Synth({
       oscillator: { type: "triangle" },
-      envelope: { attack: 0.001, decay: 0.13, sustain: 0, release: 0.05 },
-      volume: -16,
+      envelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.05 },
+      volume: -14,
     });
     snareBody.fan(...fan("glass"));
+    // High-frequency crack/sizzle layer for top-end snap
+    const snareCrackHpf = new Tone.Filter({ type: "highpass", frequency: 8000 });
+    snareCrackHpf.fan(...fan("glass"));
+    const snareCrack = new Tone.NoiseSynth({
+      noise: { type: "white" },
+      envelope: { attack: 0.001, decay: 0.045, sustain: 0 },
+      volume: -19,
+    }).connect(snareCrackHpf);
 
-    const hatHpf = new Tone.Filter({ type: "highpass", frequency: 6000 });
-    hatHpf.fan(...fan("dust"));
+    // ── HAT ──────────────────────────────────────────────────
+    const hatHpf = new Tone.Filter({ type: "highpass", frequency: 6500 });
+    const hatPanner = new Tone.Panner(0);
+    hatHpf.connect(hatPanner);
+    hatPanner.fan(...fan("dust"));
     const hat = new Tone.MetalSynth({
       envelope: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.04 },
       harmonicity: 5.1,
       modulationIndex: 28,
-      resonance: 6800,
-      octaves: 1.4,
+      resonance: 7000,
+      octaves: 1.3,
       volume: -22,
     });
     hat.connect(hatHpf);
 
+    // ── BASS ─────────────────────────────────────────────────
     const bass = new Tone.MonoSynth({
       oscillator: { type: "sawtooth" },
-      envelope: { attack: 0.005, decay: 0.22, sustain: 0.35, release: 0.35 },
+      envelope: { attack: 0.005, decay: 0.22, sustain: 0.4, release: 0.32 },
       filterEnvelope: {
-        attack: 0.005, decay: 0.18, sustain: 0.3, release: 0.25,
-        baseFrequency: 80, octaves: 2.6, exponent: 2,
+        attack: 0.005, decay: 0.2, sustain: 0.32, release: 0.22,
+        baseFrequency: 70, octaves: 2.8, exponent: 2,
       },
-      filter: { Q: 1.6, type: "lowpass", rolloff: -24 },
+      filter: { Q: 1.8, type: "lowpass", rolloff: -24 },
       portamento: 0.015,
-      volume: -6,
+      volume: -5,
     });
     bass.fan(...fan("sub"));
     const bassSub = new Tone.Synth({
       oscillator: { type: "sine" },
-      envelope: { attack: 0.005, decay: 0.5, sustain: 0.4, release: 0.4 },
-      volume: -10,
+      envelope: { attack: 0.005, decay: 0.5, sustain: 0.45, release: 0.4 },
+      volume: -8,
     });
     bassSub.fan(...fan("sub"));
 
+    // ── PLUCK ────────────────────────────────────────────────
     const pluck = new Tone.PluckSynth({
-      attackNoise: 0.7,
-      dampening: 4200,
-      resonance: 0.92,
-      release: 0.6,
-      volume: -3,
+      attackNoise: 0.85,
+      dampening: 4400,
+      resonance: 0.93,
+      release: 0.7,
+      volume: -4,
     });
-    pluck.fan(...fan("keys"));
+    // Pluck fans to (ducker → dry chain), reverb send, and ping-pong delay.
+    // The delay output bypasses the ducker so its tail rings through kick hits.
+    pluck.fan(ducker, sends["keys"], pluckDelay);
 
-    const padFilter = new Tone.Filter({ type: "lowpass", frequency: 3200, Q: 0.6 });
-    const padChorus = new Tone.Chorus({ frequency: 0.55, depth: 0.7, wet: 0.55 }).start();
-    padFilter.connect(padChorus);
-    padChorus.fan(...fan("aura"));
+    // ── PAD ──────────────────────────────────────────────────
+    const padFilter = new Tone.Filter({ type: "lowpass", frequency: 3400, Q: 0.55 });
+    const padChorus = new Tone.Chorus({ frequency: 0.55, depth: 0.75, wet: 0.6 }).start();
+    const padWidener = new Tone.StereoWidener({ width: 0.7 });
+    padFilter.chain(padChorus, padWidener);
+    padWidener.fan(...fan("aura"));
     const pad = new Tone.PolySynth(Tone.AMSynth, {
       harmonicity: 1.5,
-      oscillator: { type: "fatsawtooth" },
-      envelope: { attack: 0.85, decay: 0.4, sustain: 0.7, release: 1.8 },
+      oscillator: { type: "fatsawtooth", spread: 32, count: 3 } as Partial<Tone.OmniOscillatorOptions>,
+      envelope: { attack: 0.95, decay: 0.4, sustain: 0.7, release: 2.0 },
       modulation: { type: "sine" },
       modulationEnvelope: { attack: 0.6, decay: 0.5, sustain: 0.5, release: 0.8 },
-      volume: -16,
+      volume: -13,
     });
-    pad.maxPolyphony = 6;
+    pad.maxPolyphony = 8;
     pad.connect(padFilter);
 
-    chainRef.current = { filter, distortion, reverb, compressor, limiter };
+    chainRef.current = { filter, highpass, eq, distortion, reverb, pluckDelay, compressor, widener, limiter, ducker };
     sendsRef.current = sends;
-    voicesRef.current = { kick, kickClick, snareNoise, snareBody, hat, bass, bassSub, pluck, pad };
+    voicesRef.current = { kick, kickClick, snareNoise, snareBody, snareCrack, hat, hatPanner, bass, bassSub, pluck, pad };
 
     const m = macrosRef.current;
     filter.frequency.value = 200 * Math.pow(90, m.bloom / 100);
@@ -519,17 +561,32 @@ export default function Home() {
     const velocity = clamp(track.level, 0.05, 1);
 
     switch (track.voice) {
-      case "kick":
+      case "kick": {
         voices.kick.triggerAttackRelease("C1", "8n", time, velocity);
         voices.kickClick.triggerAttackRelease("32n", time, velocity * 0.6);
+        // Sidechain duck: pull non-kick bus down to ~55% then ramp back
+        // over 180ms — that's the audible "pump" of dance music.
+        const ducker = chainRef.current?.ducker;
+        if (ducker) {
+          ducker.gain.cancelScheduledValues(time);
+          ducker.gain.setValueAtTime(0.55, time);
+          ducker.gain.linearRampToValueAtTime(1, time + 0.18);
+        }
         return;
+      }
       case "snare":
         voices.snareNoise.triggerAttackRelease("8n", time, velocity);
         voices.snareBody.triggerAttackRelease("G2", "32n", time, velocity * 0.55);
+        voices.snareCrack.triggerAttackRelease("32n", time, velocity * 0.85);
         return;
-      case "hat":
+      case "hat": {
+        // Alternate L/R panning for stereo movement
+        const pan = hatCountRef.current % 2 === 0 ? -0.32 : 0.32;
+        voices.hatPanner.pan.setValueAtTime(pan, time);
+        hatCountRef.current += 1;
         voices.hat.triggerAttackRelease("C6", "32n", time, velocity * 0.7);
         return;
+      }
       case "bass": {
         const chord = activeChord(song, harmonyMeasure);
         const tones = chordNotes(song, chord, 1);
