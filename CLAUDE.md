@@ -13,9 +13,9 @@ Web-based music production platform. Make better music, faster.
 ```
 src/
   app/           # Next.js pages + layout
-  components/    # UI components (Transport, StepSequencer, SynthPanel)
-  store/         # Zustand store (engine.ts = single source of truth)
-  lib/           # Audio engine hook, sound definitions, WAV encoder
+  components/    # UI components (Transport, StepSequencer, Mixer)
+  store/         # Zustand stores (engine.ts = core state)
+  lib/           # Audio engine hook, sound definitions
 ```
 
 ## Commands
@@ -23,18 +23,20 @@ src/
 - `npm run build` — production build
 - `npm run lint` — run eslint
 
+## Environment
+- `ANTHROPIC_API_KEY` — required for the AI beat generator (Generate button / `G` key). Set in `.env.local` for development. The key is server-only — the route handler at `src/app/api/generate/route.ts` is the only place that touches it.
+
 ## Architecture Notes
-- Audio engine runs client-side only via `useAudioEngine` hook (dynamic import of Tone.js)
+- Audio engine runs client-side only via `useAudioEngine` hook
 - Tone.js requires user interaction before `Tone.start()` — handled by transport play button
-- `Tone.Sequence` provides sample-accurate scheduling (replaces `setInterval`)
-- Zustand store (`store/engine.ts`) is the single source of truth for sequencer state, playback, mixer, and macros
-- Synths are created once on init and reused; per-track `Gain` nodes handle volume
-- Sequence callback reads latest Zustand state each tick for real-time responsiveness
-- Undo/redo uses snapshot-based history stack (50-deep); discrete actions push immediately, continuous controls push on pointer down
-- WAV export uses `Tone.Offline` to render the pattern offline, then `lib/wav.ts` encodes to 16-bit PCM WAV
-- Macros control real-time audio effects: bloom (filter cutoff), gravity (scale rotation), shimmer (delay send), fracture (distortion)
-- Mute/solo per track: solo overrides mute; when any track is soloed, only soloed tracks play
-- Keyboard shortcuts: Space (play/pause), R (generate), F (fracture), C (clear), E (export), Ctrl+Z/Cmd+Z (undo), Ctrl+Shift+Z/Cmd+Shift+Z (redo), Escape (stop)
+- Zustand store is the single source of truth for sequencer state, playback, and mixer
+- Synths are created once on init and reused; gain nodes handle per-track volume/mute/solo
+- Step sequencer reads latest store state each tick for real-time responsiveness
+- Undo/redo uses snapshot-based history stack in Zustand (discrete actions push immediately, continuous controls throttle at 500ms)
+- WAV export uses `Tone.Offline` to render the pattern offline, then converts to 16-bit PCM WAV
+- Step probability: each step has a 0–100% trigger chance, rolled per tick during playback and export
+- Song mode: when `songMode` is true and `chain` is non-empty, the audio engine auto-advances to the next pattern in the chain at each loop boundary; export flattens the chain into one continuous render
+- AI beat generator: server route `/api/generate` uses Claude (Opus 4.7 + adaptive thinking + tool use with strict schema) to convert a text prompt into a `GeneratedBeat`, which `applyGeneratedBeat` writes into the current pattern slot. The system prompt is cached (`cache_control: ephemeral`)
 
 ## Design Tokens
 Dark theme defined in `globals.css` — accent purple (#8b5cf6), track colors per instrument in `lib/sounds.ts`.
