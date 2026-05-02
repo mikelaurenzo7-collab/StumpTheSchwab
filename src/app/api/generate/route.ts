@@ -134,10 +134,12 @@ export async function POST(req: Request) {
   }
 
   try {
+    // Note: cannot combine `thinking` with `tool_choice: {type: "tool"}` —
+    // the API rejects that combination. Forced tool choice gives us
+    // guaranteed structured output without needing extended reasoning.
     const response = await client.messages.create({
       model: "claude-opus-4-7",
       max_tokens: 4096,
-      thinking: { type: "adaptive" },
       system: [
         { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
       ],
