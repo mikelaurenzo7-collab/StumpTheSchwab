@@ -57,6 +57,9 @@ is no separate component / store / lib layer.
 - Hat humanization: pitch cycles through 4 close notes + ±8% deterministic
   velocity wobble + soft pan drift, all keyed on a per-render `hatState.count`
   (so offline render is bit-reproducible).
+- Snare humanization: body tone micro-detunes ±~25 cents around G2 with ±8%
+  velocity wobble across noise/body/crack, keyed deterministically on
+  `harmonyMeasure + stepIdx` (bit-reproducible across live + offline).
 - Bass note duration adapts to the next-step gap: `16n` when the next 16th is
   also active, `8n` with one rest, `4n` with two or more rests.
 
@@ -65,8 +68,10 @@ is no separate component / store / lib layer.
   / break 4 / drop2 8 / outro 4. Each section declares per-voice `{active,
   pattern}`.
 - `applySectionTransition()` automates the master sweep filter and riser at
-  section boundaries (build sweeps up, drop slams to 18 kHz and zeroes the
-  riser, break dips to 3.5 kHz).
+  section boundaries: intro swells from 3.5 kHz to 18 kHz across the 4-bar
+  intro, build sweeps up + raises a pink-noise riser, drop slams to 18 kHz
+  and zeroes the riser, break dips to 3.5 kHz, outro mirrors the intro by
+  closing from 18 kHz down to 1.5 kHz over its 4 bars.
 - `PAD_HOLD` triggers once per measure with a `1n` note length so chord
   changes cleanly re-attack the pad without stacking voices on the
   PolySynth's 5-voice ceiling.

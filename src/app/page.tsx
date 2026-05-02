@@ -468,6 +468,25 @@ function applySectionTransition(
     sweepFilter.frequency.linearRampToValueAtTime(3500, time + 0.4);
     riserGain.gain.cancelScheduledValues(time);
     riserGain.gain.setValueAtTime(0, time);
+  } else if (sectionName === "intro") {
+    // Intro swell: open the master sweep filter from a muted 3.5 kHz to fully
+    // open 18 kHz across the section. The verse hard-cuts to 18 kHz on entry
+    // (else branch) so the swell lands seamlessly into the first kick.
+    const introSec = sectionMeasures * 16 * sixteenthSec;
+    sweepFilter.frequency.cancelScheduledValues(time);
+    sweepFilter.frequency.setValueAtTime(3500, time);
+    sweepFilter.frequency.exponentialRampToValueAtTime(18000, time + introSec);
+    riserGain.gain.cancelScheduledValues(time);
+    riserGain.gain.setValueAtTime(0, time);
+  } else if (sectionName === "outro") {
+    // Outro close: ramp the sweep filter down from 18 kHz to a muffled 1.5 kHz
+    // across the section so the song fades into a haze instead of just stopping.
+    const outroSec = sectionMeasures * 16 * sixteenthSec;
+    sweepFilter.frequency.cancelScheduledValues(time);
+    sweepFilter.frequency.setValueAtTime(18000, time);
+    sweepFilter.frequency.exponentialRampToValueAtTime(1500, time + outroSec);
+    riserGain.gain.cancelScheduledValues(time);
+    riserGain.gain.setValueAtTime(0, time);
   } else {
     sweepFilter.frequency.cancelScheduledValues(time);
     sweepFilter.frequency.setValueAtTime(18000, time);
@@ -553,11 +572,21 @@ function applyVoiceTrigger(
       chain.ducker.gain.setValueAtTime(0.55, time);
       chain.ducker.gain.linearRampToValueAtTime(1, time + 0.18);
       return;
-    case "snare":
-      voices.snareNoise.triggerAttackRelease("8n", time, velocity);
-      voices.snareBody.triggerAttackRelease("G2", "32n", time, velocity * 0.55);
-      voices.snareCrack.triggerAttackRelease("32n", time, velocity * 0.85);
+    case "snare": {
+      // Snare humanization — the snare was the last drum still firing
+      // identically on every backbeat. Add deterministic micro-detune on the
+      // body tone (±~25 cents around G2) and a ±8% velocity wobble keyed on
+      // measure + step. Same trick as the hat/pluck — bit-reproducible so the
+      // offline render matches live playback.
+      const jitter = ((harmonyMeasure * 13 + stepIdx * 7) % 11) / 11 - 0.5; // -0.5 .. 0.5
+      const detuneSemis = jitter * 0.5; // ±0.25 semitones (~±25 cents)
+      const wobble = 0.92 + (((harmonyMeasure * 17 + stepIdx * 11) % 13) / 13) * 0.16;
+      const bodyFreq = Tone.Frequency("G2").toFrequency() * Math.pow(2, detuneSemis / 12);
+      voices.snareNoise.triggerAttackRelease("8n", time, velocity * wobble);
+      voices.snareBody.triggerAttackRelease(bodyFreq, "32n", time, velocity * 0.55 * wobble);
+      voices.snareCrack.triggerAttackRelease("32n", time, velocity * 0.85 * wobble);
       return;
+    }
     case "hat": {
       // Softer alternating pan (±0.24 vs the old ±0.32) plus a small
       // deterministic drift so the hat line doesn't lock into a hard
