@@ -603,6 +603,10 @@ export default function Home() {
   const [songProgress, setSongProgress] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  const [composePrompt, setComposePrompt] = useState("");
+  const [composing, setComposing] = useState(false);
+  const [composeError, setComposeError] = useState<string | null>(null);
+  const [composeRationale, setComposeRationale] = useState<string | null>(null);
   const [macros, setMacros] = useState<Macro>({ bloom: 72, gravity: 44, shimmer: 63, fracture: 28 });
   const songRef = useRef(song);
   const songCursorRef = useRef(0);
@@ -733,6 +737,53 @@ export default function Home() {
       transport.stop();
     };
   }, [playing, songMode, triggerVoice]);
+
+  const composeSong = async () => {
+    const prompt = composePrompt.trim();
+    if (!prompt || composing) return;
+    setComposing(true);
+    setComposeError(null);
+    setComposeRationale(null);
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? `request failed (${res.status})`);
+
+      const s = data.song;
+      if (!s || !Array.isArray(s.progression) || !Array.isArray(s.pluckMotif) || !Array.isArray(s.bassMotif)) {
+        throw new Error("malformed song response");
+      }
+
+      setSong({
+        name: s.name,
+        key: s.key,
+        mode: s.mode,
+        progression: s.progression,
+        pluckMotif: s.pluckMotif,
+        bassMotif: s.bassMotif,
+      });
+      if (typeof s.bpm === "number") setBpm(Math.round(clamp(s.bpm, 72, 178)));
+      if (typeof s.swing === "number") setSwing(clamp(s.swing, 0, 0.6));
+      if (s.macros && typeof s.macros === "object") {
+        setMacros((prev) => ({
+          bloom: typeof s.macros.bloom === "number" ? clamp(s.macros.bloom, 0, 100) : prev.bloom,
+          gravity: typeof s.macros.gravity === "number" ? clamp(s.macros.gravity, 0, 100) : prev.gravity,
+          shimmer: typeof s.macros.shimmer === "number" ? clamp(s.macros.shimmer, 0, 100) : prev.shimmer,
+          fracture: typeof s.macros.fracture === "number" ? clamp(s.macros.fracture, 0, 100) : prev.fracture,
+        }));
+      }
+      if (typeof s.rationale === "string") setComposeRationale(s.rationale);
+      setTracks((current) => current.map((track) => ({ ...track, pattern: makePattern(track, density, macros.gravity) })));
+    } catch (err) {
+      setComposeError(err instanceof Error ? err.message : "compose failed");
+    } finally {
+      setComposing(false);
+    }
+  };
 
   const exportSong = async () => {
     if (exporting) return;
@@ -1133,9 +1184,29 @@ export default function Home() {
               ))}
             </div>
           </div>
-          <div className="manifesto">
-            <span>directive</span>
-            <p>Make the session feel alive before the first plugin loads.</p>
+          <div className="compose">
+            <span>compose with claude</span>
+            <textarea
+              className="compose-input"
+              value={composePrompt}
+              onChange={(e) => setComposePrompt(e.target.value)}
+              placeholder="dark phrygian halftime trap, 80 bpm, lots of grit"
+              rows={3}
+              maxLength={1200}
+              disabled={composing}
+            />
+            <button
+              type="button"
+              className={`compose-button ${composing ? "is-thinking" : ""}`}
+              onClick={composeSong}
+              disabled={composing || !composePrompt.trim()}
+            >
+              {composing ? "thinking…" : "compose"}
+            </button>
+            {composeError && <p className="compose-error">{composeError}</p>}
+            {composeRationale && !composeError && (
+              <p className="compose-rationale">{composeRationale}</p>
+            )}
           </div>
         </aside>
       </section>

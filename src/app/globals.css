@@ -712,27 +712,86 @@ input[type="range"] { width: 100%; accent-color: var(--hot); }
   animation: vis 1.4s ease-in-out infinite alternate;
 }
 
-.manifesto {
+.compose {
   margin-top: auto;
   display: grid;
-  gap: 0.35rem;
+  gap: 0.5rem;
   padding: 0.85rem;
   border: 1px solid var(--line);
   border-radius: 1rem;
   background: var(--panel-strong);
 }
-.manifesto span {
+.compose > span {
   font-family: var(--mono);
   font-size: 0.6rem;
   letter-spacing: 0.28em;
   text-transform: uppercase;
   color: var(--cyan);
 }
-.manifesto p {
-  margin: 0;
-  font-size: 0.85rem;
-  line-height: 1.45;
+.compose-input {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: rgba(0,0,0,0.32);
   color: var(--foreground);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  resize: vertical;
+  min-height: 3.4rem;
+  outline: none;
+  transition: border-color 180ms ease;
+}
+.compose-input::placeholder { color: rgba(156, 148, 174, 0.55); }
+.compose-input:focus { border-color: var(--violet); }
+.compose-input:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.compose-button {
+  padding: 0.55rem 1rem;
+  border: 1px solid rgba(139, 92, 246, 0.55);
+  border-radius: 0.6rem;
+  background: linear-gradient(120deg, rgba(139,92,246,0.32), rgba(244,114,182,0.22));
+  color: white;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 180ms ease, box-shadow 240ms ease;
+}
+.compose-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--hot);
+  box-shadow: 0 8px 26px rgba(139, 92, 246, 0.28);
+}
+.compose-button:disabled { opacity: 0.55; cursor: not-allowed; }
+.compose-button.is-thinking { animation: composePulse 1.4s ease-in-out infinite; }
+@keyframes composePulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(139,92,246,0.18), 0 6px 22px rgba(139,92,246,0.18); }
+  50% { box-shadow: 0 0 0 1px rgba(244,114,182,0.42), 0 10px 30px rgba(244,114,182,0.26); }
+}
+
+.compose-rationale {
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border-left: 2px solid var(--cyan);
+  background: rgba(34,211,238,0.06);
+  border-radius: 0.4rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: rgba(247, 242, 255, 0.82);
+}
+.compose-error {
+  margin: 0;
+  padding: 0.45rem 0.65rem;
+  border-left: 2px solid var(--hot);
+  background: rgba(244,114,182,0.08);
+  border-radius: 0.4rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: #fda4af;
 }
 
 /* ───────── dock / transport ───────── */
