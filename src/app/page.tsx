@@ -298,9 +298,9 @@ function buildAudioGraph(): AudioGraph {
   const riserGain = new Tone.Gain(0);
   riserNoise.chain(riserFilter, riserGain, ducker);
   riserNoise.start();
-  const reverb = new Tone.Reverb({ decay: 2.6, wet: 1, preDelay: 0.025 });
+  const reverb = new Tone.Reverb({ decay: 2.0, wet: 1, preDelay: 0.025 });
   reverb.connect(compressor);
-  const pluckDelay = new Tone.PingPongDelay({ delayTime: "8n.", feedback: 0.32, wet: 0.32 });
+  const pluckDelay = new Tone.PingPongDelay({ delayTime: "8n.", feedback: 0.22, wet: 0.22 });
   pluckDelay.connect(filter);
 
   const sends: Sends = {};
@@ -314,7 +314,7 @@ function buildAudioGraph(): AudioGraph {
   const kick = new Tone.MembraneSynth({
     pitchDecay: 0.05, octaves: 5, oscillator: { type: "sine" },
     envelope: { attack: 0.001, decay: 0.55, sustain: 0.005, release: 0.7 },
-    volume: -3,
+    volume: -5,
   });
   kick.fan(...fan("pulse"));
 
@@ -323,7 +323,7 @@ function buildAudioGraph(): AudioGraph {
   const kickClick = new Tone.NoiseSynth({
     noise: { type: "white" },
     envelope: { attack: 0.001, decay: 0.014, sustain: 0 },
-    volume: -22,
+    volume: -24,
   }).connect(kickClickHpf);
 
   const snareBpf = new Tone.Filter({ type: "bandpass", frequency: 2400, Q: 1.4 });
@@ -331,12 +331,12 @@ function buildAudioGraph(): AudioGraph {
   const snareNoise = new Tone.NoiseSynth({
     noise: { type: "white" },
     envelope: { attack: 0.001, decay: 0.18, sustain: 0 },
-    volume: -11,
+    volume: -13,
   }).connect(snareBpf);
   const snareBody = new Tone.Synth({
     oscillator: { type: "triangle" },
     envelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.05 },
-    volume: -14,
+    volume: -16,
   });
   snareBody.fan(...fan("glass"));
   const snareCrackHpf = new Tone.Filter({ type: "highpass", frequency: 8000 });
@@ -344,7 +344,7 @@ function buildAudioGraph(): AudioGraph {
   const snareCrack = new Tone.NoiseSynth({
     noise: { type: "white" },
     envelope: { attack: 0.001, decay: 0.045, sustain: 0 },
-    volume: -19,
+    volume: -21,
   }).connect(snareCrackHpf);
 
   const hatHpf = new Tone.Filter({ type: "highpass", frequency: 6500 });
@@ -354,7 +354,7 @@ function buildAudioGraph(): AudioGraph {
   const hat = new Tone.MetalSynth({
     envelope: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.04 },
     harmonicity: 5.1, modulationIndex: 28, resonance: 7000, octaves: 1.3,
-    volume: -22,
+    volume: -24,
   });
   hat.connect(hatHpf);
 
@@ -364,36 +364,36 @@ function buildAudioGraph(): AudioGraph {
     filterEnvelope: { attack: 0.005, decay: 0.2, sustain: 0.32, release: 0.22, baseFrequency: 70, octaves: 2.8, exponent: 2 },
     filter: { Q: 1.8, type: "lowpass", rolloff: -24 },
     portamento: 0.015,
-    volume: -5,
+    volume: -7,
   });
   bass.fan(...fan("sub"));
   const bassSub = new Tone.Synth({
     oscillator: { type: "sine" },
     envelope: { attack: 0.005, decay: 0.5, sustain: 0.45, release: 0.4 },
-    volume: -8,
+    volume: -10,
   });
   bassSub.fan(...fan("sub"));
 
   const pluck = new Tone.PluckSynth({
     attackNoise: 0.85, dampening: 4400, resonance: 0.93, release: 0.7,
-    volume: -4,
+    volume: -7,
   });
   pluck.fan(ducker, sends["keys"], pluckDelay);
 
   const padFilter = new Tone.Filter({ type: "lowpass", frequency: 3400, Q: 0.55 });
-  const padChorus = new Tone.Chorus({ frequency: 0.55, depth: 0.75, wet: 0.6 }).start();
-  const padWidener = new Tone.StereoWidener({ width: 0.7 });
+  const padChorus = new Tone.Chorus({ frequency: 0.55, depth: 0.6, wet: 0.5 }).start();
+  const padWidener = new Tone.StereoWidener({ width: 0.6 });
   padFilter.chain(padChorus, padWidener);
   padWidener.fan(...fan("aura"));
-  const pad = new Tone.PolySynth(Tone.AMSynth, {
-    harmonicity: 1.5,
-    oscillator: { type: "fatsawtooth", spread: 32, count: 3 } as Partial<Tone.OmniOscillatorOptions>,
-    envelope: { attack: 0.95, decay: 0.4, sustain: 0.7, release: 2.0 },
-    modulation: { type: "sine" },
-    modulationEnvelope: { attack: 0.6, decay: 0.5, sustain: 0.5, release: 0.8 },
-    volume: -13,
+  // Synth (single-oscillator) is much lighter on CPU than AMSynth's FM pair —
+  // the fatsawtooth OmniOscillator still gives us width without the static
+  // that AMSynth voices were producing under chord-heavy load.
+  const pad = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: "fatsawtooth", spread: 28, count: 3 } as Partial<Tone.OmniOscillatorOptions>,
+    envelope: { attack: 0.95, decay: 0.4, sustain: 0.7, release: 1.6 },
+    volume: -15,
   });
-  pad.maxPolyphony = 8;
+  pad.maxPolyphony = 5;
   pad.connect(padFilter);
 
   return {
@@ -409,13 +409,13 @@ function buildAudioGraph(): AudioGraph {
 
 function applyMacrosInstant(graph: AudioGraph, m: Macro) {
   graph.chain.filter.frequency.value = 200 * Math.pow(90, m.bloom / 100);
-  graph.chain.distortion.distortion = (m.fracture / 100) * 0.55;
-  graph.chain.distortion.wet.value = (m.fracture / 100) * 0.6;
+  graph.chain.distortion.distortion = (m.fracture / 100) * 0.30;
+  graph.chain.distortion.wet.value = (m.fracture / 100) * 0.40;
   Object.entries(graph.sends).forEach(([id, gain]) => {
     const base = REVERB_SEND_BASE[id] ?? 0.1;
     gain.gain.value = base * ((m.shimmer / 100) * 1.4);
   });
-  graph.voices.bassSub.volume.value = -16 + (m.gravity / 100) * 12;
+  graph.voices.bassSub.volume.value = -18 + (m.gravity / 100) * 9;
 }
 
 function applySectionTransition(
@@ -433,7 +433,7 @@ function applySectionTransition(
     sweepFilter.frequency.exponentialRampToValueAtTime(18000, time + buildSec);
     riserGain.gain.cancelScheduledValues(time);
     riserGain.gain.setValueAtTime(0.0001, time);
-    riserGain.gain.exponentialRampToValueAtTime(0.22, time + buildSec);
+    riserGain.gain.exponentialRampToValueAtTime(0.14, time + buildSec);
     riserFilter.frequency.cancelScheduledValues(time);
     riserFilter.frequency.setValueAtTime(600, time);
     riserFilter.frequency.exponentialRampToValueAtTime(11000, time + buildSec);
@@ -441,7 +441,7 @@ function applySectionTransition(
     sweepFilter.frequency.cancelScheduledValues(time);
     sweepFilter.frequency.setValueAtTime(18000, time);
     riserGain.gain.cancelScheduledValues(time);
-    riserGain.gain.setValueAtTime(0.22, time);
+    riserGain.gain.setValueAtTime(0.14, time);
     riserGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.05);
   } else if (sectionName === "break") {
     sweepFilter.frequency.cancelScheduledValues(time);
@@ -480,10 +480,12 @@ function applyVoiceTrigger(
       voices.kick.triggerAttackRelease("C1", "8n", time, velocity);
       voices.kickClick.triggerAttackRelease("32n", time, velocity * 0.6);
       if (isImpact) {
-        // Sub-bass boom: the "BWAAAH" at the drop. One octave below normal sub.
+        // Sub-bass boom at the drop. Octave below normal sub, restrained
+        // velocity (0.7) so it complements the kick instead of swallowing
+        // the headroom and forcing the limiter into audible pumping.
         const chord = activeChord(song, harmonyMeasure);
         const root = chordNotes(song, chord, 0)[0];
-        voices.bassSub.triggerAttackRelease(root, "2n", time, 1);
+        voices.bassSub.triggerAttackRelease(root, "2n", time, 0.7);
       }
       chain.ducker.gain.cancelScheduledValues(time);
       chain.ducker.gain.setValueAtTime(0.55, time);
@@ -742,14 +744,14 @@ export default function Home() {
   useEffect(() => {
     const chain = chainRef.current;
     if (!chain) return;
-    chain.distortion.distortion = (macros.fracture / 100) * 0.55;
-    chain.distortion.wet.rampTo((macros.fracture / 100) * 0.6, 0.05);
+    chain.distortion.distortion = (macros.fracture / 100) * 0.30;
+    chain.distortion.wet.rampTo((macros.fracture / 100) * 0.40, 0.05);
   }, [macros.fracture]);
 
   useEffect(() => {
     const voices = voicesRef.current;
     if (!voices) return;
-    voices.bassSub.volume.rampTo(-16 + (macros.gravity / 100) * 12, 0.05);
+    voices.bassSub.volume.rampTo(-18 + (macros.gravity / 100) * 9, 0.05);
   }, [macros.gravity]);
 
   useEffect(() => {
