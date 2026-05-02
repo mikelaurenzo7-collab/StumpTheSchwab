@@ -586,7 +586,7 @@ input[type="range"] { width: 100%; accent-color: var(--hot); }
   position: sticky;
   bottom: 0.6rem;
   display: grid;
-  grid-template-columns: auto 1fr 1fr auto auto;
+  grid-template-columns: auto 1fr 1fr 1fr auto auto;
   gap: 0.7rem;
   align-items: center;
   padding: 0.7rem 1rem;

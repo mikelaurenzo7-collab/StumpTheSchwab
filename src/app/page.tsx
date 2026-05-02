@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import * as Tone from "tone";
 
 type Track = {
   id: string;
@@ -26,11 +27,6 @@ type Macro = {
   shimmer: number;
   fracture: number;
 };
-
-type AudioWindow = Window &
-  typeof globalThis & {
-    webkitAudioContext?: typeof AudioContext;
-  };
 
 const STEPS = 16;
 const RING_RADII = [292, 256, 220, 184, 148, 112];
@@ -147,6 +143,7 @@ export default function Home() {
   const [playing, setPlaying] = useState(false);
   const [step, setStep] = useState(0);
   const [bpm, setBpm] = useState(126);
+  const [swing, setSwing] = useState(0.16);
   const [density, setDensity] = useState(62);
   const [scene, setScene] = useState("Nebula Breaks");
   const [macros, setMacros] = useState<Macro>({ bloom: 72, gravity: 44, shimmer: 63, fracture: 28 });
@@ -163,10 +160,10 @@ export default function Home() {
   useEffect(() => { stepRef.current = step; }, [step]);
 
   const ensureAudio = useCallback(async () => {
-    if (!audioRef.current) {
-      const AudioCtor = window.AudioContext || (window as AudioWindow).webkitAudioContext;
-      if (!AudioCtor) return;
-      const ctx = new AudioCtor();
+    await Tone.start();
+
+    if (!masterRef.current) {
+      const ctx = Tone.getContext().rawContext as unknown as AudioContext;
       const master = ctx.createGain();
       const delay = ctx.createDelay(1.2);
       const feedback = ctx.createGain();
@@ -188,10 +185,6 @@ export default function Home() {
       delayRef.current = delay;
       feedbackRef.current = feedback;
       masterRef.current = master;
-    }
-
-    if (audioRef.current.state === "suspended") {
-      await audioRef.current.resume();
     }
   }, []);
 
@@ -267,29 +260,42 @@ export default function Home() {
     mod.stop(time + (track.voice === "pad" ? 1.2 : 0.38));
   }, []);
 
-  const pulse = useCallback((nextStep: number) => {
-    const ctx = audioRef.current;
-    if (!ctx) return;
-    const time = ctx.currentTime + 0.015;
+  const pulse = useCallback((nextStep: number, time: number) => {
+    if (!audioRef.current) return;
     tracksRef.current.forEach((track, index) => {
       if (track.pattern[nextStep]) triggerVoice(track, time, index + nextStep);
     });
   }, [triggerVoice]);
 
   useEffect(() => {
-    if (!playing) return;
-    const interval = window.setInterval(() => {
-      const next = (stepRef.current + 1) % STEPS;
-      setStep(next);
-      pulse(next);
-    }, (60 / bpm / 4) * 1000);
+    Tone.getTransport().bpm.value = bpm;
+  }, [bpm]);
 
-    return () => window.clearInterval(interval);
-  }, [bpm, playing, pulse]);
+  useEffect(() => {
+    const transport = Tone.getTransport();
+    transport.swing = swing;
+    transport.swingSubdivision = "16n";
+  }, [swing]);
+
+  useEffect(() => {
+    if (!playing) return;
+    const transport = Tone.getTransport();
+    let cursor = stepRef.current;
+    const id = transport.scheduleRepeat((time) => {
+      const current = cursor;
+      pulse(current, time);
+      Tone.getDraw().schedule(() => setStep(current), time);
+      cursor = (current + 1) % STEPS;
+    }, "16n");
+    transport.start();
+    return () => {
+      transport.clear(id);
+      transport.stop();
+    };
+  }, [playing, pulse]);
 
   const launch = async () => {
     await ensureAudio();
-    if (!playing) pulse(step);
     setPlaying((value) => !value);
   };
 
@@ -571,6 +577,12 @@ export default function Home() {
           <span>tempo</span>
           <input type="range" min="72" max="178" value={bpm} onChange={(e) => setBpm(Number(e.target.value))} />
           <strong>{bpm}</strong>
+        </div>
+
+        <div className="dock-slider">
+          <span>swing</span>
+          <input type="range" min="0" max="0.6" step="0.01" value={swing} onChange={(e) => setSwing(Number(e.target.value))} />
+          <strong>{Math.round(swing * 100)}%</strong>
         </div>
 
         <div className="dock-slider">
