@@ -45,6 +45,37 @@ const initialTracks: Track[] = [
 
 const scale = [0, 2, 3, 5, 7, 10, 12, 14];
 
+const REVERB_SEND_BASE: Record<string, number> = {
+  pulse: 0.04,
+  glass: 0.22,
+  dust: 0.10,
+  sub: 0.05,
+  keys: 0.32,
+  aura: 0.55,
+};
+
+type VoiceBundle = {
+  kick: Tone.MembraneSynth;
+  kickClick: Tone.NoiseSynth;
+  snareNoise: Tone.NoiseSynth;
+  snareBody: Tone.Synth;
+  hat: Tone.MetalSynth;
+  bass: Tone.MonoSynth;
+  bassSub: Tone.Synth;
+  pluck: Tone.PluckSynth;
+  pad: Tone.PolySynth;
+};
+
+type MasterChain = {
+  filter: Tone.Filter;
+  distortion: Tone.Distortion;
+  reverb: Tone.Reverb;
+  compressor: Tone.Compressor;
+  limiter: Tone.Limiter;
+};
+
+type Sends = Record<string, Tone.Gain>;
+
 function makePattern(track: Track, density: number, gravity: number) {
   return Array.from({ length: STEPS }, (_, step) => {
     const downbeat = step % 4 === 0;
@@ -147,10 +178,9 @@ export default function Home() {
   const [density, setDensity] = useState(62);
   const [scene, setScene] = useState("Nebula Breaks");
   const [macros, setMacros] = useState<Macro>({ bloom: 72, gravity: 44, shimmer: 63, fracture: 28 });
-  const audioRef = useRef<AudioContext | null>(null);
-  const delayRef = useRef<DelayNode | null>(null);
-  const feedbackRef = useRef<GainNode | null>(null);
-  const masterRef = useRef<GainNode | null>(null);
+  const voicesRef = useRef<VoiceBundle | null>(null);
+  const chainRef = useRef<MasterChain | null>(null);
+  const sendsRef = useRef<Sends | null>(null);
   const tracksRef = useRef(tracks);
   const macrosRef = useRef(macros);
   const stepRef = useRef(step);
@@ -161,111 +191,197 @@ export default function Home() {
 
   const ensureAudio = useCallback(async () => {
     await Tone.start();
+    if (chainRef.current) return;
 
-    if (!masterRef.current) {
-      const ctx = Tone.getContext().rawContext as unknown as AudioContext;
-      const master = ctx.createGain();
-      const delay = ctx.createDelay(1.2);
-      const feedback = ctx.createGain();
-      const filter = ctx.createBiquadFilter();
+    const filter = new Tone.Filter({ type: "lowpass", frequency: 18000, Q: 0.6 });
+    const distortion = new Tone.Distortion({ distortion: 0, wet: 0 });
+    const compressor = new Tone.Compressor({
+      threshold: -16, ratio: 3.6, attack: 0.005, release: 0.12, knee: 6,
+    });
+    const limiter = new Tone.Limiter(-1);
+    const reverb = new Tone.Reverb({ decay: 4.5, wet: 1, preDelay: 0.02 });
 
-      master.gain.value = 0.78;
-      delay.delayTime.value = 0.18;
-      feedback.gain.value = 0.22;
-      filter.type = "lowpass";
-      filter.frequency.value = 7800;
+    filter.chain(distortion, compressor, limiter, Tone.getDestination());
+    reverb.connect(compressor);
 
-      delay.connect(feedback);
-      feedback.connect(filter);
-      filter.connect(delay);
-      delay.connect(master);
-      master.connect(ctx.destination);
+    const sends: Sends = {};
+    Object.entries(REVERB_SEND_BASE).forEach(([id, base]) => {
+      sends[id] = new Tone.Gain(base).connect(reverb);
+    });
 
-      audioRef.current = ctx;
-      delayRef.current = delay;
-      feedbackRef.current = feedback;
-      masterRef.current = master;
-    }
+    const fan = (id: string): Tone.InputNode[] => [filter, sends[id]];
+
+    const kick = new Tone.MembraneSynth({
+      pitchDecay: 0.045,
+      octaves: 6,
+      oscillator: { type: "sine" },
+      envelope: { attack: 0.001, decay: 0.45, sustain: 0.005, release: 0.6 },
+      volume: -2,
+    });
+    kick.fan(...fan("pulse"));
+
+    const kickClickHpf = new Tone.Filter({ type: "highpass", frequency: 1800 });
+    kickClickHpf.fan(...fan("pulse"));
+    const kickClick = new Tone.NoiseSynth({
+      noise: { type: "white" },
+      envelope: { attack: 0.001, decay: 0.014, sustain: 0 },
+      volume: -22,
+    }).connect(kickClickHpf);
+
+    const snareBpf = new Tone.Filter({ type: "bandpass", frequency: 2400, Q: 1.4 });
+    snareBpf.fan(...fan("glass"));
+    const snareNoise = new Tone.NoiseSynth({
+      noise: { type: "white" },
+      envelope: { attack: 0.001, decay: 0.18, sustain: 0 },
+      volume: -10,
+    }).connect(snareBpf);
+    const snareBody = new Tone.Synth({
+      oscillator: { type: "triangle" },
+      envelope: { attack: 0.001, decay: 0.13, sustain: 0, release: 0.05 },
+      volume: -16,
+    });
+    snareBody.fan(...fan("glass"));
+
+    const hatHpf = new Tone.Filter({ type: "highpass", frequency: 6000 });
+    hatHpf.fan(...fan("dust"));
+    const hat = new Tone.MetalSynth({
+      envelope: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.04 },
+      harmonicity: 5.1,
+      modulationIndex: 28,
+      resonance: 6800,
+      octaves: 1.4,
+      volume: -22,
+    });
+    hat.connect(hatHpf);
+
+    const bass = new Tone.MonoSynth({
+      oscillator: { type: "sawtooth" },
+      envelope: { attack: 0.005, decay: 0.22, sustain: 0.35, release: 0.35 },
+      filterEnvelope: {
+        attack: 0.005, decay: 0.18, sustain: 0.3, release: 0.25,
+        baseFrequency: 80, octaves: 2.6, exponent: 2,
+      },
+      filter: { Q: 1.6, type: "lowpass", rolloff: -24 },
+      portamento: 0.015,
+      volume: -6,
+    });
+    bass.fan(...fan("sub"));
+    const bassSub = new Tone.Synth({
+      oscillator: { type: "sine" },
+      envelope: { attack: 0.005, decay: 0.5, sustain: 0.4, release: 0.4 },
+      volume: -10,
+    });
+    bassSub.fan(...fan("sub"));
+
+    const pluck = new Tone.PluckSynth({
+      attackNoise: 0.7,
+      dampening: 4200,
+      resonance: 0.92,
+      release: 0.6,
+      volume: -3,
+    });
+    pluck.fan(...fan("keys"));
+
+    const padFilter = new Tone.Filter({ type: "lowpass", frequency: 3200, Q: 0.6 });
+    const padChorus = new Tone.Chorus({ frequency: 0.55, depth: 0.7, wet: 0.55 }).start();
+    padFilter.connect(padChorus);
+    padChorus.fan(...fan("aura"));
+    const pad = new Tone.PolySynth(Tone.AMSynth, {
+      harmonicity: 1.5,
+      oscillator: { type: "fatsawtooth" },
+      envelope: { attack: 0.85, decay: 0.4, sustain: 0.7, release: 1.8 },
+      modulation: { type: "sine" },
+      modulationEnvelope: { attack: 0.6, decay: 0.5, sustain: 0.5, release: 0.8 },
+      volume: -16,
+    });
+    pad.maxPolyphony = 6;
+    pad.connect(padFilter);
+
+    chainRef.current = { filter, distortion, reverb, compressor, limiter };
+    sendsRef.current = sends;
+    voicesRef.current = { kick, kickClick, snareNoise, snareBody, hat, bass, bassSub, pluck, pad };
+
+    const m = macrosRef.current;
+    filter.frequency.value = 200 * Math.pow(90, m.bloom / 100);
+    distortion.distortion = (m.fracture / 100) * 0.55;
+    distortion.wet.value = (m.fracture / 100) * 0.6;
+    Object.entries(sends).forEach(([id, gain]) => {
+      const base = REVERB_SEND_BASE[id] ?? 0.1;
+      gain.gain.value = base * ((m.shimmer / 100) * 1.4);
+    });
   }, []);
 
   const triggerVoice = useCallback((track: Track, time: number, index: number) => {
-    const ctx = audioRef.current;
-    const master = masterRef.current;
-    if (!ctx || !master) return;
+    const voices = voicesRef.current;
+    if (!voices) return;
 
     const macro = macrosRef.current;
-    const out = ctx.createGain();
-    const pan = ctx.createStereoPanner();
-    const filter = ctx.createBiquadFilter();
-    const send = ctx.createGain();
-    const note = track.pitch * 2 ** (scale[(index + Math.round(macro.gravity / 14)) % scale.length] / 12);
+    const transposeOffset = Math.round(macro.gravity / 14);
+    const semis = scale[(index + transposeOffset) % scale.length];
+    const velocity = clamp(track.level, 0.05, 1);
 
-    out.gain.value = 0;
-    pan.pan.value = Math.sin(index + track.hue) * 0.42;
-    filter.type = track.voice === "pad" ? "lowpass" : "bandpass";
-    filter.frequency.value = clamp(380 + macro.bloom * 86 + track.pitch * 2, 180, 12000);
-    filter.Q.value = 0.7 + macro.fracture / 42;
-    send.gain.value = macro.shimmer / 260;
-
-    out.connect(filter);
-    filter.connect(pan);
-    pan.connect(master);
-    pan.connect(send);
-    if (delayRef.current) send.connect(delayRef.current);
-
-    if (track.voice === "kick") {
-      const osc = ctx.createOscillator();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(145, time);
-      osc.frequency.exponentialRampToValueAtTime(42, time + 0.22);
-      out.gain.setValueAtTime(track.level * 0.88, time);
-      out.gain.exponentialRampToValueAtTime(0.001, time + 0.28);
-      osc.connect(out);
-      osc.start(time);
-      osc.stop(time + 0.3);
-      return;
+    switch (track.voice) {
+      case "kick":
+        voices.kick.triggerAttackRelease("C1", "8n", time, velocity);
+        voices.kickClick.triggerAttackRelease("32n", time, velocity * 0.6);
+        return;
+      case "snare":
+        voices.snareNoise.triggerAttackRelease("8n", time, velocity);
+        voices.snareBody.triggerAttackRelease("G2", "32n", time, velocity * 0.55);
+        return;
+      case "hat":
+        voices.hat.triggerAttackRelease("C6", "32n", time, velocity * 0.7);
+        return;
+      case "bass": {
+        const note = Tone.Frequency("A1").transpose(semis).toNote();
+        voices.bass.triggerAttackRelease(note, "8n", time, velocity);
+        voices.bassSub.triggerAttackRelease(note, "8n", time, velocity * 0.7);
+        return;
+      }
+      case "pluck": {
+        const note = Tone.Frequency("E4").transpose(semis).toNote();
+        voices.pluck.triggerAttackRelease(note, "16n", time, velocity);
+        return;
+      }
+      case "pad": {
+        const root = Tone.Frequency("A3").transpose(semis).toNote();
+        const third = Tone.Frequency("C4").transpose(semis).toNote();
+        const fifth = Tone.Frequency("E4").transpose(semis).toNote();
+        voices.pad.triggerAttackRelease([root, third, fifth], "2n", time, velocity);
+        return;
+      }
     }
-
-    if (track.voice === "snare" || track.voice === "hat") {
-      const bufferSize = Math.floor(ctx.sampleRate * (track.voice === "hat" ? 0.07 : 0.18));
-      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i += 1) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
-      const noise = ctx.createBufferSource();
-      noise.buffer = buffer;
-      out.gain.setValueAtTime(track.level * (track.voice === "hat" ? 0.26 : 0.54), time);
-      out.gain.exponentialRampToValueAtTime(0.001, time + (track.voice === "hat" ? 0.05 : 0.16));
-      noise.connect(out);
-      noise.start(time);
-      return;
-    }
-
-    const osc = ctx.createOscillator();
-    const mod = ctx.createOscillator();
-    const modGain = ctx.createGain();
-    osc.type = track.voice === "pad" ? "sawtooth" : "triangle";
-    mod.type = "sine";
-    osc.frequency.value = note;
-    mod.frequency.value = 0.6 + macro.fracture / 18;
-    modGain.gain.value = track.voice === "pad" ? 11 : 4;
-    mod.connect(modGain);
-    modGain.connect(osc.frequency);
-    out.gain.setValueAtTime(0.001, time);
-    out.gain.linearRampToValueAtTime(track.level * (track.voice === "pad" ? 0.24 : 0.36), time + 0.025);
-    out.gain.exponentialRampToValueAtTime(0.001, time + (track.voice === "pad" ? 1.15 : 0.34));
-    osc.connect(out);
-    osc.start(time);
-    mod.start(time);
-    osc.stop(time + (track.voice === "pad" ? 1.2 : 0.38));
-    mod.stop(time + (track.voice === "pad" ? 1.2 : 0.38));
   }, []);
 
   const pulse = useCallback((nextStep: number, time: number) => {
-    if (!audioRef.current) return;
+    if (!voicesRef.current) return;
     tracksRef.current.forEach((track, index) => {
       if (track.pattern[nextStep]) triggerVoice(track, time, index + nextStep);
     });
   }, [triggerVoice]);
+
+  useEffect(() => {
+    const chain = chainRef.current;
+    if (!chain) return;
+    chain.filter.frequency.rampTo(200 * Math.pow(90, macros.bloom / 100), 0.05);
+  }, [macros.bloom]);
+
+  useEffect(() => {
+    const sends = sendsRef.current;
+    if (!sends) return;
+    const factor = (macros.shimmer / 100) * 1.4;
+    Object.entries(sends).forEach(([id, gain]) => {
+      const base = REVERB_SEND_BASE[id] ?? 0.1;
+      gain.gain.rampTo(base * factor, 0.05);
+    });
+  }, [macros.shimmer]);
+
+  useEffect(() => {
+    const chain = chainRef.current;
+    if (!chain) return;
+    chain.distortion.distortion = (macros.fracture / 100) * 0.55;
+    chain.distortion.wet.rampTo((macros.fracture / 100) * 0.6, 0.05);
+  }, [macros.fracture]);
 
   useEffect(() => {
     Tone.getTransport().bpm.value = bpm;
