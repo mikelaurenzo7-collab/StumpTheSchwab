@@ -6,17 +6,21 @@ Web-based music production platform. Make better music, faster.
 - **Framework**: Next.js 16 (App Router) + TypeScript
 - **Styling**: Tailwind CSS v4
 - **Audio**: Tone.js (Web Audio API)
-- **State**: Zustand v5
-- **AI**: Anthropic SDK (`@anthropic-ai/sdk`) for the beat generator
+- **AI**: Anthropic SDK (`@anthropic-ai/sdk`) for the song composer
 
 ## Project Structure
 ```
 src/
-  app/           # Next.js pages + layout
-  components/    # UI components (Transport, StepSequencer, Mixer)
-  store/         # Zustand stores (engine.ts = core state)
-  lib/           # Audio engine hook, sound definitions
+  app/
+    page.tsx                  # the studio: audio graph, sequencer, UI (one file)
+    layout.tsx
+    globals.css               # design tokens + cosmos theme
+    api/generate/route.ts     # Claude-powered song composer (server-only)
 ```
+
+The studio is a deliberate single-file app — audio graph, song arrangement,
+React UI, and the offline WAV renderer all live in `src/app/page.tsx`. There
+is no separate component / store / lib layer.
 
 ## Commands
 - `npm run dev` — start dev server
@@ -24,19 +28,71 @@ src/
 - `npm run lint` — run eslint
 
 ## Environment
-- `ANTHROPIC_API_KEY` — required for the AI beat generator (Generate button / `G` key). Set in `.env.local` for development. The key is server-only — the route handler at `src/app/api/generate/route.ts` is the only place that touches it.
+- `ANTHROPIC_API_KEY` — required for the compose-with-Claude button. Set in
+  `.env.local` for development. The key is server-only — the route handler at
+  `src/app/api/generate/route.ts` is the only place that touches it.
 
 ## Architecture Notes
-- Audio engine runs client-side only via `useAudioEngine` hook
-- Tone.js requires user interaction before `Tone.start()` — handled by transport play button
-- Zustand store is the single source of truth for sequencer state, playback, and mixer
-- Synths are created once on init and reused; gain nodes handle per-track volume/mute/solo
-- Step sequencer reads latest store state each tick for real-time responsiveness
-- Undo/redo uses snapshot-based history stack in Zustand (discrete actions push immediately, continuous controls throttle at 500ms)
-- WAV export uses `Tone.Offline` to render the pattern offline, then converts to 16-bit PCM WAV
-- Step probability: each step has a 0–100% trigger chance, rolled per tick during playback and export
-- Song mode: when `songMode` is true and `chain` is non-empty, the audio engine auto-advances to the next pattern in the chain at each loop boundary; export flattens the chain into one continuous render
-- AI beat generator: server route `/api/generate` uses Claude (Opus 4.7 + adaptive thinking + tool use with strict schema) to convert a text prompt into a `GeneratedBeat`, which `applyGeneratedBeat` writes into the current pattern slot. The system prompt is cached (`cache_control: ephemeral`)
+
+### Audio engine
+- Tone.js requires user interaction before `Tone.start()` — handled by the
+  ignite button (and the `Space` keyboard shortcut), which calls
+  `ensureAudio` before flipping the playing flag.
+- `buildAudioGraph()` constructs all synths + the master chain once and
+  returns three handles: `voices`, `chain`, `sends`. Refs hold the live
+  graph; React state drives parameter ramps via `useEffect`.
+- Master chain order: `filter → sweepFilter → highpass → eq → saturator
+  (Chebyshev order 2, "tape" warmth) → distortion → compressor → widener →
+  limiter → destination`.
+- Per-track routing: every voice fans out dry → ducker (kick is post-ducker so
+  it doesn't pump itself) and reverb send → reverb → compressor. Pluck has
+  its own ping-pong delay send.
+- Pink-noise riser feeds the ducker so it pumps with the kick during builds.
+- Pad signal path: `PolySynth(Synth, fatsawtooth) → padFilter (LFO-modulated
+  cutoff) → chorus → widener → master`. Synth (not AMSynth) keeps CPU sane
+  under chord-heavy load.
+- Drum velocity: `stepAccent(voice, stepIdx)` produces per-step accent
+  curves (kick: beat 1 strongest; snare: backbeat vs ghost; hat: quarter > 8th
+  > 16th). Multiplied by track-level fader before triggering.
+- Hat humanization: pitch cycles through 4 close notes + ±8% deterministic
+  velocity wobble + soft pan drift, all keyed on a per-render `hatState.count`
+  (so offline render is bit-reproducible).
+- Bass note duration adapts to the next-step gap: `16n` when the next 16th is
+  also active, `8n` with one rest, `4n` with two or more rests.
+
+### Song mode + arrangement
+- `ARRANGEMENT` is a fixed 48-bar form: intro 4 / verse 8 / build 4 / drop 16
+  / break 4 / drop2 8 / outro 4. Each section declares per-voice `{active,
+  pattern}`.
+- `applySectionTransition()` automates the master sweep filter and riser at
+  section boundaries (build sweeps up, drop slams to 18 kHz and zeroes the
+  riser, break dips to 3.5 kHz).
+- `PAD_HOLD` triggers once per measure with a `1n` note length so chord
+  changes cleanly re-attack the pad without stacking voices on the
+  PolySynth's 5-voice ceiling.
+- The last bar of every build replaces the snare pattern with all-16ths to
+  produce the snare-roll fill, and the first kick of the drop fires an
+  `isImpact` flag that adds a sub-bass boom on the chord root.
+
+### Composer (`/api/generate`)
+- Uses Claude (`claude-opus-4-7`) with `tool_choice: { type: "tool",
+  name: "compose_song" }` to force structured output via a strict JSON schema.
+- Note: `thinking` cannot be combined with forced `tool_choice` (the API
+  rejects it with HTTP 400). Don't add it back.
+- The system prompt is cached with `cache_control: ephemeral`.
+- Returned spec drives `setSong` (key/mode/progression/pluckMotif/bassMotif)
+  plus optional bpm / swing / macros / rationale.
+
+### WAV export
+- `Tone.Offline` renders the full arrangement + a 4-second tail offline at
+  the current bpm/swing/macros snapshot. The result is converted to 16-bit
+  PCM WAV in `audioBufferToWav` and downloaded directly.
+
+### Keyboard
+- `Space` toggles play/pause (ignored when focus is in `INPUT` / `TEXTAREA` /
+  contentEditable so the compose textarea can contain spaces).
 
 ## Design Tokens
-Dark theme defined in `globals.css` — accent purple (#8b5cf6), track colors per instrument in `lib/sounds.ts`.
+Dark cosmos theme defined in `globals.css` — accent purple (#8b5cf6) and
+per-voice hue tokens on each track (`pulse` 270 / `glass` 318 / `dust` 190 /
+`sub` 154 / `keys` 42 / `aura` 226).
