@@ -258,6 +258,7 @@ type MasterChain = {
   sweepFilter: Tone.Filter;
   highpass: Tone.Filter;
   eq: Tone.EQ3;
+  saturator: Tone.Chebyshev;
   distortion: Tone.Distortion;
   reverb: Tone.Reverb;
   pluckDelay: Tone.PingPongDelay;
@@ -268,6 +269,7 @@ type MasterChain = {
   riserNoise: Tone.Noise;
   riserFilter: Tone.Filter;
   riserGain: Tone.Gain;
+  padLfo: Tone.LFO;
 };
 
 type Sends = Record<string, Tone.Gain>;
@@ -282,12 +284,15 @@ function buildAudioGraph(): AudioGraph {
   const sweepFilter = new Tone.Filter({ type: "lowpass", frequency: 18000, Q: 0.4 });
   const highpass = new Tone.Filter({ type: "highpass", frequency: 32, Q: 0.5 });
   const eq = new Tone.EQ3({ low: -1.5, mid: -2, high: 2.5, lowFrequency: 220, highFrequency: 4500 });
+  // Chebyshev order 2 produces only the 2nd harmonic (one octave up).
+  // At low wet (0.18) this reads as warmth/glue, not distortion.
+  const saturator = new Tone.Chebyshev({ order: 2, wet: 0.18 });
   const distortion = new Tone.Distortion({ distortion: 0, wet: 0 });
   const compressor = new Tone.Compressor({ threshold: -14, ratio: 3, attack: 0.006, release: 0.18, knee: 8 });
   const widener = new Tone.StereoWidener({ width: 0.55 });
   const limiter = new Tone.Limiter(-0.8);
 
-  filter.chain(sweepFilter, highpass, eq, distortion, compressor, widener, limiter, Tone.getDestination());
+  filter.chain(sweepFilter, highpass, eq, saturator, distortion, compressor, widener, limiter, Tone.getDestination());
 
   const ducker = new Tone.Gain(1).connect(filter);
 
@@ -359,7 +364,9 @@ function buildAudioGraph(): AudioGraph {
   hat.connect(hatHpf);
 
   const bass = new Tone.MonoSynth({
-    oscillator: { type: "sawtooth" },
+    // fatsawtooth = 3 detuned saws with 14 cent spread → instant warmth + width
+    // monophonic on the play side (one note at a time) but thick in tone
+    oscillator: { type: "fatsawtooth", count: 2, spread: 14 } as Partial<Tone.OmniOscillatorOptions>,
     envelope: { attack: 0.005, decay: 0.22, sustain: 0.4, release: 0.32 },
     filterEnvelope: { attack: 0.005, decay: 0.2, sustain: 0.32, release: 0.22, baseFrequency: 70, octaves: 2.8, exponent: 2 },
     filter: { Q: 1.8, type: "lowpass", rolloff: -24 },
@@ -378,9 +385,17 @@ function buildAudioGraph(): AudioGraph {
     attackNoise: 0.85, dampening: 4400, resonance: 0.93, release: 0.7,
     volume: -7,
   });
-  pluck.fan(ducker, sends["keys"], pluckDelay);
+  // Slight off-center pan; ping-pong delay continues to bounce L/R from there.
+  const pluckPan = new Tone.Panner(0.18);
+  pluck.connect(pluckPan);
+  pluckPan.fan(ducker, sends["keys"], pluckDelay);
 
   const padFilter = new Tone.Filter({ type: "lowpass", frequency: 3400, Q: 0.55 });
+  // Slow filter LFO so the pad cutoff drifts between 2400 and 4200 Hz on a
+  // ~12-second cycle — the chord breathes instead of sitting flat.
+  const padLfo = new Tone.LFO({ frequency: 0.085, min: 2400, max: 4200, type: "sine" });
+  padLfo.connect(padFilter.frequency);
+  padLfo.start();
   const padChorus = new Tone.Chorus({ frequency: 0.55, depth: 0.6, wet: 0.5 }).start();
   const padWidener = new Tone.StereoWidener({ width: 0.6 });
   padFilter.chain(padChorus, padWidener);
@@ -399,9 +414,9 @@ function buildAudioGraph(): AudioGraph {
   return {
     voices: { kick, kickClick, snareNoise, snareBody, snareCrack, hat, hatPanner, bass, bassSub, pluck, pad },
     chain: {
-      filter, sweepFilter, highpass, eq, distortion, reverb, pluckDelay,
+      filter, sweepFilter, highpass, eq, saturator, distortion, reverb, pluckDelay,
       compressor, widener, limiter, ducker,
-      riserNoise, riserFilter, riserGain,
+      riserNoise, riserFilter, riserGain, padLfo,
     },
     sends,
   };
@@ -463,6 +478,29 @@ function resetSectionState(graph: AudioGraph, time: number) {
   graph.chain.riserGain.gain.setValueAtTime(0, time);
 }
 
+// Per-step velocity envelope by voice — the "groove" that separates a real
+// drum part from a click-track. Multiplied against the track-level fader.
+function stepAccent(voice: Voice, stepIdx: number): number {
+  switch (voice) {
+    case "kick":
+      // Beat 1 strongest, beat 3 nearly so, off-beats sit back
+      if (stepIdx === 0) return 1.0;
+      if (stepIdx === 8) return 0.95;
+      return 0.85;
+    case "snare":
+      // Backbeat (beats 2 and 4) is the accent; everything else is a ghost note
+      if (stepIdx === 4 || stepIdx === 12) return 1.0;
+      return 0.5;
+    case "hat":
+      // Quarter notes louder than 8ths louder than 16ths
+      if (stepIdx % 4 === 0) return 1.0;
+      if (stepIdx % 2 === 0) return 0.7;
+      return 0.55;
+    default:
+      return 1.0;
+  }
+}
+
 function applyVoiceTrigger(
   graph: AudioGraph,
   song: Song,
@@ -474,7 +512,8 @@ function applyVoiceTrigger(
   isImpact = false,
 ) {
   const { voices, chain } = graph;
-  const velocity = isImpact ? 1 : clamp(track.level, 0.05, 1);
+  const baseVel = clamp(track.level, 0.05, 1);
+  const velocity = isImpact ? 1 : baseVel * stepAccent(track.voice, stepIdx);
   switch (track.voice) {
     case "kick":
       voices.kick.triggerAttackRelease("C1", "8n", time, velocity);
