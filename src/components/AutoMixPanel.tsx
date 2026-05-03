@@ -1,19 +1,17 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import { useEngineStore, type Track } from "@/store/engine";
+import { useEngineStore, type Track, type MasterBus } from "@/store/engine";
 import { DEFAULT_KIT } from "@/lib/sounds";
 
 /**
- * Intelligent AutoMix — Frequency-conflict-aware AI mixer
+ * AutoMix — Frequency-conflict-aware rule-based mixer with optional
+ * Claude-powered AI mastering (requires ANTHROPIC_API_KEY).
  *
- * Analyzes the spectral content of each track (based on instrument type
- * and naming) and automatically applies:
- *  - Smart volume leveling (LUFS-style target)
- *  - Frequency-aware panning (spread the spectrum)
- *  - Automatic sidechain routing (kick → bass)
- *  - Per-track EQ suggestions (cut mud, boost presence)
- *  - Master bus glue compression and limiting
+ * Rule-based analysis assigns tracks to spectral zones, detects frequency
+ * conflicts, and applies opinionated leveling / panning / sidechain fixes.
+ * The "AI Master" section calls /api/master, which uses Claude to recommend
+ * master-bus patches that target a chosen loudness platform.
  */
 
 interface MixAnalysis {
@@ -72,8 +70,17 @@ function analyzeMix(tracks: Track[]): MixAnalysis[] {
   return analyses;
 }
 
-export function AutoMixPanel() {
+export function AutoMixPanel({
+  getLoudness,
+  getTruePeak,
+  getMasterSpectrum,
+}: {
+  getLoudness?: () => number;
+  getTruePeak?: () => number;
+  getMasterSpectrum?: () => Float32Array | null;
+}) {
   const tracks = useEngineStore((s) => s.tracks);
+  const master = useEngineStore((s) => s.master);
   const autoMix = useEngineStore((s) => s.autoMix);
   const setTrackVolume = useEngineStore((s) => s.setTrackVolume);
   const setTrackPan = useEngineStore((s) => s.setTrackPan);
@@ -83,6 +90,12 @@ export function AutoMixPanel() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<MixAnalysis[] | null>(null);
   const [applied, setApplied] = useState(false);
+
+  // ── AI Master state ──────────────────────────────────────────
+  const [masterTarget, setMasterTarget] = useState<"spotify" | "apple" | "youtube" | "club">("spotify");
+  const [masterLoading, setMasterLoading] = useState(false);
+  const [masterResult, setMasterResult] = useState<{ explanation: string; predicted_lufs_change?: number } | null>(null);
+  const [masterError, setMasterError] = useState<string | null>(null);
 
   const runAnalysis = useCallback(() => {
     setAnalyzing(true);
@@ -170,6 +183,71 @@ export function AutoMixPanel() {
     const score = Math.max(0, 100 - (totalConflicts / maxPossible) * 100);
     return Math.round(score);
   }, [analysis, tracks.length]);
+
+  // ── AI Master handler ────────────────────────────────────────
+  const applyAIMaster = useCallback(async () => {
+    setMasterLoading(true);
+    setMasterError(null);
+    setMasterResult(null);
+    try {
+      const lufs = getLoudness?.() ?? -999;
+      const truePeak = getTruePeak?.() ?? -999;
+      const spectrum = getMasterSpectrum?.();
+
+      // Build 6-zone spectrum summary (matches system prompt zones)
+      let spectrumSummary = {};
+      if (spectrum && spectrum.length >= 1024) {
+        // Map FFT bins to frequency zones: sub <80Hz, bass 80-250, loMid 250-2k, hiMid 2-6k, presence 6-12k, air >12k
+        const sampleRate = 44100;
+        const binHz = sampleRate / (2 * spectrum.length);
+        const rms = (lo: number, hi: number) => {
+          let sum = 0; let n = 0;
+          for (let i = Math.floor(lo / binHz); i < Math.min(spectrum.length, Math.ceil(hi / binHz)); i++) {
+            sum += spectrum[i] * spectrum[i]; n++;
+          }
+          return n > 0 ? Math.sqrt(sum / n) : 0;
+        };
+        spectrumSummary = {
+          sub: +rms(20, 80).toFixed(4),
+          bass: +rms(80, 250).toFixed(4),
+          loMid: +rms(250, 2000).toFixed(4),
+          hiMid: +rms(2000, 6000).toFixed(4),
+          presence: +rms(6000, 12000).toFixed(4),
+          air: +rms(12000, 20000).toFixed(4),
+        };
+      }
+
+      const snapshot = JSON.stringify({
+        target: masterTarget,
+        master,
+        lufs_short: lufs > -900 ? +lufs.toFixed(1) : null,
+        true_peak: truePeak > -900 ? +truePeak.toFixed(1) : null,
+        spectrum: spectrumSummary,
+      });
+
+      const res = await fetch("/api/master", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ snapshot }),
+      });
+      const json = await res.json() as { patches?: { key: string; value: unknown }[]; explanation?: string; predicted_lufs_change?: number; error?: string };
+      if (!res.ok || json.error) {
+        setMasterError(json.error ?? "AI master failed");
+        return;
+      }
+      // Apply returned patches to the master bus
+      if (json.patches) {
+        json.patches.forEach(({ key, value }) => {
+          setMaster(key as keyof MasterBus, value as never);
+        });
+      }
+      setMasterResult({ explanation: json.explanation ?? "", predicted_lufs_change: json.predicted_lufs_change });
+    } catch (e) {
+      setMasterError(e instanceof Error ? e.message : "Network error");
+    } finally {
+      setMasterLoading(false);
+    }
+  }, [master, masterTarget, getLoudness, getTruePeak, getMasterSpectrum, setMaster]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -287,8 +365,54 @@ export function AutoMixPanel() {
           ))}
         </div>
       )}
+
+      {/* AI Master section */}
+      <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted">Claude AI Master</span>
+        <div className="flex gap-1">
+          {(["spotify", "apple", "youtube", "club"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setMasterTarget(t)}
+              className={`flex-1 rounded-md px-1.5 py-1 text-[9px] font-semibold uppercase tracking-wide transition-colors ${
+                masterTarget === t
+                  ? "bg-accent text-[#1a1408]"
+                  : "bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={applyAIMaster}
+          disabled={masterLoading}
+          className="button-primary flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold"
+        >
+          {masterLoading ? (
+            <>
+              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              Mastering...
+            </>
+          ) : (
+            "✨ AI Master"
+          )}
+        </button>
+        {masterResult && (
+          <div className="rounded-md border border-accent/20 bg-accent/5 px-2.5 py-2 text-[10px] text-soft">
+            <p className="leading-relaxed">{masterResult.explanation}</p>
+            {masterResult.predicted_lufs_change !== undefined && (
+              <p className="mt-1 font-semibold text-accent">
+                Predicted LUFS change: {masterResult.predicted_lufs_change > 0 ? "+" : ""}{masterResult.predicted_lufs_change.toFixed(1)} dB
+              </p>
+            )}
+          </div>
+        )}
+        {masterError && (
+          <p className="rounded-md bg-red-500/10 px-2 py-1.5 text-[10px] text-red-400">{masterError}</p>
+        )}
+      </div>
     </div>
   );
 }
-
 

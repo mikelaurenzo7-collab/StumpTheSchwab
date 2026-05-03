@@ -1,16 +1,33 @@
 import { create } from "zustand";
-import { useEngineStore, _setCheckpoint, type Track, type Pattern, type MasterBus } from "./engine";
+import { useEngineStore, _setCheckpoint, type Track, type Pattern, type MasterBus, type TrackEffects } from "./engine";
 
 const MAX_HISTORY = 50;
+
+interface SnapshotTrack {
+  steps: number[];
+  notes: string[];
+  probabilities: number[];
+  volume: number;
+  pan: number;
+  muted: boolean;
+  solo: boolean;
+  effects: TrackEffects;
+  noteLength: number;
+  nudge: number[];
+  stepLocks: Array<Partial<TrackEffects> | undefined>;
+  sampleReverse: boolean;
+  samplePitchShift: number;
+}
 
 interface Snapshot {
   bpm: number;
   swing: number;
   totalSteps: number;
-  tracks: Pick<Track, "steps" | "notes" | "probabilities" | "volume" | "pan" | "muted" | "solo" | "effects" | "noteLength">[];
+  tracks: SnapshotTrack[];
   patterns: Pattern[];
   currentPattern: number;
   chain: number[];
+  chainMeta: Array<{ bpmOverride?: number; swingOverride?: number }>;
   songMode: boolean;
   master: MasterBus;
 }
@@ -39,6 +56,10 @@ function captureSnapshot(): Snapshot {
       solo: t.solo,
       effects: { ...t.effects },
       noteLength: t.noteLength,
+      nudge: [...t.nudge],
+      stepLocks: [...t.stepLocks],
+      sampleReverse: t.sampleReverse,
+      samplePitchShift: t.samplePitchShift,
     })),
     patterns: s.patterns.map((p) => ({
       ...p,
@@ -47,6 +68,7 @@ function captureSnapshot(): Snapshot {
     })),
     currentPattern: s.currentPattern,
     chain: [...s.chain],
+    chainMeta: s.chainMeta.map((m) => ({ ...m })),
     songMode: s.songMode,
     master: { ...s.master },
   };
@@ -61,6 +83,7 @@ function restoreSnapshot(snapshot: Snapshot) {
     currentPattern: snapshot.currentPattern,
     patterns: snapshot.patterns,
     chain: snapshot.chain,
+    chainMeta: snapshot.chainMeta,
     songMode: snapshot.songMode,
     master: snapshot.master,
     tracks: state.tracks.map((t, i) => ({
@@ -74,6 +97,10 @@ function restoreSnapshot(snapshot: Snapshot) {
       solo: snapshot.tracks[i]?.solo ?? t.solo,
       effects: snapshot.tracks[i]?.effects ?? t.effects,
       noteLength: snapshot.tracks[i]?.noteLength ?? t.noteLength,
+      nudge: snapshot.tracks[i]?.nudge ?? t.nudge,
+      stepLocks: snapshot.tracks[i]?.stepLocks ?? t.stepLocks,
+      sampleReverse: snapshot.tracks[i]?.sampleReverse ?? t.sampleReverse,
+      samplePitchShift: snapshot.tracks[i]?.samplePitchShift ?? t.samplePitchShift,
     })),
   });
 }

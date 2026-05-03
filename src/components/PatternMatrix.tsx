@@ -17,7 +17,10 @@ export function PatternMatrix() {
   const tracks = useEngineStore((s) => s.tracks);
   const patterns = useEngineStore((s) => s.patterns);
   const currentPattern = useEngineStore((s) => s.currentPattern);
+  const trackSlots = useEngineStore((s) => s.trackSlots);
   const setCurrentPattern = useEngineStore((s) => s.setCurrentPattern);
+  const setTrackSlot = useEngineStore((s) => s.setTrackSlot);
+  const resetTrackSlots = useEngineStore((s) => s.resetTrackSlots);
   const copyPattern = useEngineStore((s) => s.copyPattern);
   const playbackState = useEngineStore((s) => s.playbackState);
   const chain = useEngineStore((s) => s.chain);
@@ -55,9 +58,11 @@ export function PatternMatrix() {
         setCopySource(null);
         return;
       }
-      setCurrentPattern(patternIdx);
+      // Set this track's individual clip slot so it reads from patternIdx
+      // independently, enabling Ableton-style per-track clip launching.
+      setTrackSlot(trackIdx, patternIdx);
     },
-    [copySource, copyPattern, setCurrentPattern]
+    [copySource, copyPattern, setTrackSlot]
   );
 
   const handleCopy = useCallback(() => {
@@ -66,14 +71,14 @@ export function PatternMatrix() {
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Header row: pattern labels */}
+      {/* Header row: pattern labels — clicking resets ALL track slots to this pattern */}
       <div className="flex items-center gap-1">
         <div className="w-20 text-[9px] font-bold uppercase tracking-[0.18em] text-muted" />
         <div className="flex flex-1 gap-1">
           {PATTERN_LABELS.map((label, i) => (
             <button
               key={i}
-              onClick={() => setCurrentPattern(i)}
+              onClick={() => { setCurrentPattern(i); resetTrackSlots(); }}
               className={`flex-1 rounded-md py-1 text-[10px] font-bold transition-colors ${
                 i === currentPattern
                   ? "bg-accent text-[#1a1408]"
@@ -81,6 +86,7 @@ export function PatternMatrix() {
                     ? "bg-accent/15 text-accent"
                     : "bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground"
               }`}
+              title={`Switch all tracks to pattern ${label}`}
             >
               {label}
             </button>
@@ -125,7 +131,10 @@ export function PatternMatrix() {
               <div className="flex flex-1 gap-1">
                 {PATTERN_LABELS.map((_, pIdx) => {
                   const density = densityMap[tIdx]?.[pIdx] ?? 0;
-                  const isCurrent = pIdx === currentPattern;
+                  // A cell is "active" if THIS TRACK's slot points at this pattern
+                  const isTrackActive = pIdx === (trackSlots[tIdx] ?? currentPattern);
+                  // Global current pattern (all-track column)
+                  const isGlobalCurrent = pIdx === currentPattern;
                   const isActive = density > 0;
                   const isInChain = chainMap.has(pIdx);
 
@@ -136,11 +145,11 @@ export function PatternMatrix() {
                       onMouseEnter={() => setHoveredCell({ row: tIdx, col: pIdx })}
                       onMouseLeave={() => setHoveredCell(null)}
                       className={`relative flex-1 overflow-hidden rounded-md transition-all ${
-                        isCurrent
-                          ? "ring-1 ring-accent ring-offset-1 ring-offset-background"
+                        isTrackActive
+                          ? "ring-1 ring-offset-1 ring-offset-background"
                           : ""
                       } ${
-                        isInChain && !isCurrent
+                        isInChain && !isTrackActive
                           ? "border border-accent/20"
                           : "border border-transparent"
                       }`}
@@ -149,8 +158,10 @@ export function PatternMatrix() {
                         backgroundColor: isActive
                           ? `${trackColor}${Math.round(density * 160 + 40).toString(16).padStart(2, "0")}`
                           : "var(--surface-2)",
+                        // Per-track slot = track color ring; global column = accent ring
+                        ["--tw-ring-color" as string]: isGlobalCurrent ? "var(--accent)" : trackColor,
                       }}
-                      title={`${trackName} · Pattern ${PATTERN_LABELS[pIdx]} · ${Math.round(density * 100)}% density`}
+                      title={`${trackName} · Pattern ${PATTERN_LABELS[pIdx]} · ${Math.round(density * 100)}% density\nClick to launch clip for this track`}
                     >
                       {/* Mini step dots */}
                       <div className="absolute inset-0 flex items-center justify-center gap-[1px] px-0.5">
@@ -162,14 +173,14 @@ export function PatternMatrix() {
                               width: "2px",
                               height: v > 0 ? `${Math.max(2, v * 10)}px` : "2px",
                               backgroundColor: v > 0 ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.08)",
-                              opacity: isCurrent ? 1 : 0.6,
+                              opacity: isTrackActive ? 1 : 0.6,
                             }}
                           />
                         ))}
                       </div>
 
-                      {/* Playing indicator */}
-                      {isCurrent && playbackState === "playing" && (
+                      {/* Playing indicator — show on this track's active slot */}
+                      {isTrackActive && playbackState === "playing" && (
                         <div className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
                       )}
 

@@ -900,9 +900,21 @@ export function useAudioEngine() {
             }
 
             currentTracks.forEach((track: Track, trackIndex: number) => {
-              const velocity = track.steps[stepIndex];
+              // Per-track clip slot: when a track's slot differs from the
+              // global current pattern, read step data from that pattern instead
+              // of the live track arrays (which reflect currentPattern).
+              const slotIdx = currentState.trackSlots?.[trackIndex] ?? currentState.currentPattern;
+              const slotPattern = slotIdx !== currentState.currentPattern
+                ? currentState.patterns[slotIdx]
+                : null;
+
+              const velocity = slotPattern
+                ? (slotPattern.steps[trackIndex]?.[stepIndex] ?? 0)
+                : track.steps[stepIndex];
               if (!velocity) return;
-              const probability = track.probabilities?.[stepIndex] ?? 1.0;
+              const probability = slotPattern
+                ? (slotPattern.probabilities[trackIndex]?.[stepIndex] ?? 1.0)
+                : (track.probabilities?.[stepIndex] ?? 1.0);
               if (probability < 1.0 && Math.random() > probability) return;
               const audible = hasSolo
                 ? track.solo && !track.muted
@@ -916,11 +928,14 @@ export function useAudioEngine() {
               const synth = synthsRef.current[trackIndex];
               const fx = fxChainsRef.current[trackIndex];
               if (synth) {
-                let noteOverride = track.notes?.[stepIndex] || undefined;
+                const slotNotes = slotPattern?.notes[trackIndex];
+                let noteOverride = (slotNotes ? slotNotes[stepIndex] : track.notes?.[stepIndex]) || undefined;
                 const dur = stepDurationSeconds * (track.noteLength ?? 1.0);
                 // Stack per-track micro-nudge with groove timing jitter.
-                const nudgeOffset =
-                  (track.nudge?.[stepIndex] ?? 0) * stepDurationSeconds + grooveTimingNudge;
+                const rawNudge = slotPattern
+                  ? (slotPattern.nudge[trackIndex]?.[stepIndex] ?? 0)
+                  : (track.nudge?.[stepIndex] ?? 0);
+                const nudgeOffset = rawNudge * stepDurationSeconds + grooveTimingNudge;
                 
                 // Sample pitch shift: tone.Player uses playbackRate, already
                 // applied at load/hot-swap. For Sampler, transpose the triggered note.

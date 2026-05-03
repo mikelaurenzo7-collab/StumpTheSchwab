@@ -80,7 +80,7 @@ export default function DAW() {
   const [recoveryBanner, setRecoveryBanner] = useState(() => {
     if (typeof window === "undefined") return false;
     try {
-      return localStorage.getItem("sts_session___autosave") !== null;
+      return localStorage.getItem("sts_session___autosave__") !== null;
     } catch {
       return false;
     }
@@ -172,8 +172,12 @@ export default function DAW() {
 
           {sidebarTab === "mix" && (
             <div className="panel rounded-lg p-3">
-              <SectionHeader eyebrow="AI" title="AutoMix" />
-              <AutoMixPanel />
+              <SectionHeader eyebrow="Mix" title="AutoMix" />
+              <AutoMixPanel
+                getLoudness={getMasterLoudness}
+                getTruePeak={getMasterTruePeak}
+                getMasterSpectrum={getMasterSpectrum}
+              />
             </div>
           )}
 
@@ -242,7 +246,7 @@ export default function DAW() {
       <CommandPalette onInit={initAudio} />
       <MidiPanel status={midiStatus} onEnable={enableMidi} />
 
-      <StatusBar getMasterMeter={getMasterMeter} getMasterWaveform={getMasterWaveform} midiStatus={midiStatus} />
+      <StatusBar getMasterMeter={getMasterMeter} midiStatus={midiStatus} />
 
       <style jsx global>{`
         .kbd {

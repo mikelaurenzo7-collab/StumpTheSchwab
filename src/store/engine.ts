@@ -311,6 +311,11 @@ export interface EngineState {
   performanceMode: boolean;
   activeScenes: Set<string>;  // Currently playing scenes
 
+  // Per-track pattern slot for the clip launcher. Index i = which pattern
+  // track i is reading from. All slots default to currentPattern; setting a
+  // slot independently enables Ableton-style clip launching from PatternMatrix.
+  trackSlots: number[];
+
   sampleLibrary: Sample[];
   sampleCategories: string[];
 
@@ -411,6 +416,13 @@ export interface EngineState {
   triggerScene: (sceneId: string) => void;
   stopScene: (sceneId: string) => void;
   updateScene: (sceneId: string, updates: Partial<Omit<Scene, "id">>) => void;
+
+  // ── Clip launcher (per-track pattern slots) ───────────────
+  // Set which pattern a single track reads from during playback.
+  // All other tracks remain on their current slots.
+  setTrackSlot: (trackIdx: number, patternIdx: number) => void;
+  // Reset all track slots to point at the global currentPattern.
+  resetTrackSlots: () => void;
 
   // ── Sample library actions ────────────────────────────────
   addSampleToLibrary: (sample: Sample) => void;
@@ -583,6 +595,10 @@ interface SessionData {
     customSampleName?: string | null;
     noteLength?: number;
     nudge?: number[];
+    // Step-level parameter locks — sparse array (null entries = use track default)
+    stepLocks?: (Partial<TrackEffects> | null)[];
+    sampleReverse?: boolean;
+    samplePitchShift?: number;
   }[];
   patterns?: {
     name: string;
@@ -594,12 +610,14 @@ interface SessionData {
   }[];
   currentPattern?: number;
   chain?: number[];
+  chainMeta?: Array<{ bpmOverride?: number; swingOverride?: number }>;
   songMode?: boolean;
   master: MasterBus;
   grooveTemplates?: GrooveTemplate[];
   activeGroove?: string | null;
   scenes?: Scene[];
   sampleLibrary?: Sample[];
+  activeScenes?: string[];
 }
 
 function serializeSession(state: EngineState): SessionData {
@@ -622,6 +640,10 @@ function serializeSession(state: EngineState): SessionData {
       customSampleName: t.customSampleName,
       noteLength: t.noteLength,
       nudge: t.nudge,
+      // Map undefined entries to null so JSON round-trips correctly
+      stepLocks: t.stepLocks.map((s) => s ?? null),
+      sampleReverse: t.sampleReverse,
+      samplePitchShift: t.samplePitchShift,
     })),
     patterns: state.patterns.map((p, i) => ({
       name: p.name,
@@ -632,12 +654,14 @@ function serializeSession(state: EngineState): SessionData {
       automation: p.automation,
     })),
     chain: state.chain,
+    chainMeta: state.chainMeta,
     songMode: state.songMode,
     master: state.master,
     grooveTemplates: state.grooveTemplates,
     activeGroove: state.activeGroove,
     scenes: state.scenes,
     sampleLibrary: state.sampleLibrary,
+    activeScenes: [...state.activeScenes],
   };
 }
 
@@ -781,6 +805,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
   scenes: [],
   performanceMode: false,
   activeScenes: new Set(),
+  trackSlots: Array(DEFAULT_KIT.length).fill(0),
 
   sampleLibrary: [],
   sampleCategories: ["Drums", "Bass", "Melodic", "FX", "Vocals", "Loops"],
@@ -976,6 +1001,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
       return {
         patterns: updatedPatterns,
         currentPattern: index,
+        trackSlots: Array(state.tracks.length).fill(index),
         tracks: applyPatternToTracks(state.tracks, target, state.totalSteps),
       };
     });
@@ -1470,6 +1496,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
       return {
         patterns: updatedPatterns,
         currentPattern: index,
+        trackSlots: Array(state.tracks.length).fill(index),
         tracks: applyPatternToTracks(state.tracks, target, state.totalSteps),
       };
     });
@@ -1653,9 +1680,12 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
           customSampleName: data.tracks[i]?.customSampleName ?? null,
           noteLength: data.tracks[i]?.noteLength ?? 1.0,
           nudge: data.tracks[i]?.nudge ?? Array(data.totalSteps).fill(0),
-          stepLocks: Array(data.totalSteps).fill(undefined),
-          sampleReverse: false,
-          samplePitchShift: 0,
+          // Restore step locks: null entries (from JSON) become undefined
+          stepLocks: data.tracks[i]?.stepLocks
+            ? data.tracks[i].stepLocks!.map((s) => s ?? undefined)
+            : Array(data.totalSteps).fill(undefined),
+          sampleReverse: data.tracks[i]?.sampleReverse ?? false,
+          samplePitchShift: data.tracks[i]?.samplePitchShift ?? 0,
         })),
         patterns: data.patterns
           ? data.patterns.map((p, i) => ({
@@ -1681,7 +1711,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
             }))
           : state.patterns,
         chain: data.chain ?? [],
-        chainMeta: (data.chain ?? []).map(() => ({})),
+        chainMeta: data.chainMeta ?? (data.chain ?? []).map(() => ({})),
         songMode: data.songMode ?? false,
         chainPosition: 0,
         // Merge default master onto the saved bus so older sessions pick up
@@ -1690,6 +1720,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         grooveTemplates: data.grooveTemplates ?? DEFAULT_GROOVE_TEMPLATES,
         activeGroove: data.activeGroove ?? null,
         scenes: data.scenes ?? [],
+        activeScenes: new Set(data.activeScenes ?? []),
         sampleLibrary: data.sampleLibrary ?? [],
       }));
       return true;
@@ -1921,8 +1952,11 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
   setPerformanceMode: (on) => {
     set({ performanceMode: on });
     if (!on) {
-      // Stop all active scenes when exiting performance mode
-      set({ activeScenes: new Set() });
+      // Stop all active scenes and restore uniform track slots
+      set((state) => ({
+        activeScenes: new Set(),
+        trackSlots: Array(state.tracks.length).fill(state.currentPattern),
+      }));
     }
   },
 
@@ -1953,9 +1987,23 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
 
   triggerScene: (sceneId) => {
     set((state) => {
+      const scene = state.scenes.find((s) => s.id === sceneId);
       const newActive = new Set(state.activeScenes);
       newActive.add(sceneId);
-      return { activeScenes: newActive };
+
+      // Apply the scene's per-track pattern slots to the clip launcher.
+      // Each defined slot overrides that track's active pattern; null/undefined
+      // slots leave the track on its current slot.
+      let nextSlots = [...state.trackSlots];
+      if (scene) {
+        scene.patternSlots.forEach((slot, trackIdx) => {
+          if (slot !== null && slot !== undefined && trackIdx < nextSlots.length) {
+            nextSlots[trackIdx] = slot;
+          }
+        });
+      }
+
+      return { activeScenes: newActive, trackSlots: nextSlots };
     });
   },
 
@@ -1963,6 +2011,14 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
     set((state) => {
       const newActive = new Set(state.activeScenes);
       newActive.delete(sceneId);
+      // When a scene stops and there are no other active scenes, reset all
+      // track slots back to the global current pattern.
+      if (newActive.size === 0) {
+        return {
+          activeScenes: newActive,
+          trackSlots: Array(state.tracks.length).fill(state.currentPattern),
+        };
+      }
       return { activeScenes: newActive };
     });
   },
@@ -1973,6 +2029,22 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
       scenes: state.scenes.map((s) =>
         s.id === sceneId ? { ...s, ...updates } : s
       ),
+    }));
+  },
+
+  // ── Clip launcher ─────────────────────────────────────────────
+  setTrackSlot: (trackIdx, patternIdx) => {
+    set((state) => {
+      if (patternIdx < 0 || patternIdx >= MAX_PATTERNS) return state;
+      const next = [...state.trackSlots];
+      next[trackIdx] = patternIdx;
+      return { trackSlots: next };
+    });
+  },
+
+  resetTrackSlots: () => {
+    set((state) => ({
+      trackSlots: Array(state.tracks.length).fill(state.currentPattern),
     }));
   },
 

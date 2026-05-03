@@ -30,10 +30,8 @@ export function SessionManager() {
     return () => clearInterval(interval);
   }, [saveSession]);
 
-  // Load autosave on mount
-  useEffect(() => {
-    loadSession(AUTOSAVE_KEY);
-  }, [loadSession]);
+  // Intentionally NOT auto-loading autosave on mount here.
+  // The recovery banner in page.tsx asks the user explicitly before restoring.
 
   const showFlash = useCallback((msg: string) => {
     setFlash(msg);

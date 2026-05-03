@@ -66,18 +66,6 @@ const SHORTCUTS: ShortcutGroup[] = [
       { keys: ["?"], label: "Toggle this help overlay" },
     ],
   },
-  {
-    title: "New Features",
-    items: [
-      { keys: ["Matrix"], label: "Pattern launcher grid — live-launch clips" },
-      { keys: ["Fill"], label: "Smart fills, breaks, builds, drops, ghost notes" },
-      { keys: ["Mix"], label: "AI AutoMix — frequency-aware intelligent mixing" },
-      { keys: ["Arrange+"], label: "Smart Arrangement AI — song structure suggestions" },
-      { keys: ["3D"], label: "WebGL 3D spectrum visualizer in mixer" },
-      { keys: ["LUFS"], label: "Pro mastering meters — LUFS + TruePeak readout" },
-      { keys: ["Reactive"], label: "Audio-reactive UI — interface breathes with the music" },
-    ],
-  },
 ];
 
 function Key({ children }: { children: React.ReactNode }) {

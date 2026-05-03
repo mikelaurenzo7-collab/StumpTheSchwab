@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useEngineStore } from "@/store/engine";
 
-const AUTOSAVE_KEY = "sts_session___autosave";
+// Must match the key that SessionManager.tsx uses so both systems share one slot.
+const AUTOSAVE_NAME = "__autosave__";
 const AUTOSAVE_INTERVAL = 30_000;
 
 export function useAutoSave() {
@@ -15,36 +16,7 @@ export function useAutoSave() {
       const state = useEngineStore.getState();
       const hasContent = state.tracks.some((t) => t.steps.some((s) => s > 0));
       if (!hasContent) return;
-
-      const data = {
-        bpm: state.bpm,
-        swing: state.swing,
-        totalSteps: state.totalSteps,
-        currentPattern: state.currentPattern,
-        tracks: state.tracks.map((t) => ({
-          steps: t.steps,
-          notes: t.notes,
-          probabilities: t.probabilities,
-          volume: t.volume,
-          pan: t.pan,
-          muted: t.muted,
-          solo: t.solo,
-          effects: t.effects,
-          customSampleUrl: t.customSampleUrl,
-          customSampleName: t.customSampleName,
-          noteLength: t.noteLength,
-          nudge: t.nudge,
-        })),
-        patterns: state.patterns.map((p) => ({
-          name: p.name,
-          steps: p.steps,
-          probabilities: p.probabilities,
-        })),
-        chain: state.chain,
-        songMode: state.songMode,
-        master: state.master,
-      };
-      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
+      state.saveSession(AUTOSAVE_NAME);
       setLastSaved(new Date());
     } catch {}
   }, []);
@@ -58,7 +30,7 @@ export function useAutoSave() {
 
   const hasAutosave = useCallback((): boolean => {
     try {
-      return localStorage.getItem(AUTOSAVE_KEY) !== null;
+      return useEngineStore.getState().getSavedSessions().includes(AUTOSAVE_NAME);
     } catch {
       return false;
     }
@@ -66,9 +38,7 @@ export function useAutoSave() {
 
   const recoverAutosave = useCallback((): boolean => {
     try {
-      const raw = localStorage.getItem(AUTOSAVE_KEY);
-      if (!raw) return false;
-      return useEngineStore.getState().loadSession("__autosave");
+      return useEngineStore.getState().loadSession(AUTOSAVE_NAME);
     } catch {
       return false;
     }
@@ -76,7 +46,7 @@ export function useAutoSave() {
 
   const clearAutosave = useCallback(() => {
     try {
-      localStorage.removeItem(AUTOSAVE_KEY);
+      useEngineStore.getState().deleteSession(AUTOSAVE_NAME);
     } catch {}
   }, []);
 
