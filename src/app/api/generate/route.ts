@@ -265,9 +265,23 @@ export async function POST(req: NextRequest) {
     ? `STYLE FINGERPRINT (recent user tendencies — bias subtly toward these unless contradicted by the description): ${styleFingerprint}\n\n`
     : "";
 
+  // Key/scale constraint from the user's Scale Lock setting.
+  const keyRaw =
+    typeof body === "object" && body !== null && "key" in body
+      ? (body as { key: unknown }).key
+      : null;
+  const scaleRaw =
+    typeof body === "object" && body !== null && "scale" in body
+      ? (body as { scale: unknown }).scale
+      : null;
+  const keyConstraint =
+    typeof keyRaw === "string" && typeof scaleRaw === "string"
+      ? `KEY CONSTRAINT (Scale Lock is ON — all melodic notes MUST be in ${keyRaw} ${scaleRaw}. Do not use notes outside this scale for tom, perc, or bass.)\n\n`
+      : "";
+
   const userMessage = currentBeat
-    ? `${fingerprintBlock}CURRENT BEAT:\n\`\`\`json\n${JSON.stringify(currentBeat, null, 2)}\n\`\`\`\n\nTARGET FOCUS: ${TARGET_GUIDANCE[target]}\nINSTRUCTION: ${description}`
-    : `${fingerprintBlock}TARGET FOCUS: ${TARGET_GUIDANCE[target]}\nDESCRIPTION: ${description}`;
+    ? `${fingerprintBlock}${keyConstraint}CURRENT BEAT:\n\`\`\`json\n${JSON.stringify(currentBeat, null, 2)}\n\`\`\`\n\nTARGET FOCUS: ${TARGET_GUIDANCE[target]}\nINSTRUCTION: ${description}`
+    : `${fingerprintBlock}${keyConstraint}TARGET FOCUS: ${TARGET_GUIDANCE[target]}\nDESCRIPTION: ${description}`;
 
   const client = new Anthropic();
 

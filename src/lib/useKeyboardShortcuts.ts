@@ -181,6 +181,14 @@ export function useKeyboardShortcuts(
           break;
         }
 
+        // L: Toggle scale lock
+        case "KeyL": {
+          if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) break;
+          e.preventDefault();
+          state.setScaleLock(!state.scaleLock);
+          break;
+        }
+
       }
     };
 

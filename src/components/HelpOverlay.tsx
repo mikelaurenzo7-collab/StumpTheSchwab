@@ -63,6 +63,7 @@ const SHORTCUTS: ShortcutGroup[] = [
       { keys: ["G"], label: "Generate beat with Claude" },
       { keys: ["H"], label: "Humanize all tracks" },
       { keys: ["F"], label: "Open Fill Engine panel" },
+      { keys: ["L"], label: "Toggle Scale Lock (constrain piano roll to key)" },
       { keys: ["?"], label: "Toggle this help overlay" },
     ],
   },

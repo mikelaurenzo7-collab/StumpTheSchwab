@@ -5,6 +5,7 @@ import { useEngineStore, MAX_PATTERNS } from "@/store/engine";
 import { useUiStore } from "@/store/ui";
 import * as Tone from "tone";
 import type { MidiStatus } from "@/lib/useMidi";
+import { ALL_NOTES, SCALE_TYPES, type NoteName, type ScaleType } from "@/lib/musicTheory";
 
 interface StatusBarProps {
   getMasterMeter: () => number;
@@ -25,6 +26,12 @@ export function StatusBar({ getMasterMeter, midiStatus }: StatusBarProps) {
   const currentPattern = useEngineStore((s) => s.currentPattern);
   const currentStep = useEngineStore((s) => s.currentStep);
   const songMode = useEngineStore((s) => s.songMode);
+  const globalKey = useEngineStore((s) => s.globalKey);
+  const globalScale = useEngineStore((s) => s.globalScale);
+  const scaleLock = useEngineStore((s) => s.scaleLock);
+  const setGlobalKey = useEngineStore((s) => s.setGlobalKey);
+  const setGlobalScale = useEngineStore((s) => s.setGlobalScale);
+  const setScaleLock = useEngineStore((s) => s.setScaleLock);
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   const setMidiOpen = useUiStore((s) => s.setMidiOpen);
   const tracks = useEngineStore((s) => s.tracks);
@@ -110,6 +117,37 @@ export function StatusBar({ getMasterMeter, midiStatus }: StatusBarProps) {
             {playbackState === "stopped" ? "—" : currentStep + 1}
           </span>
           <span className="text-muted">/{totalSteps}</span>
+        </span>
+        <span className="opacity-40">·</span>
+        <span className="flex items-center gap-1">
+          <span className="text-soft">KEY</span>
+          <select
+            value={globalKey}
+            onChange={(e) => setGlobalKey(e.target.value as NoteName)}
+            className="h-4 rounded border-none bg-transparent px-0 text-[10px] font-mono text-foreground focus:outline-none"
+          >
+            {ALL_NOTES.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+          <select
+            value={globalScale}
+            onChange={(e) => setGlobalScale(e.target.value as ScaleType)}
+            className="h-4 rounded border-none bg-transparent px-0 text-[10px] font-mono text-foreground focus:outline-none"
+          >
+            {SCALE_TYPES.map((s) => (
+              <option key={s.id} value={s.id}>{s.label}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => setScaleLock(!scaleLock)}
+            className={`rounded px-1 text-[9px] font-bold ${
+              scaleLock ? "bg-accent/30 text-accent" : "text-muted hover:text-foreground"
+            }`}
+            title="Toggle scale lock"
+          >
+            {scaleLock ? "🔒" : "🔓"}
+          </button>
         </span>
         <span className="opacity-40">·</span>
         <span>

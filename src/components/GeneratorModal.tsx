@@ -504,10 +504,12 @@ export function GeneratorModal() {
 
       try {
         const fingerprint = buildFingerprintContext();
+        const { globalKey, globalScale, scaleLock } = useEngineStore.getState();
         const body: Record<string, unknown> = {
           description: text,
           target: opts.target,
           ...(fingerprint ? { styleFingerprint: fingerprint } : {}),
+          ...(scaleLock ? { key: globalKey, scale: globalScale } : {}),
         };
         if (opts.refine) {
           const snapshot = snapshotCurrentBeat();

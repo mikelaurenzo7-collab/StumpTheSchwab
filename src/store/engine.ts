@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { DEFAULT_KIT, type TrackSound } from "@/lib/sounds";
 import { PRESETS, type PatternPreset } from "@/lib/presets";
 import { findKitPack } from "@/lib/kitPacks";
+import { type NoteName, type ScaleType, type ChordType, snapPatternToScale } from "@/lib/musicTheory";
 
 let _checkpoint: (() => void) | null = null;
 export function _setCheckpoint(fn: () => void) { _checkpoint = fn; }
@@ -317,6 +318,12 @@ export interface EngineState {
   automationRecording: boolean;
   selectedAutomationLane: string | null;
 
+  // ── Key / Scale / Chord ─────────────────────��──────────────
+  globalKey: NoteName;
+  globalScale: ScaleType;
+  scaleLock: boolean;
+  chordMode: ChordType | null;
+
   setBpm: (bpm: number) => void;
   setSwing: (swing: number) => void;
   play: () => void;
@@ -433,6 +440,13 @@ export interface EngineState {
   upsertMacro: (macro: MacroControl) => void;
   removeMacro: (macroId: string) => void;
   setMacroValue: (macroId: string, value: number) => void;
+
+  // ── Key / Scale / Chord actions ──────────────���──────────
+  setGlobalKey: (key: NoteName) => void;
+  setGlobalScale: (scale: ScaleType) => void;
+  setScaleLock: (on: boolean) => void;
+  setChordMode: (mode: ChordType | null) => void;
+  snapAllToScale: () => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -600,6 +614,9 @@ interface SessionData {
   activeGroove?: string | null;
   scenes?: Scene[];
   sampleLibrary?: Sample[];
+  globalKey?: string;
+  globalScale?: string;
+  scaleLock?: boolean;
 }
 
 function serializeSession(state: EngineState): SessionData {
@@ -638,6 +655,9 @@ function serializeSession(state: EngineState): SessionData {
     activeGroove: state.activeGroove,
     scenes: state.scenes,
     sampleLibrary: state.sampleLibrary,
+    globalKey: state.globalKey,
+    globalScale: state.globalScale,
+    scaleLock: state.scaleLock,
   };
 }
 
@@ -787,6 +807,12 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
 
   automationRecording: false,
   selectedAutomationLane: null,
+
+  // ── Key / Scale / Chord state ──────────────────────────────
+  globalKey: "C" as NoteName,
+  globalScale: "minor" as ScaleType,
+  scaleLock: false,
+  chordMode: null,
 
   setBpm: (bpm) => set({ bpm: Math.max(30, Math.min(300, bpm)) }),
   setSwing: (swing) => set({ swing: Math.max(0, Math.min(1, swing)) }),
@@ -1691,6 +1717,9 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         activeGroove: data.activeGroove ?? null,
         scenes: data.scenes ?? [],
         sampleLibrary: data.sampleLibrary ?? [],
+        globalKey: (data.globalKey as NoteName) ?? "C",
+        globalScale: (data.globalScale as ScaleType) ?? "minor",
+        scaleLock: data.scaleLock ?? false,
       }));
       return true;
     } catch {
@@ -2165,6 +2194,25 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
             }
           : p
       ),
+    }));
+  },
+
+  // ── Key / Scale / Chord actions ────────────────────────────
+  setGlobalKey: (key) => set({ globalKey: key }),
+  setGlobalScale: (scale) => set({ globalScale: scale }),
+  setScaleLock: (on) => set({ scaleLock: on }),
+  setChordMode: (mode) => set({ chordMode: mode }),
+
+  snapAllToScale: () => {
+    pushHistory();
+    set((state) => ({
+      tracks: state.tracks.map((t) => {
+        if (!t.sound.melodic) return t;
+        return {
+          ...t,
+          notes: snapPatternToScale(t.notes, t.steps, state.globalKey, state.globalScale),
+        };
+      }),
     }));
   },
 }));
