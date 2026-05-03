@@ -108,7 +108,48 @@ export function AutomationEditor() {
               <option value="track.1.effects.delayWet">Delay Wet</option>
               <option value="track.1.effects.reverbWet">Reverb Wet</option>
             </optgroup>
-            {/* Add more tracks as needed */}
+            <optgroup label="Track 2 (Hi-Hat)">
+              <option value="track.2.volume">Volume</option>
+              <option value="track.2.pan">Pan</option>
+              <option value="track.2.effects.filterFreq">Filter Freq</option>
+              <option value="track.2.effects.delayWet">Delay Wet</option>
+              <option value="track.2.effects.reverbWet">Reverb Wet</option>
+            </optgroup>
+            <optgroup label="Track 3 (Open Hat)">
+              <option value="track.3.volume">Volume</option>
+              <option value="track.3.pan">Pan</option>
+              <option value="track.3.effects.filterFreq">Filter Freq</option>
+              <option value="track.3.effects.delayWet">Delay Wet</option>
+              <option value="track.3.effects.reverbWet">Reverb Wet</option>
+            </optgroup>
+            <optgroup label="Track 4 (Clap)">
+              <option value="track.4.volume">Volume</option>
+              <option value="track.4.pan">Pan</option>
+              <option value="track.4.effects.filterFreq">Filter Freq</option>
+              <option value="track.4.effects.delayWet">Delay Wet</option>
+              <option value="track.4.effects.reverbWet">Reverb Wet</option>
+            </optgroup>
+            <optgroup label="Track 5 (Tom)">
+              <option value="track.5.volume">Volume</option>
+              <option value="track.5.pan">Pan</option>
+              <option value="track.5.effects.filterFreq">Filter Freq</option>
+              <option value="track.5.effects.delayWet">Delay Wet</option>
+              <option value="track.5.effects.reverbWet">Reverb Wet</option>
+            </optgroup>
+            <optgroup label="Track 6 (Perc)">
+              <option value="track.6.volume">Volume</option>
+              <option value="track.6.pan">Pan</option>
+              <option value="track.6.effects.filterFreq">Filter Freq</option>
+              <option value="track.6.effects.delayWet">Delay Wet</option>
+              <option value="track.6.effects.reverbWet">Reverb Wet</option>
+            </optgroup>
+            <optgroup label="Track 7 (Bass)">
+              <option value="track.7.volume">Volume</option>
+              <option value="track.7.pan">Pan</option>
+              <option value="track.7.effects.filterFreq">Filter Freq</option>
+              <option value="track.7.effects.delayWet">Delay Wet</option>
+              <option value="track.7.effects.reverbWet">Reverb Wet</option>
+            </optgroup>
           </select>
           <div className="flex gap-2">
             <button

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import * as Tone from "tone";
-import { useEngineStore, type Track, type TrackEffects, type MasterBus, type ModLfoTarget } from "@/store/engine";
+import { useEngineStore, type Track, type TrackEffects, type MasterBus, type ModLfoTarget, type AutomationTarget, type AutomationPoint } from "@/store/engine";
 import type { TrackSound } from "@/lib/sounds";
 import { getStepDurationSeconds, getStepSubdivision } from "@/lib/stepTiming";
 
@@ -15,6 +15,7 @@ export type SynthNode =
   | Tone.FMSynth
   | Tone.MonoSynth
   | Tone.Sampler
+  | Tone.Player
   | Tone.UserMedia;
 
 interface TrackFXChain {
@@ -76,6 +77,12 @@ export function triggerSynth(
   if (synth instanceof Tone.UserMedia) {
     // Mic input is continuous, no trigger needed. (Could implement a gate or recording envelope later).
     return;
+  } else if (synth instanceof Tone.Player) {
+    // Reverse/sample player — start at the scheduled time.
+    // Scale volume by velocity: Player.volume is in dB.
+    const dbVelocity = 20 * Math.log10(Math.max(0.001, velocity));
+    synth.volume.setValueAtTime(dbVelocity, time);
+    synth.start(time);
   } else if (synth instanceof Tone.NoiseSynth) {
     synth.triggerAttackRelease(duration, time, velocity);
   } else if (synth instanceof Tone.Sampler) {
@@ -265,6 +272,72 @@ function routeModLfo(
   }
 }
 
+// ── Automation helpers ──────────────────────────────────────────────────────
+// Linear interpolation between sorted automation points at a normalized
+// position (0..1). Returns null if there are no points.
+function interpolateAutomation(points: AutomationPoint[], position: number): number | null {
+  if (points.length === 0) return null;
+  const sorted = [...points].sort((a, b) => a.position - b.position);
+  if (position <= sorted[0].position) return sorted[0].value;
+  const last = sorted[sorted.length - 1];
+  if (position >= last.position) return last.value;
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = sorted[i];
+    const b = sorted[i + 1];
+    if (position >= a.position && position <= b.position) {
+      const t = (b.position - a.position < 1e-9)
+        ? 0
+        : (position - a.position) / (b.position - a.position);
+      return a.value + t * (b.value - a.value);
+    }
+  }
+  return null;
+}
+
+// Schedule a sample-accurate automation value onto the appropriate AudioParam.
+// Uses setValueAtTime so it integrates with Tone.js look-ahead scheduling
+// rather than overwriting the AudioParam's instantaneous value.
+function scheduleAutomationValue(
+  target: AutomationTarget,
+  value: number,
+  time: number,
+  gainNodes: Tone.Gain[],
+  panNodes: Tone.Panner[],
+  fxChains: TrackFXChain[],
+  masterChain: MasterChain | null,
+) {
+  if (target === "bpm") {
+    Tone.getTransport().bpm.setValueAtTime(value, time);
+    return;
+  }
+  if (target === "master.volume") {
+    masterChain?.gain.gain.setValueAtTime(value, time);
+    return;
+  }
+  const parts = target.split(".");
+  if (parts[0] !== "track") return;
+  const trackIdx = parseInt(parts[1], 10);
+  if (isNaN(trackIdx)) return;
+  const paramPath = parts.slice(2).join(".");
+  switch (paramPath) {
+    case "volume":
+      gainNodes[trackIdx]?.gain.setValueAtTime(value, time);
+      break;
+    case "pan":
+      panNodes[trackIdx]?.pan.setValueAtTime(value, time);
+      break;
+    case "effects.filterFreq":
+      fxChains[trackIdx]?.filter.frequency.setValueAtTime(value, time);
+      break;
+    case "effects.delayWet":
+      fxChains[trackIdx]?.delayGain.gain.setValueAtTime(value, time);
+      break;
+    case "effects.reverbWet":
+      fxChains[trackIdx]?.reverbGain.gain.setValueAtTime(value, time);
+      break;
+  }
+}
+
 function createMasterChain(): MasterChain {
   const master = useEngineStore.getState().master;
   // Order: gain → tape (warmth) → widener (M/S width) → eq → comp → limiter → out.
@@ -414,7 +487,12 @@ export function useAudioEngine() {
 
       let synth: SynthNode;
       if (track.customSampleUrl) {
-        synth = new Tone.Sampler({ urls: { [track.sound.note]: track.customSampleUrl } });
+        const player = new Tone.Player({ url: track.customSampleUrl });
+        player.reverse = track.sampleReverse;
+        if (track.samplePitchShift !== 0) {
+          player.playbackRate = Math.pow(2, track.samplePitchShift / 12);
+        }
+        synth = player;
       } else {
         synth = createSynth(track.sound);
       }
@@ -491,6 +569,37 @@ export function useAudioEngine() {
     return unsub;
   }, []);
 
+  // Sync macro control values to their audio targets in real-time
+  useEffect(() => {
+    let prevMacros = useEngineStore.getState().patterns[useEngineStore.getState().currentPattern]?.macros ?? [];
+    const unsub = useEngineStore.subscribe((state) => {
+      const macros = state.patterns[state.currentPattern]?.macros ?? [];
+      if (macros === prevMacros) return;
+      prevMacros = macros;
+      const now = Tone.now();
+      macros.forEach((macro) => {
+        macro.targets.forEach(({ target, min, max, curve }) => {
+          let scaled = min + macro.value * (max - min);
+          if (curve === "exp" && macro.value > 0) {
+            scaled = min * Math.pow(max / Math.max(min, 0.001), macro.value);
+          } else if (curve === "log") {
+            scaled = min + Math.log1p(macro.value * (Math.E - 1)) / 1 * (max - min);
+          }
+          scheduleAutomationValue(
+            target,
+            scaled,
+            now,
+            gainNodesRef.current,
+            panNodesRef.current,
+            fxChainsRef.current,
+            masterChainRef.current,
+          );
+        });
+      });
+    });
+    return unsub;
+  }, []);
+
   // Sync per-track effects (incl. auto-pan LFO state)
   useEffect(() => {
     const unsub = useEngineStore.subscribe((state) => {
@@ -522,29 +631,67 @@ export function useAudioEngine() {
     return unsub;
   }, []);
 
-  // Hot-swap synths when a custom sample is loaded or cleared
+  // Hot-swap synths when a custom sample is loaded/cleared, or reverse/pitch changes
   useEffect(() => {
     const prevUrls: (string | null)[] = useEngineStore
       .getState()
       .tracks.map((t) => t.customSampleUrl);
+    const prevReverse: boolean[] = useEngineStore
+      .getState()
+      .tracks.map((t) => t.sampleReverse);
+    const prevPitch: number[] = useEngineStore
+      .getState()
+      .tracks.map((t) => t.samplePitchShift);
 
     const unsub = useEngineStore.subscribe((state) => {
       state.tracks.forEach((track, i) => {
-        const prev = prevUrls[i] ?? null;
-        const curr = track.customSampleUrl;
-        if (curr === prev) return;
-        prevUrls[i] = curr;
+        const prevUrl = prevUrls[i] ?? null;
+        const currUrl = track.customSampleUrl;
+        const currReverse = track.sampleReverse;
+        const currPitch = track.samplePitchShift;
+
+        const urlChanged = currUrl !== prevUrl;
+        const reverseChanged = currReverse !== prevReverse[i];
+        const pitchChanged = currPitch !== prevPitch[i];
+
+        // Update in-place when only pitch changed and a Player is already loaded
+        if (!urlChanged && !reverseChanged && pitchChanged && currUrl) {
+          const existing = synthsRef.current[i];
+          if (existing instanceof Tone.Player) {
+            existing.playbackRate = Math.pow(2, currPitch / 12);
+            prevPitch[i] = currPitch;
+          }
+          return;
+        }
+
+        // Update reverse in-place when only reverse changed
+        if (!urlChanged && reverseChanged && !pitchChanged && currUrl) {
+          const existing = synthsRef.current[i];
+          if (existing instanceof Tone.Player) {
+            existing.reverse = currReverse;
+            prevReverse[i] = currReverse;
+          }
+          return;
+        }
+
+        if (!urlChanged) return;
+
+        prevUrls[i] = currUrl;
+        prevReverse[i] = currReverse;
+        prevPitch[i] = currPitch;
 
         const fx = fxChainsRef.current[i];
         if (!fx) return;
 
         const oldSynth = synthsRef.current[i];
-        if (curr) {
-          const sampler = new Tone.Sampler({
-            urls: { [track.sound.note]: curr },
+        if (currUrl) {
+          const player = new Tone.Player({
+            url: currUrl,
             onload: () => {
-              sampler.connect(fx.bitCrusher);
-              synthsRef.current[i] = sampler;
+              player.reverse = currReverse;
+              player.playbackRate = currPitch !== 0 ? Math.pow(2, currPitch / 12) : 1;
+              player.connect(fx.bitCrusher);
+              synthsRef.current[i] = player;
               oldSynth?.dispose();
             },
           });
@@ -647,6 +794,10 @@ export function useAudioEngine() {
             startState.switchPatternSilent(firstPattern);
           }
           startState.setChainPosition(0);
+          // Apply slot 0's BPM/swing override on initial play.
+          const meta0 = startState.chainMeta[0];
+          if (meta0?.bpmOverride != null) transport.bpm.value = meta0.bpmOverride;
+          if (meta0?.swingOverride != null) transport.swing = meta0.swingOverride;
         }
         needsChainAdvance = false;
 
@@ -654,13 +805,30 @@ export function useAudioEngine() {
           (time, stepIndex) => {
             // Advance chain at the start of a new loop iteration
             if (needsChainAdvance && stepIndex === 0) {
-              const { songMode, chain, chainPosition, switchPatternSilent, setChainPosition } =
+              const { songMode, chain, chainMeta, chainPosition, switchPatternSilent, setChainPosition } =
                 useEngineStore.getState();
               if (songMode && chain.length > 0) {
                 const nextPos = (chainPosition + 1) % chain.length;
                 const nextPattern = chain[nextPos];
                 switchPatternSilent(nextPattern);
                 setChainPosition(nextPos);
+                // Apply per-slot BPM/swing overrides when advancing the chain.
+                const meta = chainMeta[nextPos];
+                if (meta?.bpmOverride != null) {
+                  Tone.getTransport().bpm.value = meta.bpmOverride;
+                }
+                if (meta?.swingOverride != null) {
+                  Tone.getTransport().swing = meta.swingOverride;
+                }
+                if (meta?.bpmOverride == null || meta?.swingOverride == null) {
+                  const globalState = useEngineStore.getState();
+                  if (meta?.bpmOverride == null) {
+                    Tone.getTransport().bpm.value = globalState.bpm;
+                  }
+                  if (meta?.swingOverride == null) {
+                    Tone.getTransport().swing = globalState.swing;
+                  }
+                }
               }
               needsChainAdvance = false;
             }
@@ -675,6 +843,62 @@ export function useAudioEngine() {
             // each track can be staccato or held independent of the grid.
             const stepDurationSeconds = getStepDurationSeconds(currentState.bpm, totalSteps);
 
+            // ── Automation lanes ───────────────────────────────────────────
+            // Interpolate each enabled lane to the current position and
+            // schedule the value sample-accurately on the target AudioParam.
+            const position = totalSteps > 0 ? stepIndex / totalSteps : 0;
+            const automationLanes =
+              currentState.patterns[currentState.currentPattern]?.automation ?? [];
+            automationLanes.forEach((lane) => {
+              if (!lane.enabled || lane.points.length === 0) return;
+              const value = interpolateAutomation(lane.points, position);
+              if (value === null) return;
+              scheduleAutomationValue(
+                lane.target,
+                value,
+                time,
+                gainNodesRef.current,
+                panNodesRef.current,
+                fxChainsRef.current,
+                masterChainRef.current,
+              );
+            });
+
+            // ── Groove & humanization ──────────────────────────────────────
+            // Pre-compute per-step velocity multiplier and timing nudge from
+            // the active groove template and global humanize knobs. These are
+            // applied to every track uniformly — per-track nudge then stacks
+            // on top inside the track loop.
+            let grooveVelocityMult = 1.0;
+            let grooveTimingNudge = 0;
+            const grooveId = currentState.activeGroove;
+            if (grooveId) {
+              const template = currentState.grooveTemplates.find((g) => g.id === grooveId);
+              if (template) {
+                if (template.accentPattern.length > 0) {
+                  grooveVelocityMult = template.accentPattern[stepIndex % template.accentPattern.length];
+                }
+                if (template.velocityVariation > 0) {
+                  grooveVelocityMult *=
+                    1 + (Math.random() * 2 - 1) * template.velocityVariation * 0.5;
+                }
+                if (template.timingVariation > 0) {
+                  grooveTimingNudge =
+                    (Math.random() * 2 - 1) * template.timingVariation * stepDurationSeconds * 0.5;
+                }
+              }
+            }
+            // Global humanization knobs stack on top of groove template values.
+            const velHuman = currentState.globalVelocityHumanize ?? 0;
+            const timeHuman = currentState.globalTimingHumanize ?? 0;
+            if (velHuman > 0) {
+              grooveVelocityMult *= 1 + (Math.random() * 2 - 1) * velHuman * 0.25;
+            }
+            if (timeHuman > 0) {
+              grooveTimingNudge +=
+                (Math.random() * 2 - 1) * timeHuman * stepDurationSeconds * 0.25;
+            }
+
             currentTracks.forEach((track: Track, trackIndex: number) => {
               const velocity = track.steps[stepIndex];
               if (!velocity) return;
@@ -685,15 +909,72 @@ export function useAudioEngine() {
                 : !track.muted;
               if (!audible) return;
 
+              // Apply groove velocity multiplier (clamped so accented steps
+              // never clip and quiet steps don't disappear entirely).
+              const finalVelocity = Math.max(0.05, Math.min(1.0, velocity * grooveVelocityMult));
+
               const synth = synthsRef.current[trackIndex];
+              const fx = fxChainsRef.current[trackIndex];
               if (synth) {
-                const noteOverride = track.notes?.[stepIndex] || undefined;
+                let noteOverride = track.notes?.[stepIndex] || undefined;
                 const dur = stepDurationSeconds * (track.noteLength ?? 1.0);
-                const nudgeOffset = (track.nudge?.[stepIndex] ?? 0) * stepDurationSeconds;
-                triggerSynth(synth, track.sound, time + nudgeOffset, velocity, dur, noteOverride);
+                // Stack per-track micro-nudge with groove timing jitter.
+                const nudgeOffset =
+                  (track.nudge?.[stepIndex] ?? 0) * stepDurationSeconds + grooveTimingNudge;
+                
+                // Sample pitch shift: tone.Player uses playbackRate, already
+                // applied at load/hot-swap. For Sampler, transpose the triggered note.
+                if (synth instanceof Tone.Sampler && track.samplePitchShift !== 0) {
+                  const baseNote = noteOverride || track.sound.note;
+                  try {
+                    const baseMidi = Tone.Frequency(baseNote).toMidi();
+                    noteOverride = Tone.Frequency(baseMidi + track.samplePitchShift, "midi").toNote();
+                  } catch {
+                    // invalid note string — leave as-is
+                  }
+                }
+
+                // Per-step FX locks: apply merged overrides for this step,
+                // then restore the track's baseline after the step duration.
+                const stepLock = track.stepLocks?.[stepIndex];
+                if (stepLock && fx) {
+                  const triggerAt = time + nudgeOffset;
+                  const restoreAt = triggerAt + dur;
+                  // Apply locked values sample-accurately
+                  if (stepLock.filterFreq !== undefined)
+                    fx.filter.frequency.setValueAtTime(stepLock.filterFreq, triggerAt);
+                  if (stepLock.filterQ !== undefined)
+                    fx.filter.Q.setValueAtTime(stepLock.filterQ, triggerAt);
+                  if (stepLock.driveAmount !== undefined)
+                    fx.drive.wet.setValueAtTime(stepLock.driveOn ?? track.effects.driveOn ? stepLock.driveAmount : 0, triggerAt);
+                  if (stepLock.delayWet !== undefined)
+                    fx.delayGain.gain.setValueAtTime(stepLock.delayWet, triggerAt);
+                  if (stepLock.reverbWet !== undefined)
+                    fx.reverbGain.gain.setValueAtTime(stepLock.reverbWet, triggerAt);
+                  if (stepLock.bitCrushWet !== undefined)
+                    fx.bitCrusher.wet.setValueAtTime(stepLock.bitCrushWet, triggerAt);
+                  // Restore to track baseline after step
+                  const eff = track.effects;
+                  fx.filter.frequency.setValueAtTime(eff.filterOn ? eff.filterFreq : 20000, restoreAt);
+                  fx.filter.Q.setValueAtTime(eff.filterOn ? eff.filterQ : 1, restoreAt);
+                  fx.drive.wet.setValueAtTime(eff.driveOn ? eff.driveAmount : 0, restoreAt);
+                  fx.delayGain.gain.setValueAtTime(eff.delayOn ? eff.delayWet : 0, restoreAt);
+                  fx.reverbGain.gain.setValueAtTime(eff.reverbOn ? eff.reverbWet : 0, restoreAt);
+                  fx.bitCrusher.wet.setValueAtTime(eff.bitCrushOn ? eff.bitCrushWet : 0, restoreAt);
+                }
+
+                // Polyphonic chord support: if noteOverride contains commas, trigger each note
+                if (noteOverride && noteOverride.includes(",")) {
+                  const notes = noteOverride.split(",").filter((n) => n.trim());
+                  notes.forEach((n) => {
+                    triggerSynth(synth, track.sound, time + nudgeOffset, finalVelocity, dur, n.trim());
+                  });
+                } else {
+                  triggerSynth(synth, track.sound, time + nudgeOffset, finalVelocity, dur, noteOverride);
+                }
               }
 
-              const triggerTime = time + ((track.nudge?.[stepIndex] ?? 0) * stepDurationSeconds);
+              const triggerTime = time + ((track.nudge?.[stepIndex] ?? 0) * stepDurationSeconds) + grooveTimingNudge;
               currentTracks.forEach((target: Track, targetIdx: number) => {
                 if (!target.effects.sidechainOn) return;
                 if (target.effects.sidechainSource !== trackIndex) return;

@@ -8,6 +8,7 @@ import { ErrorChip } from "./ErrorChip";
 export function SongChain() {
   const songMode = useEngineStore((s) => s.songMode);
   const chain = useEngineStore((s) => s.chain);
+  const chainMeta = useEngineStore((s) => s.chainMeta);
   const chainPosition = useEngineStore((s) => s.chainPosition);
   const playbackState = useEngineStore((s) => s.playbackState);
   const currentPattern = useEngineStore((s) => s.currentPattern);
@@ -18,6 +19,8 @@ export function SongChain() {
   const setSongMode = useEngineStore((s) => s.setSongMode);
   const moveChainItem = useEngineStore((s) => s.moveChainItem);
   const applyBeatToSlot = useEngineStore((s) => s.applyBeatToSlot);
+  const setChainSlotMeta = useEngineStore((s) => s.setChainSlotMeta);
+  const globalBpm = useEngineStore((s) => s.bpm);
 
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
@@ -337,48 +340,100 @@ export function SongChain() {
               const isDropTarget = dragOver === position && dragFrom !== position;
               const patternName = patterns[patternIdx]?.name ?? PATTERN_LABELS[patternIdx];
               const customName = patternName !== PATTERN_LABELS[patternIdx];
+              const meta = chainMeta[position] ?? {};
+              const hasBpmOverride = meta.bpmOverride != null;
+              const hasSwingOverride = meta.swingOverride != null;
 
               return (
-                <button
+                <div
                   key={position}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, position)}
-                  onDragOver={(e) => handleDragOver(e, position)}
-                  onDrop={(e) => handleDrop(e, position)}
-                  onDragEnd={handleDragEnd}
-                  onClick={() => removeFromChain(position)}
-                  onKeyDown={(e) => handleChainKeyDown(e, position)}
-                  aria-current={isCurrent ? "step" : undefined}
-                  aria-describedby={dragFrom !== null ? "song-chain-drag-status" : undefined}
-                  aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown Delete"
-                  aria-label={`${position + 1}. ${patternName}${customName ? `, pattern ${PATTERN_LABELS[patternIdx]}` : ""}${isCurrent ? ", currently playing" : ""}. Click or press Enter to remove. Use Alt plus arrow keys to reorder.`}
-                  className={`group flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-all ${
+                  className={`rounded-lg border transition-all ${
                     isCurrent
                       ? "border-accent/50 bg-[linear-gradient(180deg,rgba(139,92,246,0.2),rgba(139,92,246,0.08)),rgba(12,16,25,0.82)] shadow-sm shadow-accent/30"
                       : isDropTarget
                         ? "border-accent bg-accent/20"
                         : isDragging
                           ? "border-white/5 bg-surface-3/50 opacity-40"
-                          : "border-border bg-surface-2 hover:border-danger/30 hover:bg-danger/10"
+                          : "border-border bg-surface-2"
                   }`}
-                  title={`${position + 1}. ${patternName}${customName ? ` (${PATTERN_LABELS[patternIdx]})` : ""} — drag to reorder · click to remove`}
                 >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background-2 text-[10px] font-bold text-muted">
-                    {position + 1}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-bold text-foreground">
-                      {patternName}
+                  {/* Main row — drag handle + label + remove */}
+                  <button
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, position)}
+                    onDragOver={(e) => handleDragOver(e, position)}
+                    onDrop={(e) => handleDrop(e, position)}
+                    onDragEnd={handleDragEnd}
+                    onClick={() => removeFromChain(position)}
+                    onKeyDown={(e) => handleChainKeyDown(e, position)}
+                    aria-current={isCurrent ? "step" : undefined}
+                    aria-describedby={dragFrom !== null ? "song-chain-drag-status" : undefined}
+                    aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown Delete"
+                    aria-label={`${position + 1}. ${patternName}${customName ? `, pattern ${PATTERN_LABELS[patternIdx]}` : ""}${isCurrent ? ", currently playing" : ""}. Click to remove.`}
+                    className="group flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-danger/10"
+                    title={`${position + 1}. ${patternName} — drag to reorder · click to remove`}
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background-2 text-[10px] font-bold text-muted">
+                      {position + 1}
                     </span>
-                    <span className="text-[9px] font-mono uppercase tracking-[0.18em] text-muted">
-                      Pattern {PATTERN_LABELS[patternIdx]}
-                      {isCurrent ? " · playing" : ""}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-bold text-foreground">
+                        {patternName}
+                      </span>
+                      <span className="text-[9px] font-mono uppercase tracking-[0.18em] text-muted">
+                        Pattern {PATTERN_LABELS[patternIdx]}
+                        {isCurrent ? " · playing" : ""}
+                        {meta.bpmOverride != null ? ` · ${meta.bpmOverride} BPM` : ""}
+                      </span>
                     </span>
-                  </span>
-                  <span className="rounded-full border border-border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-muted transition-colors group-hover:border-danger/30 group-hover:text-danger group-focus-visible:text-danger">
-                    Drag · Remove
-                  </span>
-                </button>
+                    <span className="rounded-full border border-border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-muted transition-colors group-hover:border-danger/30 group-hover:text-danger">
+                      Drag · Remove
+                    </span>
+                  </button>
+
+                  {/* Per-slot BPM + swing override controls */}
+                  <div className="flex items-center gap-2 border-t border-border/50 px-3 py-1.5">
+                    <span className="text-[9px] text-muted">BPM</span>
+                    <input
+                      type="number"
+                      min={40}
+                      max={300}
+                      step={1}
+                      value={meta.bpmOverride ?? ""}
+                      placeholder={String(globalBpm)}
+                      onChange={(e) => {
+                        const val = e.target.value === "" ? undefined : Number(e.target.value);
+                        setChainSlotMeta(position, { bpmOverride: val });
+                      }}
+                      className="w-16 rounded border border-border bg-background-2 px-1.5 py-0.5 text-[10px] text-foreground placeholder:text-muted/50 focus:border-accent focus:outline-none"
+                      title="Override BPM for this slot (leave blank to use global BPM)"
+                    />
+                    <span className="ml-1 text-[9px] text-muted">Swing</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={meta.swingOverride != null ? meta.swingOverride.toFixed(2) : ""}
+                      placeholder="—"
+                      onChange={(e) => {
+                        const val = e.target.value === "" ? undefined : Number(e.target.value);
+                        setChainSlotMeta(position, { swingOverride: val });
+                      }}
+                      className="w-16 rounded border border-border bg-background-2 px-1.5 py-0.5 text-[10px] text-foreground placeholder:text-muted/50 focus:border-accent focus:outline-none"
+                      title="Override swing for this slot (leave blank to use global swing)"
+                    />
+                    {(meta.bpmOverride != null || meta.swingOverride != null) && (
+                      <button
+                        onClick={() => setChainSlotMeta(position, { bpmOverride: undefined, swingOverride: undefined })}
+                        className="ml-auto text-[9px] text-muted hover:text-soft"
+                        title="Reset to global"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                </div>
               );
             })}
           </div>

@@ -133,6 +133,12 @@ export interface Track {
   // +0.5 = half a step late (behind the beat). This is the secret to groove —
   // slightly pushing or pulling individual hits creates human-feeling rhythms.
   nudge: number[];
+  // Per-step parameter locks (Elektron-style) — each step can override track FX.
+  // Sparse array: undefined entries use the track-level effect value.
+  stepLocks: Array<Partial<TrackEffects> | undefined>;
+  // Sample manipulation per track
+  sampleReverse: boolean;
+  samplePitchShift: number; // semitones -12..+12
 }
 
 // ── Automation types ─────────────────────────────────────────
@@ -184,6 +190,23 @@ export interface Pattern {
   probabilities: number[][];
   nudge: number[][];
   automation: AutomationLane[];
+  // Macro controls — up to 8 user-defined multi-parameter modulators.
+  // Each macro can control multiple targets simultaneously with individual
+  // depth scaling, enabling complex sound transformations from a single knob.
+  macros: MacroControl[];
+}
+
+// ── Macro control system ─────────────────────────────────────
+export interface MacroControl {
+  id: string;
+  name: string;
+  value: number; // 0..1
+  targets: Array<{
+    target: AutomationTarget;
+    min: number;
+    max: number;
+    curve: "linear" | "exp" | "log";
+  }>;
 }
 
 // ── Sample browser ───────────────────────────────────────────
@@ -271,6 +294,9 @@ export interface EngineState {
   pianoRollTrack: number | null;
 
   chain: number[];
+  // Parallel metadata for each chain slot. Index i corresponds to chain[i].
+  // undefined entries mean "use global BPM/swing".
+  chainMeta: Array<{ bpmOverride?: number; swingOverride?: number }>;
   songMode: boolean;
   chainPosition: number;
   trackClipboard: { steps: number[]; notes: string[]; probabilities: number[]; nudge: number[] } | null;
@@ -327,6 +353,7 @@ export interface EngineState {
   removeFromChain: (position: number) => void;
   clearChain: () => void;
   setChainPosition: (pos: number) => void;
+  setChainSlotMeta: (position: number, meta: { bpmOverride?: number; swingOverride?: number }) => void;
   switchPatternSilent: (index: number) => void;
   moveChainItem: (from: number, to: number) => void;
   renamePattern: (index: number, name: string) => void;
@@ -394,6 +421,18 @@ export interface EngineState {
 
   // ── AI Mix Assistant ──────────────────────────────────────
   autoMix: () => void;
+
+  // ── Per-step parameter locks ─────────────────────────────
+  setStepLock: (trackId: number, step: number, lock: Partial<TrackEffects> | undefined) => void;
+
+  // ── Sample manipulation ───────────────────────────────────
+  setSampleReverse: (trackId: number, reverse: boolean) => void;
+  setSamplePitchShift: (trackId: number, semitones: number) => void;
+
+  // ── Macro controls ───────────────────────────────────────
+  upsertMacro: (macro: MacroControl) => void;
+  removeMacro: (macroId: string) => void;
+  setMacroValue: (macroId: string, value: number) => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -518,6 +557,9 @@ function createTracks(totalSteps: number, preset?: PatternPreset): Track[] {
     customSampleName: null,
     noteLength: 1.0,
     nudge: Array(totalSteps).fill(0),
+    stepLocks: Array(totalSteps).fill(undefined),
+    sampleReverse: false,
+    samplePitchShift: 0,
   }));
 }
 
@@ -659,6 +701,7 @@ function createEmptyPattern(name: string, trackCount: number, totalSteps: number
     probabilities: Array.from({ length: trackCount }, () => Array(totalSteps).fill(1.0)),
     nudge: Array.from({ length: trackCount }, () => Array(totalSteps).fill(0)),
     automation: [],
+    macros: [],
   };
 }
 
@@ -672,6 +715,7 @@ function createPatternFromPreset(preset: PatternPreset, trackCount: number, tota
     probabilities: Array.from({ length: trackCount }, () => Array(totalSteps).fill(1.0)),
     nudge: Array.from({ length: trackCount }, () => Array(totalSteps).fill(0)),
     automation: [],
+    macros: [],
   };
 }
 
@@ -723,6 +767,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
   currentPattern: 0,
 
   chain: [],
+  chainMeta: [],
   songMode: false,
   chainPosition: 0,
   trackClipboard: null,
@@ -876,20 +921,39 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         const currentVelocity = t.steps[step];
         const currentNote = t.notes[step];
 
-        if (currentVelocity > 0 && currentNote === note) {
+        // Polyphonic chord support: notes stored as comma-separated string.
+        // Single note "C4", chord "C4,E4,G4". When the user clicks the same
+        // note twice, we remove it from the chord (or clear the step if it's
+        // the last note). When they click a new note, we add it to the chord.
+        const existingNotes = currentNote ? currentNote.split(",") : [];
+        const noteIndex = existingNotes.indexOf(note);
+
+        if (currentVelocity > 0 && noteIndex >= 0) {
+          // Remove this note from the chord
+          const updatedNotes = existingNotes.filter((n) => n !== note);
+          if (updatedNotes.length === 0) {
+            // Last note removed — clear the step
+            return {
+              ...t,
+              steps: t.steps.map((s, i) => (i === step ? 0 : s)),
+              notes: t.notes.map((n, i) => (i === step ? "" : n)),
+              probabilities: t.probabilities.map((p, i) => (i === step ? 1.0 : p)),
+              nudge: t.nudge.map((n, i) => (i === step ? 0 : n)),
+            };
+          }
+          // Some notes remain — update the chord string
           return {
             ...t,
-            steps: t.steps.map((s, i) => (i === step ? 0 : s)),
-            notes: t.notes.map((n, i) => (i === step ? "" : n)),
-            probabilities: t.probabilities.map((p, i) => (i === step ? 1.0 : p)),
-            nudge: t.nudge.map((n, i) => (i === step ? 0 : n)),
+            notes: t.notes.map((n, i) => (i === step ? updatedNotes.join(",") : n)),
           };
         }
 
+        // Add the note to the chord (or create a new step if empty)
+        const updatedNotes = currentVelocity > 0 ? [...existingNotes, note] : [note];
         return {
           ...t,
           steps: t.steps.map((s, i) => (i === step ? (s > 0 ? s : 1.0) : s)),
-          notes: t.notes.map((n, i) => (i === step ? note : n)),
+          notes: t.notes.map((n, i) => (i === step ? updatedNotes.join(",") : n)),
         };
       }),
     }));
@@ -1088,23 +1152,35 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
   addToChain: (patternIndex) => {
     if (patternIndex < 0 || patternIndex >= MAX_PATTERNS) return;
     pushHistory();
-    set((state) => ({ chain: [...state.chain, patternIndex] }));
+    set((state) => ({
+      chain: [...state.chain, patternIndex],
+      chainMeta: [...state.chainMeta, {}],
+    }));
   },
 
   removeFromChain: (position) => {
     pushHistory();
     set((state) => ({
       chain: state.chain.filter((_, i) => i !== position),
+      chainMeta: state.chainMeta.filter((_, i) => i !== position),
       chainPosition: Math.max(0, Math.min(state.chainPosition, state.chain.length - 2)),
     }));
   },
 
   clearChain: () => {
     pushHistory();
-    set({ chain: [], chainPosition: 0 });
+    set({ chain: [], chainMeta: [], chainPosition: 0 });
   },
 
   setChainPosition: (pos) => set({ chainPosition: pos }),
+
+  setChainSlotMeta: (position, meta) => {
+    set((state) => {
+      const next = [...state.chainMeta];
+      next[position] = { ...next[position], ...meta };
+      return { chainMeta: next };
+    });
+  },
 
   moveChainItem: (from, to) => {
     pushHistory();
@@ -1121,7 +1197,10 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
       const next = [...state.chain];
       const [item] = next.splice(from, 1);
       next.splice(to, 0, item);
-      return { chain: next };
+      const nextMeta = [...state.chainMeta];
+      const [metaItem] = nextMeta.splice(from, 1);
+      nextMeta.splice(to, 0, metaItem);
+      return { chain: next, chainMeta: nextMeta };
     });
   },
 
@@ -1375,7 +1454,7 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
     }));
 
     // Set chain + enable song mode
-    set({ chain: input.chain, chainPosition: 0, songMode: true });
+    set({ chain: input.chain, chainMeta: input.chain.map(() => ({})), chainPosition: 0, songMode: true });
   },
 
   switchPatternSilent: (index) => {
@@ -1574,6 +1653,9 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
           customSampleName: data.tracks[i]?.customSampleName ?? null,
           noteLength: data.tracks[i]?.noteLength ?? 1.0,
           nudge: data.tracks[i]?.nudge ?? Array(data.totalSteps).fill(0),
+          stepLocks: Array(data.totalSteps).fill(undefined),
+          sampleReverse: false,
+          samplePitchShift: 0,
         })),
         patterns: data.patterns
           ? data.patterns.map((p, i) => ({
@@ -1595,9 +1677,11 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
                 Array(data.totalSteps).fill(0).map((_, stepIdx) => p.nudge?.[trackIdx]?.[stepIdx] ?? 0)
               ),
               automation: p.automation ?? [],
+              macros: [],
             }))
           : state.patterns,
         chain: data.chain ?? [],
+        chainMeta: (data.chain ?? []).map(() => ({})),
         songMode: data.songMode ?? false,
         chainPosition: 0,
         // Merge default master onto the saved bus so older sessions pick up
@@ -2007,5 +2091,80 @@ export const useEngineStore = create<EngineState>()((set, get) => ({
         }
       };
     });
-  }
+  },
+
+  // ── Per-step parameter locks ─────────────────────────────────
+  setStepLock: (trackId, step, lock) => {
+    set((state) => ({
+      tracks: state.tracks.map((t) =>
+        t.id === trackId
+          ? {
+              ...t,
+              stepLocks: t.stepLocks.map((l, i) => (i === step ? lock : l)),
+            }
+          : t
+      ),
+    }));
+  },
+
+  // ── Sample manipulation ───────────────────────────────────────
+  setSampleReverse: (trackId, reverse) => {
+    set((state) => ({
+      tracks: state.tracks.map((t) =>
+        t.id === trackId ? { ...t, sampleReverse: reverse } : t
+      ),
+    }));
+  },
+
+  setSamplePitchShift: (trackId, semitones) => {
+    set((state) => ({
+      tracks: state.tracks.map((t) =>
+        t.id === trackId
+          ? { ...t, samplePitchShift: Math.max(-12, Math.min(12, semitones)) }
+          : t
+      ),
+    }));
+  },
+
+  // ── Macro controls ────────────────────────────────────────────
+  upsertMacro: (macro) => {
+    set((state) => {
+      const pattern = state.patterns[state.currentPattern];
+      const existing = pattern.macros.findIndex((m) => m.id === macro.id);
+      const newMacros =
+        existing >= 0
+          ? pattern.macros.map((m) => (m.id === macro.id ? macro : m))
+          : [...pattern.macros, macro];
+      return {
+        patterns: state.patterns.map((p, i) =>
+          i === state.currentPattern ? { ...p, macros: newMacros } : p
+        ),
+      };
+    });
+  },
+
+  removeMacro: (macroId) => {
+    set((state) => ({
+      patterns: state.patterns.map((p, i) =>
+        i === state.currentPattern
+          ? { ...p, macros: p.macros.filter((m) => m.id !== macroId) }
+          : p
+      ),
+    }));
+  },
+
+  setMacroValue: (macroId, value) => {
+    set((state) => ({
+      patterns: state.patterns.map((p, i) =>
+        i === state.currentPattern
+          ? {
+              ...p,
+              macros: p.macros.map((m) =>
+                m.id === macroId ? { ...m, value: Math.max(0, Math.min(1, value)) } : m
+              ),
+            }
+          : p
+      ),
+    }));
+  },
 }));

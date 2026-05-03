@@ -18,6 +18,7 @@ export function StepDetailPopover({ trackId, step, anchorRect, onClose }: StepDe
   const setStepProbability = useEngineStore((s) => s.setStepProbability);
   const setStepNudge = useEngineStore((s) => s.setStepNudge);
   const setStepNote = useEngineStore((s) => s.setStepNote);
+  const setStepLock = useEngineStore((s) => s.setStepLock);
 
   const velocity = track?.steps[step] ?? 0;
   const probability = track?.probabilities[step] ?? 1;
@@ -25,6 +26,7 @@ export function StepDetailPopover({ trackId, step, anchorRect, onClose }: StepDe
   const note = track?.notes[step] ?? "";
   const isMelodic = track?.sound.melodic ?? false;
   const noteRange = track?.sound.noteRange;
+  const stepLock = track?.stepLocks?.[step];
 
   const notes = isMelodic && noteRange
     ? generateNoteRange(noteRange[0], noteRange[1])
@@ -82,8 +84,9 @@ export function StepDetailPopover({ trackId, step, anchorRect, onClose }: StepDe
     return null;
   }
 
+  const fxLockActive = stepLock && Object.keys(stepLock).length > 0;
   const popoverWidth = 220;
-  const popoverHeight = isMelodic ? 210 : 170;
+  const popoverHeight = isMelodic ? 350 : 310;
   let left = anchorRect.left + anchorRect.width / 2 - popoverWidth / 2;
   let top = anchorRect.bottom + 6;
 
@@ -187,6 +190,78 @@ export function StepDetailPopover({ trackId, step, anchorRect, onClose }: StepDe
             </select>
           </div>
         )}
+
+        {/* Per-step FX locks */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted">
+              Step Lock
+            </span>
+            {fxLockActive && (
+              <button
+                type="button"
+                onClick={() => setStepLock(trackId, step, undefined)}
+                className="text-[9px] text-amber-400 hover:text-amber-200"
+              >
+                clear
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
+            {(
+              [
+                ["Filter", "filterFreq", track.effects.filterFreq, 200, 20000] as const,
+                ["Drive", "driveAmount", track.effects.driveAmount, 0, 1] as const,
+                ["Delay", "delayWet", track.effects.delayWet, 0, 1] as const,
+                ["Reverb", "reverbWet", track.effects.reverbWet, 0, 1] as const,
+              ] as const
+            ).map(([label, key, trackDefault, min, max]) => {
+              const locked = stepLock?.[key];
+              const isLocked = locked !== undefined;
+              return (
+                <div key={key}>
+                  <div className="flex items-center justify-between">
+                    <label className={`text-[9px] ${isLocked ? "text-amber-300" : "text-muted"}`}>
+                      {label}
+                    </label>
+                    <button
+                      type="button"
+                      className={`text-[8px] px-1 rounded ${isLocked ? "text-amber-300 bg-amber-300/10" : "text-muted/50"}`}
+                      onClick={() => {
+                        if (isLocked) {
+                          const next = { ...(stepLock ?? {}) };
+                          delete next[key];
+                          setStepLock(trackId, step, Object.keys(next).length > 0 ? next : undefined);
+                        } else {
+                          setStepLock(trackId, step, { ...(stepLock ?? {}), [key]: trackDefault });
+                        }
+                      }}
+                    >
+                      {isLocked ? "on" : "off"}
+                    </button>
+                  </div>
+                  {isLocked && (
+                    <input
+                      type="range"
+                      min={min}
+                      max={max}
+                      step={(max - min) / 200}
+                      value={locked}
+                      onChange={(e) =>
+                        setStepLock(trackId, step, {
+                          ...(stepLock ?? {}),
+                          [key]: parseFloat(e.target.value),
+                        })
+                      }
+                      className="w-full h-1 appearance-none rounded-full cursor-pointer"
+                      style={{ accentColor: "#f59e0b" }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );

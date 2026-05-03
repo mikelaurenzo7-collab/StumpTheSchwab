@@ -523,6 +523,12 @@ const ChannelStrip = memo(function ChannelStrip({
     effects.panLfoOn ||
     effects.modLfoOn;
 
+  // Sample manipulation controls (direct store reads, avoids prop-threading)
+  const sampleReverse = useEngineStore((s) => s.tracks[trackId]?.sampleReverse ?? false);
+  const samplePitchShift = useEngineStore((s) => s.tracks[trackId]?.samplePitchShift ?? 0);
+  const setSampleReverse = useEngineStore((s) => s.setSampleReverse);
+  const setSamplePitchShift = useEngineStore((s) => s.setSamplePitchShift);
+
   // Brief flash on the track dot when this track is performance-triggered
   // (Q-I keys). The audio engine dispatches "sts-track-trigger" with the
   // track index; flash fades via CSS transition.
@@ -580,6 +586,39 @@ const ChannelStrip = memo(function ChannelStrip({
             </button>
           )}
         </div>
+
+        {/* Sample reverse + pitch — only when a sample is loaded */}
+        {hasSample && (
+          <div className="w-full space-y-1">
+            <button
+              onClick={() => setSampleReverse(trackId, !sampleReverse)}
+              className={`w-full h-5 rounded-lg text-[8px] font-bold transition-colors ${
+                sampleReverse ? "bg-accent/30 text-accent" : "button-secondary text-muted"
+              }`}
+              title="Reverse sample playback"
+            >
+              {sampleReverse ? "⟵ REV" : "REV"}
+            </button>
+            <div title={`Pitch shift: ${samplePitchShift > 0 ? "+" : ""}${samplePitchShift} st`}>
+              <input
+                type="range"
+                min={-12}
+                max={12}
+                step={1}
+                value={samplePitchShift}
+                onChange={(e) => setSamplePitchShift(trackId, parseInt(e.target.value))}
+                onDoubleClick={() => setSamplePitchShift(trackId, 0)}
+                className="w-full h-1 appearance-none rounded-full cursor-pointer"
+                style={{ accentColor: color }}
+              />
+              <div className="flex justify-between text-[8px] text-muted/60 -mt-0.5">
+                <span>-12</span>
+                <span className="text-muted">{samplePitchShift > 0 ? "+" : ""}{samplePitchShift}</span>
+                <span>+12</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Sound editor — tweak synth params, swap voice */}
         <button

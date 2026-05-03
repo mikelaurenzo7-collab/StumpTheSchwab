@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import { useEngineStore } from "@/store/engine";
+import { useEngineStore, type GeneratedBeat } from "@/store/engine";
 import { DEFAULT_KIT } from "@/lib/sounds";
 import {
   suggestArrangements,
@@ -37,6 +37,8 @@ export function ArrangementPanel() {
   const bpm = useEngineStore((s) => s.bpm);
   const swing = useEngineStore((s) => s.swing);
   const addToChain = useEngineStore((s) => s.addToChain);
+  const clearChain = useEngineStore((s) => s.clearChain);
+  const applyBeatToSlot = useEngineStore((s) => s.applyBeatToSlot);
   const setSongMode = useEngineStore((s) => s.setSongMode);
   const chain = useEngineStore((s) => s.chain);
 
@@ -62,15 +64,101 @@ export function ArrangementPanel() {
 
   const applyArrangement = useCallback(() => {
     if (!current) return;
-    // Enable song mode and build a chain that represents the arrangement
-    setSongMode(true);
-    // For now, we use the current pattern repeated with section context
-    // A full implementation would create pattern variations per section
-    const patternCount = Math.min(current.sections.length, 8);
-    for (let i = 0; i < patternCount; i++) {
-      addToChain(i % 8);
+
+    const state = useEngineStore.getState();
+    const TRACK_KEYS = ["kick","snare","hihat","openhat","clap","tom","perc","bass"] as const;
+    type TKey = typeof TRACK_KEYS[number];
+
+    // Map section index → pattern slot.
+    // Section 0 always uses the current (seed) slot; remaining sections get
+    // sequential slots wrapping around and skipping the seed slot.
+    const seedSlot = state.currentPattern;
+    const availableSlots: number[] = [];
+    for (let i = 0; i < 8; i++) {
+      if (i !== seedSlot) availableSlots.push(i);
     }
-  }, [current, setSongMode, addToChain]);
+
+    setSongMode(true);
+    clearChain();
+
+    const sectionSlots: number[] = [];
+
+    current.sections.forEach((section, sectionIdx) => {
+      const slot = sectionIdx === 0
+        ? seedSlot
+        : (availableSlots[sectionIdx - 1] ?? seedSlot);
+      sectionSlots.push(slot);
+
+      // Slot 0 is the untouched seed — leave it in place.
+      if (sectionIdx === 0) return;
+      if (slot === seedSlot) return; // wrapped around — don't overwrite seed
+
+      const mods = section.patternModifications;
+
+      const tracksObj: Record<string, number[]> = {};
+      const melodicNotes: Record<string, string[]> = { tom: [], perc: [], bass: [] };
+
+      TRACK_KEYS.forEach((key, i) => {
+        const track = state.tracks[i];
+        const targetDensity = mods.trackDensities[key] ?? null;
+        const velMult = mods.velocityMultiplier;
+
+        let steps = [...track.steps];
+
+        // Scale step density by randomly dropping active steps.
+        if (targetDensity !== null) {
+          const activeCnt = steps.filter((v) => v > 0).length;
+          const currentDensity = activeCnt / (steps.length || 1);
+          if (targetDensity < currentDensity && currentDensity > 0) {
+            const keepRatio = targetDensity / currentDensity;
+            steps = steps.map((v) => (v > 0 && Math.random() > keepRatio) ? 0 : v);
+          } else if (targetDensity > currentDensity) {
+            // Add steps randomly to reach higher density (e.g. drop section).
+            const need = Math.round((targetDensity - currentDensity) * steps.length);
+            const emptyIdxs = steps.map((v, i) => v === 0 ? i : -1).filter((i) => i >= 0);
+            for (let n = 0; n < need && emptyIdxs.length > 0; n++) {
+              const pick = Math.floor(Math.random() * emptyIdxs.length);
+              steps[emptyIdxs[pick]] = 1.0;
+              emptyIdxs.splice(pick, 1);
+            }
+          }
+        }
+
+        // Scale velocities and clamp.
+        steps = steps.map((v) =>
+          v > 0 ? Math.max(0.25, Math.min(1.0, v * velMult)) : 0
+        );
+
+        tracksObj[key] = steps;
+        if (key === "tom" || key === "perc" || key === "bass") {
+          melodicNotes[key as "tom" | "perc" | "bass"] = [...track.notes];
+        }
+      });
+
+      const beat: GeneratedBeat = {
+        name: `${state.patterns[seedSlot]?.name ?? "Pat"} — ${section.type}`,
+        bpm: state.bpm,
+        swing: Math.max(0, Math.min(1, state.swing + mods.swingAdjust)),
+        totalSteps: state.totalSteps as 16 | 32,
+        tracks: tracksObj as GeneratedBeat["tracks"],
+        melodicNotes: melodicNotes as GeneratedBeat["melodicNotes"],
+        explanation: mods.description,
+      };
+
+      applyBeatToSlot(slot, beat);
+    });
+
+    // Build chain: repeat each section's slot proportionally to its bar count.
+    // We use ceil(bars/4) repeats so a 4-bar section appears once and an
+    // 8-bar section appears twice, giving the chain a convincing song shape.
+    current.sections.forEach((section, sectionIdx) => {
+      const slot = sectionSlots[sectionIdx];
+      const chainRepeats = Math.max(1, Math.ceil(section.bars / 4));
+      for (let r = 0; r < chainRepeats; r++) {
+        addToChain(slot);
+      }
+    });
+  }, [current, setSongMode, clearChain, addToChain, applyBeatToSlot]);
 
   return (
     <div className="flex flex-col gap-3">

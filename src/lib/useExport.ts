@@ -15,7 +15,8 @@ type SynthNode =
   | Tone.AMSynth
   | Tone.FMSynth
   | Tone.MonoSynth
-  | Tone.Sampler;
+  | Tone.Sampler
+  | Tone.Player;
 
 function createOfflineSynth(sound: TrackSound): SynthNode {
   const opts = (sound.options ?? {}) as Record<string, unknown>;
@@ -249,7 +250,11 @@ function triggerOfflineSynth(
   duration: number,
   noteOverride?: string,
 ) {
-  if (synth instanceof Tone.NoiseSynth) {
+  if (synth instanceof Tone.Player) {
+    const dbVelocity = 20 * Math.log10(Math.max(0.001, velocity));
+    synth.volume.setValueAtTime(dbVelocity, time);
+    synth.start(time);
+  } else if (synth instanceof Tone.NoiseSynth) {
     synth.triggerAttackRelease(duration, time, velocity);
   } else if (synth instanceof Tone.Sampler) {
     if (!synth.loaded) return;
@@ -476,9 +481,16 @@ async function renderOfflineAudio(
           lfo.start(0);
         }
 
-        synth = trackRender.sourceTrack.customSampleUrl
-          ? new Tone.Sampler({ urls: { [trackRender.sourceTrack.sound.note]: trackRender.sourceTrack.customSampleUrl } })
-          : createOfflineSynth(trackRender.sourceTrack.sound);
+        if (trackRender.sourceTrack.customSampleUrl) {
+          const player = new Tone.Player({ url: trackRender.sourceTrack.customSampleUrl });
+          player.reverse = trackRender.sourceTrack.sampleReverse;
+          if (trackRender.sourceTrack.samplePitchShift !== 0) {
+            player.playbackRate = Math.pow(2, trackRender.sourceTrack.samplePitchShift / 12);
+          }
+          synth = player;
+        } else {
+          synth = createOfflineSynth(trackRender.sourceTrack.sound);
+        }
 
         if (passOptions.includeTrackFX) {
           const drive = new Tone.Distortion({

@@ -21,6 +21,7 @@ import { AutoMixPanel } from "@/components/AutoMixPanel";
 import { ArrangementPanel } from "@/components/ArrangementPanel";
 import { CommandPalette } from "@/components/CommandPalette";
 import { MidiPanel } from "@/components/MidiPanel";
+import { MacroPanel } from "@/components/MacroPanel";
 import { useAudioEngine } from "@/lib/useAudioEngine";
 import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
 import { useMidi } from "@/lib/useMidi";
@@ -36,6 +37,7 @@ const TABS = [
   { id: "automation", label: "Auto" },
   { id: "fill", label: "Fill" },
   { id: "mix", label: "Mix" },
+  { id: "macros", label: "Macros" },
   { id: "arrange-ai", label: "Arrange+" },
   { id: "performance", label: "Perf" },
   { id: "samples", label: "Samples" },
@@ -172,6 +174,12 @@ export default function DAW() {
             <div className="panel rounded-lg p-3">
               <SectionHeader eyebrow="AI" title="AutoMix" />
               <AutoMixPanel />
+            </div>
+          )}
+
+          {sidebarTab === "macros" && (
+            <div className="panel rounded-lg">
+              <MacroPanel />
             </div>
           )}
 

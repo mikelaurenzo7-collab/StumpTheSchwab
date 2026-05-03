@@ -70,7 +70,8 @@ export function PianoRoll() {
   const notesTopDown = [...noteRange].reverse();
 
   const handleMouseDown = (step: number, note: string) => {
-    const isActive = track.steps[step] > 0 && track.notes[step] === note;
+    const stepNotes = track.notes[step] ? track.notes[step].split(",") : [];
+    const isActive = track.steps[step] > 0 && stepNotes.includes(note);
     paintModeRef.current = isActive ? "remove" : "add";
     paintNoteRef.current = note;
     lastPaintedRef.current = `${step}-${note}`;
@@ -84,7 +85,8 @@ export function PianoRoll() {
     if (key === lastPaintedRef.current) return;
     lastPaintedRef.current = key;
 
-    const isActive = track.steps[step] > 0 && track.notes[step] === note;
+    const stepNotes = track.notes[step] ? track.notes[step].split(",") : [];
+    const isActive = track.steps[step] > 0 && stepNotes.includes(note);
     if (paintModeRef.current === "add" && !isActive) {
       pianoRollToggleNote(pianoRollTrack, step, note);
     } else if (paintModeRef.current === "remove" && isActive) {
@@ -174,7 +176,9 @@ export function PianoRoll() {
                 >
                   {track.steps.map((velocity, stepIdx) => {
                     const stepNote = track.notes[stepIdx];
-                    const isActiveHere = velocity > 0 && stepNote === note;
+                    // Polyphonic chord support: check if this note is included in a comma-separated list
+                    const stepNotes = stepNote ? stepNote.split(",") : [];
+                    const isActiveHere = velocity > 0 && stepNotes.includes(note);
 
                     return (
                       <NoteCell
